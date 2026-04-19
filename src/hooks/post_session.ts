@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
@@ -14,6 +14,15 @@ import { projectDir } from '../config.js';
 import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
+import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
+import { embedMissing } from '../core/reindex.js';
+import {
+  FileFingerprintStore,
+  matchesAnyGlob,
+  statFile,
+  summarizeFile,
+  summaryHash,
+} from '../core/file_summary.js';
 import type { Config } from '../core/schema.js';
 
 export const HookPayloadSchema = z
@@ -87,6 +96,63 @@ function populateCache(
   return inserted;
 }
 
+function collectSessionFiles(turns: ReturnType<typeof parseTranscript>): string[] {
+  const set = new Set<string>();
+  for (const t of turns) {
+    for (const f of t.files_touched ?? []) set.add(f);
+  }
+  return [...set];
+}
+
+async function populateFileSummaries(
+  db: DB,
+  turns: ReturnType<typeof parseTranscript>,
+  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller },
+): Promise<number> {
+  const paths = collectSessionFiles(turns);
+  if (paths.length === 0) return 0;
+  const store = new FileFingerprintStore(db);
+  const { exclude_globs, min_file_size_tokens } = opts.config.file_gating;
+  let generated = 0;
+
+  for (const path of paths) {
+    if (matchesAnyGlob(path, exclude_globs)) continue;
+    const stat = statFile(path, { cwd: opts.cwd });
+    if (!stat || stat.tokens < min_file_size_tokens) continue;
+
+    const existing = store.get(opts.projectId, path);
+    if (existing && existing.content_hash === stat.contentHash && existing.summary) continue;
+
+    const abs = isAbsolute(path) ? path : resolvePath(opts.cwd, path);
+    let contents: string;
+    try {
+      contents = readFileSync(abs, 'utf8');
+    } catch {
+      continue;
+    }
+
+    try {
+      const { summary } = await summarizeFile(path, contents, {
+        model: opts.config.extraction.model,
+        caller: opts.caller,
+      });
+      store.upsert({
+        project_id: opts.projectId,
+        path,
+        content_hash: stat.contentHash,
+        mtime: stat.mtime,
+        tokens: stat.tokens,
+        summary,
+        summary_hash: summaryHash(summary),
+      });
+      generated += 1;
+    } catch (err) {
+      console.error(`[somtum] summarize ${path} failed: ${(err as Error).message}`);
+    }
+  }
+  return generated;
+}
+
 export interface RunOptions {
   cwd?: string;
   config?: Config;
@@ -105,6 +171,8 @@ export interface RunResult {
   tokensSavedTotal: number;
   indexPath: string;
   cacheEntriesAdded: number;
+  embeddingsAdded: number;
+  summariesGenerated: number;
 }
 
 export async function runPostSession(payload: HookPayload, opts: RunOptions = {}): Promise<RunResult> {
@@ -170,6 +238,21 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
       ? populateCache(db, resolved.turns, { cwd, model: config.extraction.model })
       : 0;
 
+    let embeddingsAdded = 0;
+    if (config.retrieval.embeddings.enabled) {
+      ensureEmbedderConfigured(config);
+      try {
+        const r = await embedMissing(db, projectId);
+        embeddingsAdded = r.embedded;
+      } catch (err) {
+        console.error(`[somtum] embedding failed: ${(err as Error).message}`);
+      }
+    }
+
+    const summariesGenerated = config.file_gating.enabled
+      ? await populateFileSummaries(db, resolved.turns, { cwd, projectId, config, caller })
+      : 0;
+
     generateIndex({
       projectName,
       projectId,
@@ -186,6 +269,8 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
       tokensSavedTotal,
       indexPath,
       cacheEntriesAdded,
+      embeddingsAdded,
+      summariesGenerated,
     };
   } finally {
     if (ownsDb) db.close();
@@ -203,6 +288,7 @@ export async function main(): Promise<void> {
         ok: true,
         inserted: result.inserted,
         cache_entries_added: result.cacheEntriesAdded,
+        summaries_generated: result.summariesGenerated,
         tokens_spent_estimated: result.tokensSpent,
         tokens_saved_total_estimated: result.tokensSavedTotal,
       }),

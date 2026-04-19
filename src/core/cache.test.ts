@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DB } from './db.js';
 import { PromptCache, hashPrompt, normalizePrompt } from './cache.js';
+import { EMBEDDING_DIM, encodeVector, type Embedder } from './embeddings.js';
 
 let tmp: string;
 let db: DB;
@@ -79,5 +80,42 @@ describe('PromptCache', () => {
     });
     cache.invalidate(entry.id);
     expect(cache.lookupByHash(hash)).toBeNull();
+  });
+
+  it('lookupFuzzy returns the nearest entry above threshold', async () => {
+    const vec = (seed: number): Float32Array => {
+      const v = new Float32Array(EMBEDDING_DIM);
+      v[seed] = 1;
+      return v;
+    };
+    // A near-identity embedder: returns a fixed vector per text.
+    const embeddings: Record<string, Float32Array> = {
+      'how do I debug the cache': vec(0),
+      'how can I debug caches': vec(0), // aliased to the stored entry
+      'what is the current time': vec(50),
+    };
+    const embedder: Embedder = {
+      name: 'mock',
+      dim: EMBEDDING_DIM,
+      async embed(texts: string[]): Promise<Float32Array[]> {
+        return texts.map((t) => embeddings[t] ?? new Float32Array(EMBEDDING_DIM));
+      },
+    };
+
+    const stored = cache.put({
+      prompt_hash: hashPrompt('how do I debug the cache'),
+      prompt_text: 'how do I debug the cache',
+      response: 'enable debug logging',
+      model: 'm',
+      context_fingerprint: 'fp',
+      prompt_embedding: encodeVector(vec(0)),
+    });
+
+    const hit = await cache.lookupFuzzy('how can I debug caches', embedder, 0.9);
+    expect(hit?.entry.id).toBe(stored.id);
+    expect(hit?.similarity).toBeCloseTo(1, 3);
+
+    const miss = await cache.lookupFuzzy('what is the current time', embedder, 0.9);
+    expect(miss).toBeNull();
   });
 });

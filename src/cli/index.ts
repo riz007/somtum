@@ -5,6 +5,7 @@ import { statsCommand } from './stats.js';
 import { searchCommand } from './search.js';
 import { showCommand } from './show.js';
 import { hookCommand } from './hook.js';
+import { reindexCommand } from './reindex.js';
 import { runMcpServer } from '../mcp/server.js';
 
 const program = new Command();
@@ -30,6 +31,15 @@ program
       mcp: opts.mcp,
       all: opts.all,
     });
+    process.exit(code);
+  });
+
+program
+  .command('reindex')
+  .description('Embed any observations that are missing a vector (for hybrid/embeddings retrieval)')
+  .option('--json', 'Emit JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const code = await reindexCommand({ json: opts.json ?? false });
     process.exit(code);
   });
 

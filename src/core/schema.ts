@@ -119,7 +119,10 @@ export const ConfigSchema = z.object({
     .default({}),
   retrieval: z
     .object({
-      strategy: RetrievalStrategy.default('bm25'),
+      // Default is hybrid; it degrades to BM25 automatically when embeddings
+      // are disabled or the model hasn't been downloaded yet, so it's safe
+      // as a default even on fresh installs.
+      strategy: RetrievalStrategy.default('hybrid'),
       k: z.number().int().positive().default(8),
       rerank_model: z.string().default('claude-haiku-4-5-20251001'),
       bm25: z.object({ enabled: z.boolean().default(true) }).default({}),

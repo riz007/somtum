@@ -24,7 +24,7 @@ describe('loadConfig', () => {
       global: join(globalDir, 'config.json'),
     });
     expect(cfg.cache.enabled).toBe(true);
-    expect(cfg.retrieval.strategy).toBe('bm25');
+    expect(cfg.retrieval.strategy).toBe('hybrid');
   });
 
   it('project config overrides global', () => {

@@ -124,6 +124,33 @@ export class MemoryStore {
     return row.n;
   }
 
+  setEmbedding(id: string, embedding: Buffer): void {
+    this.db
+      .prepare(`UPDATE observations SET embedding = ? WHERE id = ?`)
+      .run(embedding, id);
+  }
+
+  listMissingEmbeddings(projectId: string, limit: number = 1000): Observation[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL AND embedding IS NULL
+         ORDER BY created_at ASC LIMIT ?`,
+      )
+      .all(projectId, Math.floor(limit)) as ObservationRow[];
+    return rows.map(rowToObservation);
+  }
+
+  listWithEmbeddings(projectId: string): { id: string; embedding: Buffer }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, embedding FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL AND embedding IS NOT NULL`,
+      )
+      .all(projectId) as { id: string; embedding: Buffer }[];
+    return rows;
+  }
+
   countByKind(projectId: string): Record<ObservationKind, number> {
     const rows = this.db
       .prepare(

@@ -49,7 +49,7 @@ export async function recall(ctx: ToolContext, input: z.infer<typeof RecallInput
   const strategy = input.strategy ?? ctx.config.retrieval.strategy;
   const k = input.k ?? ctx.config.retrieval.k;
   const retriever = makeRetriever(strategy, ctx.db, ctx.config);
-  const fallback = !strategyAvailable(strategy);
+  const fallback = !strategyAvailable(strategy, ctx.config);
   const results = await retriever.search(input.query, { k, projectId: ctx.projectId });
   const resultsPayload = results.map((r) => ({
     id: r.id,
