@@ -57,6 +57,7 @@ export const CacheEntrySchema = z.object({
   hit_count: z.number().int().nonnegative(),
   false_hit_count: z.number().int().nonnegative(),
   invalidated: z.boolean(),
+  files_touched: z.array(z.string()).default([]),
 });
 export type CacheEntry = z.infer<typeof CacheEntrySchema>;
 
@@ -66,6 +67,7 @@ export const CacheEntryInputSchema = z.object({
   response: z.string(),
   model: z.string(),
   context_fingerprint: z.string(),
+  files_touched: z.array(z.string()).default([]),
 });
 export type CacheEntryInput = z.input<typeof CacheEntryInputSchema>;
 

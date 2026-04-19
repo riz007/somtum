@@ -11,6 +11,9 @@ import { extract, anthropicCaller, estimateTokensSaved, type LlmCaller } from '.
 import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
 import { countTokens } from '../core/tokens.js';
 import { projectDir } from '../config.js';
+import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
+import { PromptCache, hashPrompt } from '../core/cache.js';
+import { fingerprintFiles } from '../core/fingerprint.js';
 import type { Config } from '../core/schema.js';
 
 export const HookPayloadSchema = z
@@ -39,10 +42,49 @@ export async function readToEnd(stream: NodeJS.ReadableStream): Promise<string> 
   return Buffer.concat(chunks).toString('utf8');
 }
 
-function resolveTranscript(payload: HookPayload): string {
-  if (payload.transcript !== undefined) return payload.transcript;
-  if (payload.transcript_path !== undefined) return readFileSync(payload.transcript_path, 'utf8');
-  throw new Error('Unreachable: schema requires one of transcript | transcript_path');
+interface ResolvedTranscript {
+  text: string;
+  turns: ReturnType<typeof parseTranscript>;
+}
+
+function resolveTranscript(payload: HookPayload): ResolvedTranscript {
+  const raw =
+    payload.transcript !== undefined
+      ? payload.transcript
+      : payload.transcript_path !== undefined
+        ? readFileSync(payload.transcript_path, 'utf8')
+        : (() => {
+            throw new Error('Unreachable: schema requires one of transcript | transcript_path');
+          })();
+
+  const turns = parseTranscript(raw);
+  // If the parser found structured turns, render them compactly for the extractor.
+  // Otherwise fall back to the raw string (plain-text transcript fixtures etc.).
+  return { text: turns.length > 0 ? renderTurns(turns) : raw, turns };
+}
+
+function populateCache(
+  db: DB,
+  turns: ReturnType<typeof parseTranscript>,
+  opts: { cwd: string; model: string },
+): number {
+  const cache = new PromptCache(db);
+  const pairs = extractPromptResponsePairs(turns);
+  let inserted = 0;
+  for (const pair of pairs) {
+    if (pair.prompt.trim().length === 0 || pair.response.trim().length === 0) continue;
+    const { fingerprint } = fingerprintFiles(pair.files_touched, { cwd: opts.cwd });
+    cache.put({
+      prompt_hash: hashPrompt(pair.prompt),
+      prompt_text: pair.prompt,
+      response: pair.response,
+      model: opts.model,
+      context_fingerprint: fingerprint,
+      files_touched: pair.files_touched,
+    });
+    inserted += 1;
+  }
+  return inserted;
 }
 
 export interface RunOptions {
@@ -62,6 +104,7 @@ export interface RunResult {
   tokensSpent: number;
   tokensSavedTotal: number;
   indexPath: string;
+  cacheEntriesAdded: number;
 }
 
 export async function runPostSession(payload: HookPayload, opts: RunOptions = {}): Promise<RunResult> {
@@ -81,7 +124,8 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
   try {
     const store = new MemoryStore(db);
 
-    const transcript = resolveTranscript(parsed);
+    const resolved = resolveTranscript(parsed);
+    const transcript = resolved.text;
     const transcriptTokens = countTokens(transcript);
 
     const caller =
@@ -122,6 +166,10 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
 
     const tokensSavedTotal = store.totalTokensSaved(projectId);
 
+    const cacheEntriesAdded = config.cache.enabled
+      ? populateCache(db, resolved.turns, { cwd, model: config.extraction.model })
+      : 0;
+
     generateIndex({
       projectName,
       projectId,
@@ -131,7 +179,14 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
       now: opts.now ?? Date.now(),
     });
 
-    return { projectId, inserted, tokensSpent: outcome.tokensSpent, tokensSavedTotal, indexPath };
+    return {
+      projectId,
+      inserted,
+      tokensSpent: outcome.tokensSpent,
+      tokensSavedTotal,
+      indexPath,
+      cacheEntriesAdded,
+    };
   } finally {
     if (ownsDb) db.close();
   }
@@ -147,6 +202,7 @@ export async function main(): Promise<void> {
       JSON.stringify({
         ok: true,
         inserted: result.inserted,
+        cache_entries_added: result.cacheEntriesAdded,
         tokens_spent_estimated: result.tokensSpent,
         tokens_saved_total_estimated: result.tokensSavedTotal,
       }),

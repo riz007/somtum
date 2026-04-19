@@ -5,6 +5,7 @@ import { statsCommand } from './stats.js';
 import { searchCommand } from './search.js';
 import { showCommand } from './show.js';
 import { hookCommand } from './hook.js';
+import { runMcpServer } from '../mcp/server.js';
 
 const program = new Command();
 
@@ -15,11 +16,33 @@ program
 
 program
   .command('init')
-  .description('Install the SessionEnd capture hook in the current project')
+  .description('Install the SessionEnd capture hook (and optional extras) in the current project')
   .option('-f, --force', 'Reinstall even if the hook is already present', false)
-  .action((opts: { force: boolean }) => {
-    const code = initCommand({ force: opts.force });
+  .option('--cache', 'Also install the UserPromptSubmit cache hook', false)
+  .option('--file-gating', 'Also install the PreToolUse file-gating hook', false)
+  .option('--no-mcp', 'Do not register the somtum MCP server in .mcp.json')
+  .option('--all', 'Enable cache + file-gating + MCP', false)
+  .action((opts: { force: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
+    const code = initCommand({
+      force: opts.force,
+      cache: opts.cache,
+      fileGating: opts.fileGating,
+      mcp: opts.mcp,
+      all: opts.all,
+    });
     process.exit(code);
+  });
+
+program
+  .command('mcp')
+  .description('Run the somtum MCP server over stdio (invoked by .mcp.json)')
+  .action(async () => {
+    try {
+      await runMcpServer();
+    } catch (err) {
+      console.error(`[somtum] mcp server failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
   });
 
 program

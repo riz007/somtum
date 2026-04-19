@@ -21,6 +21,7 @@ interface CacheRow {
   hit_count: number;
   false_hit_count: number;
   invalidated: number;
+  files_touched: string;
 }
 
 function rowToEntry(row: CacheRow): CacheEntry {
@@ -38,6 +39,7 @@ function rowToEntry(row: CacheRow): CacheEntry {
     hit_count: row.hit_count,
     false_hit_count: row.false_hit_count,
     invalidated: row.invalidated === 1,
+    files_touched: JSON.parse(row.files_touched) as string[],
   });
 }
 
@@ -68,19 +70,21 @@ export class PromptCache {
   put(input: CacheEntryInput): CacheEntry {
     const id = ulid();
     const now = Date.now();
+    const filesTouched = JSON.stringify(input.files_touched ?? []);
     this.db
       .prepare(
         `INSERT INTO cache_entries
            (id, prompt_hash, prompt_text, prompt_embedding, response, model,
             context_fingerprint, fingerprint_version, created_at, last_hit_at,
-            hit_count, false_hit_count, invalidated)
-         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, 0, 0)
+            hit_count, false_hit_count, invalidated, files_touched)
+         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?)
          ON CONFLICT(prompt_hash) DO UPDATE SET
            response = excluded.response,
            model = excluded.model,
            context_fingerprint = excluded.context_fingerprint,
            fingerprint_version = excluded.fingerprint_version,
            last_hit_at = excluded.last_hit_at,
+           files_touched = excluded.files_touched,
            invalidated = 0`,
       )
       .run(
@@ -93,11 +97,18 @@ export class PromptCache {
         CACHE_FINGERPRINT_VERSION,
         now,
         now,
+        filesTouched,
       );
 
     const entry = this.lookupByHash(input.prompt_hash);
     if (!entry) throw new Error('PromptCache.put: readback failed');
     return entry;
+  }
+
+  recordFalseHit(id: string): void {
+    this.db
+      .prepare(`UPDATE cache_entries SET false_hit_count = false_hit_count + 1 WHERE id = ?`)
+      .run(id);
   }
 
   touch(id: string): void {
