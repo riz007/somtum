@@ -1,4 +1,4 @@
-# somtum
+# <img src="./assets/logo.png" width="45" vertical-align="middle" alt="Somtum Logo">
 
 Local-first memory layer for Claude Code. Somtum captures durable observations
 from your Claude Code sessions — decisions, bugfixes, learnings, file summaries —
@@ -39,13 +39,13 @@ pnpm exec somtum stats --json
 
 ## CLI
 
-| Command                   | Purpose                                                         |
-| ------------------------- | --------------------------------------------------------------- |
-| `somtum init`             | Install the SessionEnd capture hook in the current project.    |
-| `somtum search <query>`   | BM25 search over stored observations.                           |
-| `somtum show <id>`        | Print the full body of an observation.                          |
-| `somtum stats [--json]`   | Cumulative tokens saved / spent (estimated).                    |
-| `somtum hook <name>`      | Internal: dispatched by the installed hook command.             |
+| Command                 | Purpose                                                     |
+| ----------------------- | ----------------------------------------------------------- |
+| `somtum init`           | Install the SessionEnd capture hook in the current project. |
+| `somtum search <query>` | BM25 search over stored observations.                       |
+| `somtum show <id>`      | Print the full body of an observation.                      |
+| `somtum stats [--json]` | Cumulative tokens saved / spent (estimated).                |
+| `somtum hook <name>`    | Internal: dispatched by the installed hook command.         |
 
 ## Storage layout
 
