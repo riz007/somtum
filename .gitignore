@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.somtum/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.ai/
