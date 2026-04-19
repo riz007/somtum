@@ -1,4 +1,4 @@
-# <img src="./assets/logo.png" width="45" vertical-align="middle" alt="Somtum Logo">
+<img src="./assets/logo.png" width="500" alt="Somtum Logo">
 
 Local-first memory layer for Claude Code. Somtum captures durable observations
 from your Claude Code sessions — decisions, bugfixes, learnings, file summaries —
