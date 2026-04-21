@@ -41,10 +41,9 @@ describe('parseTranscript', () => {
   });
 
   it('skips lines that are not valid JSON', () => {
-    const jsonl = [
-      '{not json',
-      JSON.stringify({ message: { role: 'user', content: 'ok' } }),
-    ].join('\n');
+    const jsonl = ['{not json', JSON.stringify({ message: { role: 'user', content: 'ok' } })].join(
+      '\n',
+    );
     expect(parseTranscript(jsonl)).toEqual([{ role: 'user', text: 'ok' }]);
   });
 

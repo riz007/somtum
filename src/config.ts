@@ -42,8 +42,7 @@ export function loadConfig(options: LoadOptions = {}): Config {
   const globalPath = options.global ?? GLOBAL_CONFIG_PATH;
 
   const globalRaw = (readJsonIfExists(globalPath) ?? {}) as ConfigInput;
-  const projectRaw = (readJsonIfExists(join(cwd, PROJECT_CONFIG_RELATIVE)) ??
-    {}) as ConfigInput;
+  const projectRaw = (readJsonIfExists(join(cwd, PROJECT_CONFIG_RELATIVE)) ?? {}) as ConfigInput;
 
   const merged = deepMerge<ConfigInput>(globalRaw, projectRaw);
   return ConfigSchema.parse(merged);

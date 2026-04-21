@@ -17,6 +17,12 @@ const KIND_TITLES: Record<ObservationKind, string> = {
 
 const ISO_DAY = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
+// Threshold above which we switch to the incremental rendering path that
+// avoids loading all observations into memory at once.
+const INCREMENTAL_THRESHOLD = 1000;
+// Max entries shown per kind section in incremental mode.
+const INCREMENTAL_KIND_LIMIT = 20;
+
 function groupByKind(obs: Observation[]): Record<ObservationKind, Observation[]> {
   const out: Record<ObservationKind, Observation[]> = {
     decision: [],
@@ -28,18 +34,6 @@ function groupByKind(obs: Observation[]): Record<ObservationKind, Observation[]>
   };
   for (const o of obs) out[o.kind].push(o);
   return out;
-}
-
-function fileReferenceCounts(obs: Observation[]): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const o of obs) {
-    for (const f of o.files) {
-      const list = map.get(f) ?? [];
-      list.push(o.id);
-      map.set(f, list);
-    }
-  }
-  return map;
 }
 
 function formatLine(o: Observation): string {
@@ -54,19 +48,26 @@ export interface IndexOptions {
   recentDays?: number;
 }
 
-export function renderIndex(obs: Observation[], opts: IndexOptions): string {
+// Full render path: loads all observations into memory. Used when total < INCREMENTAL_THRESHOLD.
+function renderFull(obs: Observation[], opts: IndexOptions): string {
   const now = opts.now ?? Date.now();
   const recentDays = opts.recentDays ?? 7;
   const recentCutoff = now - recentDays * 24 * 60 * 60 * 1000;
 
   const byKind = groupByKind(obs);
-  const byFile = fileReferenceCounts(obs);
+  const byFile = new Map<string, string[]>();
+  for (const o of obs) {
+    for (const f of o.files) {
+      const list = byFile.get(f) ?? [];
+      list.push(o.id);
+      byFile.set(f, list);
+    }
+  }
   const recent = obs
     .filter((o) => o.created_at >= recentCutoff)
     .sort((a, b) => b.created_at - a.created_at);
 
   const sections: string[] = [];
-
   sections.push(HEADER_COMMENT);
   sections.push('');
   sections.push(`# ${opts.projectName} Memory Index`);
@@ -93,7 +94,9 @@ export function renderIndex(obs: Observation[], opts: IndexOptions): string {
     sections.push('');
     const entries = [...byFile.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 20);
     for (const [file, ids] of entries) {
-      sections.push(`- \`${file}\` — ${ids.length} memories: ${ids.map((i) => `\`${i}\``).join(', ')}`);
+      sections.push(
+        `- \`${file}\` — ${ids.length} memories: ${ids.map((i) => `\`${i}\``).join(', ')}`,
+      );
     }
     sections.push('');
   }
@@ -110,6 +113,76 @@ export function renderIndex(obs: Observation[], opts: IndexOptions): string {
   return sections.join('\n');
 }
 
+// Incremental render path: avoids loading all observations. Uses targeted
+// SQL queries (counts, recent, per-kind limits) so memory and time stay
+// bounded even at 10k+ observations.
+function renderIncremental(store: MemoryStore, projectId: string, opts: IndexOptions): string {
+  const now = opts.now ?? Date.now();
+  const recentDays = opts.recentDays ?? 7;
+  const recentCutoff = now - recentDays * 24 * 60 * 60 * 1000;
+
+  const totalCount = store.countByProject(projectId);
+  const byKindCounts = store.countByKind(projectId);
+  const recentObs = store.listRecent(projectId, recentCutoff, 100);
+  const topFiles = store.topFileReferences(projectId, 20);
+
+  const sections: string[] = [];
+  sections.push(HEADER_COMMENT);
+  sections.push('');
+  sections.push(`# ${opts.projectName} Memory Index`);
+  sections.push('');
+  sections.push(
+    `Last updated: ${new Date(now).toISOString()}. ${totalCount} memories. ${opts.totalTokensSaved} tokens saved cumulative (estimated).`,
+  );
+  sections.push('');
+
+  sections.push('## By kind');
+  sections.push('');
+  for (const kind of Object.keys(KIND_TITLES) as ObservationKind[]) {
+    const count = byKindCounts[kind] ?? 0;
+    if (count === 0) continue;
+    const recent = store.listByKind(projectId, kind, INCREMENTAL_KIND_LIMIT);
+    sections.push(`### ${KIND_TITLES[kind]} (${count})`);
+    sections.push('');
+    for (const o of recent) sections.push(formatLine(o));
+    if (count > INCREMENTAL_KIND_LIMIT) {
+      sections.push(
+        `- _… and ${count - INCREMENTAL_KIND_LIMIT} more — use \`somtum search\` to explore_`,
+      );
+    }
+    sections.push('');
+  }
+
+  if (topFiles.length > 0) {
+    sections.push('## By file (most-referenced)');
+    sections.push('');
+    for (const { file, count, ids } of topFiles) {
+      const shown = ids
+        .slice(0, 10)
+        .map((i) => `\`${i}\``)
+        .join(', ');
+      const extra = ids.length > 10 ? ` … +${ids.length - 10} more` : '';
+      sections.push(`- \`${file}\` — ${count} memories: ${shown}${extra}`);
+    }
+    sections.push('');
+  }
+
+  sections.push(`## Recent (last ${recentDays} days)`);
+  sections.push('');
+  if (recentObs.length === 0) {
+    sections.push('- _none_');
+  } else {
+    for (const o of recentObs) sections.push(formatLine(o));
+  }
+  sections.push('');
+
+  return sections.join('\n');
+}
+
+export function renderIndex(obs: Observation[], opts: IndexOptions): string {
+  return renderFull(obs, opts);
+}
+
 export interface GenerateOptions extends IndexOptions {
   store: MemoryStore;
   projectId: string;
@@ -117,8 +190,18 @@ export interface GenerateOptions extends IndexOptions {
 }
 
 export function generateIndex(options: GenerateOptions): string {
-  const obs = options.store.listByProject(options.projectId);
-  const md = renderIndex(obs, options);
+  const totalCount = options.store.countByProject(options.projectId);
+  let md: string;
+
+  if (totalCount >= INCREMENTAL_THRESHOLD) {
+    // Incremental path: SQL-driven, bounded memory usage.
+    md = renderIncremental(options.store, options.projectId, options);
+  } else {
+    // Full path: load all observations once, render in-memory.
+    const obs = options.store.listByProject(options.projectId);
+    md = renderFull(obs, options);
+  }
+
   const dir = dirname(options.outputPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(options.outputPath, md, 'utf8');

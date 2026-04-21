@@ -1,0 +1,164 @@
+// SSH-based push/pull sync (M6). Transfers observations as JSONL so we can
+// merge rather than overwrite. Conflict rule: if the same ULID already exists
+// locally the remote copy is skipped (ULIDs are unique across machines).
+// Relies on `scp` being available in PATH.
+import { execFileSync, execSync } from 'node:child_process';
+import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join as pathJoin } from 'node:path';
+import { openDb } from '../core/db.js';
+import { resolveProjectId } from '../core/project_id.js';
+import { loadConfig, projectDir } from '../config.js';
+import { runExport } from './export.js';
+import { runImport } from './import.js';
+
+// Parses "user@host:/remote/path" or "host:/remote/path"
+function parseRemote(remote: string): { userHost: string; path: string } {
+  const colonIdx = remote.indexOf(':');
+  if (colonIdx === -1) throw new Error(`invalid sync.remote: "${remote}". Expected user@host:/path`);
+  return { userHost: remote.slice(0, colonIdx), path: remote.slice(colonIdx + 1) };
+}
+
+function scpTo(localPath: string, remote: string): void {
+  execFileSync('scp', ['-q', localPath, remote], { stdio: ['ignore', 'ignore', 'pipe'] });
+}
+
+function scpFrom(remote: string, localPath: string): void {
+  execFileSync('scp', ['-q', remote, localPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+}
+
+function remoteCount(userHost: string, remotePath: string): number | null {
+  try {
+    const out = execSync(
+      `ssh -o BatchMode=yes -o ConnectTimeout=5 ${userHost} "wc -l < '${remotePath}' 2>/dev/null || echo 0"`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    return Number.parseInt(out.trim(), 10);
+  } catch {
+    return null;
+  }
+}
+
+export interface SyncResult {
+  direction: 'push' | 'pull' | 'status';
+  local_count: number;
+  remote_count: number | null;
+  transferred: number;
+  remote: string;
+}
+
+export async function runSync(opts: {
+  direction: 'push' | 'pull' | 'status';
+  cwd?: string;
+  remote?: string;
+}): Promise<SyncResult> {
+  const cwd = opts.cwd ?? process.cwd();
+  const config = loadConfig({ cwd });
+  const projectId = resolveProjectId(cwd);
+  const dbPath = join(projectDir(projectId), 'db.sqlite');
+
+  const remote = opts.remote ?? config.sync.remote;
+  if (!remote) {
+    throw new Error(
+      'sync.remote is not configured. Set it via `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`',
+    );
+  }
+
+  const { userHost, path: remotePath } = parseRemote(remote);
+  const remoteJsonl = `${remotePath}/observations.jsonl`;
+  const localJsonl = join(projectDir(projectId), 'observations.jsonl');
+
+  const db = openDb({ path: dbPath });
+  let localCount: number;
+  try {
+    const { MemoryStore } = await import('../core/store.js');
+    localCount = new MemoryStore(db).countByProject(projectId);
+  } finally {
+    db.close();
+  }
+
+  if (opts.direction === 'status') {
+    const remoteLineCount = remoteCount(userHost, remoteJsonl);
+    return {
+      direction: 'status',
+      local_count: localCount,
+      remote_count: remoteLineCount,
+      transferred: 0,
+      remote,
+    };
+  }
+
+  if (opts.direction === 'push') {
+    // Export local observations to JSONL then scp to remote.
+    runExport({ format: 'jsonl', output: localJsonl, cwd });
+    try {
+      // Ensure remote directory exists via SSH mkdir.
+      execSync(
+        `ssh -o BatchMode=yes ${userHost} "mkdir -p '${remotePath}'"`,
+        { stdio: ['ignore', 'ignore', 'pipe'] },
+      );
+      scpTo(localJsonl, `${userHost}:${remoteJsonl}`);
+    } finally {
+      if (existsSync(localJsonl)) unlinkSync(localJsonl);
+    }
+    return {
+      direction: 'push',
+      local_count: localCount,
+      remote_count: localCount,
+      transferred: localCount,
+      remote,
+    };
+  }
+
+  // pull: copy remote JSONL locally and merge.
+  const tmpPath = join(tmpdir(), `somtum-pull-${projectId}.jsonl`);
+  try {
+    scpFrom(`${userHost}:${remoteJsonl}`, tmpPath);
+    const importResult = runImport({ input: tmpPath, format: 'jsonl', cwd });
+    return {
+      direction: 'pull',
+      local_count: localCount + importResult.imported,
+      remote_count: localCount + importResult.imported + importResult.skipped,
+      transferred: importResult.imported,
+      remote,
+    };
+  } finally {
+    if (existsSync(tmpPath)) unlinkSync(tmpPath);
+  }
+}
+
+export async function syncCommand(
+  direction: 'push' | 'pull' | 'status',
+  options: { remote?: string; json?: boolean; cwd?: string } = {},
+): Promise<number> {
+  let result: SyncResult;
+  try {
+    const syncOpts: Parameters<typeof runSync>[0] = {
+      direction,
+      cwd: options.cwd ?? process.cwd(),
+    };
+    if (options.remote !== undefined) syncOpts.remote = options.remote;
+    result = await runSync(syncOpts);
+  } catch (err) {
+    console.error(`sync error: ${(err as Error).message}`);
+    return 1;
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return 0;
+  }
+
+  if (direction === 'status') {
+    console.log(`local   ${result.local_count} observations`);
+    const remoteStr = result.remote_count !== null ? String(result.remote_count) : 'unreachable';
+    console.log(`remote  ${remoteStr} observation lines`);
+    console.log(`remote  ${result.remote}`);
+  } else if (direction === 'push') {
+    console.log(`pushed ${result.transferred} observations to ${result.remote}`);
+  } else {
+    console.log(`pulled ${result.transferred} new observations from ${result.remote}`);
+  }
+  return 0;
+}

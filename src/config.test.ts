@@ -51,8 +51,6 @@ describe('loadConfig', () => {
       join(globalDir, 'config.json'),
       JSON.stringify({ cache: { fuzzy_threshold: 5 } }),
     );
-    expect(() =>
-      loadConfig({ cwd: projectDir, global: join(globalDir, 'config.json') }),
-    ).toThrow();
+    expect(() => loadConfig({ cwd: projectDir, global: join(globalDir, 'config.json') })).toThrow();
   });
 });

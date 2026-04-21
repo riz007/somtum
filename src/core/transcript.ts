@@ -40,15 +40,27 @@ function coerceContent(content: unknown): { text: string; files: string[] } {
       .map((block) => {
         if (block == null) return '';
         if (typeof block === 'string') return block;
-        if (typeof block === 'object' && 'text' in block && typeof (block as { text: unknown }).text === 'string') {
+        if (
+          typeof block === 'object' &&
+          'text' in block &&
+          typeof (block as { text: unknown }).text === 'string'
+        ) {
           return (block as { text: string }).text;
         }
-        if (typeof block === 'object' && 'type' in block && (block as { type: string }).type === 'tool_use') {
+        if (
+          typeof block === 'object' &&
+          'type' in block &&
+          (block as { type: string }).type === 'tool_use'
+        ) {
           const b = block as { name?: string; input?: unknown };
           files.push(...extractFilesFromBlock(block));
           return `[tool_use ${b.name ?? ''} ${JSON.stringify(b.input ?? {})}]`;
         }
-        if (typeof block === 'object' && 'type' in block && (block as { type: string }).type === 'tool_result') {
+        if (
+          typeof block === 'object' &&
+          'type' in block &&
+          (block as { type: string }).type === 'tool_result'
+        ) {
           const b = block as { content?: unknown };
           return `[tool_result ${coerceContent(b.content).text}]`;
         }
@@ -65,7 +77,8 @@ export function parseTranscript(raw: string): Turn[] {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return [];
 
-  const looksLikeJsonl = trimmed.includes('\n{') || (trimmed.startsWith('{') && trimmed.endsWith('}'));
+  const looksLikeJsonl =
+    trimmed.includes('\n{') || (trimmed.startsWith('{') && trimmed.endsWith('}'));
   if (!looksLikeJsonl) {
     return [{ role: 'user', text: trimmed }];
   }

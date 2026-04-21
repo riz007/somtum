@@ -93,13 +93,16 @@ export class MemoryStore {
   }
 
   get(id: string): Observation | null {
-    const row = this.db
-      .prepare(`SELECT * FROM observations WHERE id = ?`)
-      .get(id) as ObservationRow | undefined;
+    const row = this.db.prepare(`SELECT * FROM observations WHERE id = ?`).get(id) as
+      | ObservationRow
+      | undefined;
     return row ? rowToObservation(row) : null;
   }
 
-  listByProject(projectId: string, options: { includeDeleted?: boolean; limit?: number } = {}): Observation[] {
+  listByProject(
+    projectId: string,
+    options: { includeDeleted?: boolean; limit?: number } = {},
+  ): Observation[] {
     const where = options.includeDeleted
       ? `WHERE project_id = ?`
       : `WHERE project_id = ? AND deleted_at IS NULL`;
@@ -125,9 +128,7 @@ export class MemoryStore {
   }
 
   setEmbedding(id: string, embedding: Buffer): void {
-    this.db
-      .prepare(`UPDATE observations SET embedding = ? WHERE id = ?`)
-      .run(embedding, id);
+    this.db.prepare(`UPDATE observations SET embedding = ? WHERE id = ?`).run(embedding, id);
   }
 
   listMissingEmbeddings(projectId: string, limit: number = 1000): Observation[] {
@@ -189,5 +190,71 @@ export class MemoryStore {
       )
       .get(projectId) as { total: number };
     return row.total;
+  }
+
+  // Hard-delete rows that were soft-deleted before `olderThanMs`.
+  // Returns the number of rows removed.
+  purge(projectId: string, olderThanMs: number): number {
+    const info = this.db
+      .prepare(
+        `DELETE FROM observations
+         WHERE project_id = ? AND deleted_at IS NOT NULL AND deleted_at < ?`,
+      )
+      .run(projectId, olderThanMs);
+    return info.changes;
+  }
+
+  // Observations newer than `sinceMs`, most-recent first.
+  listRecent(projectId: string, sinceMs: number, limit = 100): Observation[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL AND created_at >= ?
+         ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(projectId, sinceMs, Math.floor(limit)) as ObservationRow[];
+    return rows.map(rowToObservation);
+  }
+
+  // Latest N observations of a given kind.
+  listByKind(projectId: string, kind: ObservationKind, limit = 50): Observation[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE project_id = ? AND kind = ? AND deleted_at IS NULL
+         ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(projectId, kind, Math.floor(limit)) as ObservationRow[];
+    return rows.map(rowToObservation);
+  }
+
+  // Top N most-referenced files with observation ID lists.
+  // Uses SQLite json_each to unnest the files JSON array.
+  topFileReferences(
+    projectId: string,
+    limit = 20,
+  ): { file: string; count: number; ids: string[] }[] {
+    // Two-phase: first count per file, then collect IDs for the top files.
+    const countRows = this.db
+      .prepare(
+        `SELECT f.value AS file, COUNT(*) AS cnt
+         FROM observations o, json_each(o.files) AS f
+         WHERE o.project_id = ? AND o.deleted_at IS NULL
+         GROUP BY f.value
+         ORDER BY cnt DESC
+         LIMIT ?`,
+      )
+      .all(projectId, Math.floor(limit)) as { file: string; cnt: number }[];
+
+    return countRows.map(({ file, cnt }) => {
+      const idRows = this.db
+        .prepare(
+          `SELECT o.id FROM observations o, json_each(o.files) AS f
+           WHERE o.project_id = ? AND o.deleted_at IS NULL AND f.value = ?
+           ORDER BY o.created_at DESC`,
+        )
+        .all(projectId, file) as { id: string }[];
+      return { file, count: cnt, ids: idRows.map((r) => r.id) };
+    });
   }
 }

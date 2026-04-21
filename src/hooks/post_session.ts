@@ -7,7 +7,12 @@ import { loadConfig } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { generateIndex } from '../core/index_gen.js';
-import { extract, anthropicCaller, estimateTokensSaved, type LlmCaller } from '../core/extractor.js';
+import {
+  extract,
+  anthropicCaller,
+  estimateTokensSaved,
+  type LlmCaller,
+} from '../core/extractor.js';
 import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
 import { countTokens } from '../core/tokens.js';
 import { projectDir } from '../config.js';
@@ -23,6 +28,7 @@ import {
   summarizeFile,
   summaryHash,
 } from '../core/file_summary.js';
+import { writeMemoryMarkdown, memoriesDir } from '../core/memory_files.js';
 import type { Config } from '../core/schema.js';
 
 export const HookPayloadSchema = z
@@ -175,7 +181,10 @@ export interface RunResult {
   summariesGenerated: number;
 }
 
-export async function runPostSession(payload: HookPayload, opts: RunOptions = {}): Promise<RunResult> {
+export async function runPostSession(
+  payload: HookPayload,
+  opts: RunOptions = {},
+): Promise<RunResult> {
   const parsed = HookPayloadSchema.parse(payload);
   const cwd = opts.cwd ?? parsed.cwd ?? process.cwd();
   const config = opts.config ?? loadConfig({ cwd });
@@ -198,9 +207,7 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
 
     const caller =
       opts.caller ??
-      anthropicCaller(
-        new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] ?? '' }),
-      );
+      anthropicCaller(new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] ?? '' }));
 
     const outcome = await extract(transcript, caller, {
       model: config.extraction.model,
@@ -212,10 +219,14 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
     // Divide extraction cost across observations so per-observation tokens_spent adds up.
     const perObsSpend = total > 0 ? Math.floor(outcome.tokensSpent / total) : 0;
 
+    const memDir = memoriesDir(
+      opts.dbPath ? opts.dbPath.replace(/db\.sqlite$/, '') : projectDir(projectId),
+    );
+
     let inserted = 0;
     for (const obs of outcome.observations) {
       const saved = estimateTokensSaved(transcriptTokens, obs, total);
-      store.insert(
+      const stored = store.insert(
         {
           project_id: projectId,
           session_id: sessionId,
@@ -229,6 +240,12 @@ export async function runPostSession(payload: HookPayload, opts: RunOptions = {}
         },
         { redactPatterns: config.privacy.redact_patterns },
       );
+      // Write the human-readable markdown mirror (SPEC.md §5.2).
+      try {
+        writeMemoryMarkdown(stored, memDir);
+      } catch {
+        // Non-fatal: SQLite is the source of truth.
+      }
       inserted += 1;
     }
 

@@ -46,7 +46,9 @@ describe('runPrePrompt', () => {
 
   it('returns a hit with the cached response as additionalContext', async () => {
     writeFileSync(join(tmp, 'notes.md'), 'stable content');
-    seed('explain fingerprinting', 'Fingerprints are sha256 of sorted (path,hash) pairs.', ['notes.md']);
+    seed('explain fingerprinting', 'Fingerprints are sha256 of sorted (path,hash) pairs.', [
+      'notes.md',
+    ]);
     const r = await runPrePrompt(
       { prompt: 'explain fingerprinting', cwd: tmp },
       { db, config: ConfigSchema.parse({}), projectId: 'p1' },

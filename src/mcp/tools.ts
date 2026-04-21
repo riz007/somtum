@@ -5,6 +5,7 @@ import { MemoryStore } from '../core/store.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { makeRetriever, strategyAvailable } from '../core/retriever/factory.js';
 import { RetrievalStrategy, ObservationKind } from '../core/schema.js';
+import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { countTokens } from '../core/tokens.js';
 
 // Shared zod-derived JSON schemas for the six MCP tools.
@@ -45,12 +46,20 @@ export interface ToolContext {
   projectId: string;
 }
 
-export async function recall(ctx: ToolContext, input: z.infer<typeof RecallInput>): Promise<object> {
+export async function recall(
+  ctx: ToolContext,
+  input: z.infer<typeof RecallInput>,
+): Promise<object> {
   const strategy = input.strategy ?? ctx.config.retrieval.strategy;
   const k = input.k ?? ctx.config.retrieval.k;
   const retriever = makeRetriever(strategy, ctx.db, ctx.config);
   const fallback = !strategyAvailable(strategy, ctx.config);
   const results = await retriever.search(input.query, { k, projectId: ctx.projectId });
+
+  // Log which strategy was actually used.
+  const statsStore = new RetrievalStatsStore(ctx.db);
+  statsStore.incrementRetrieval(ctx.projectId, retriever.name as typeof strategy);
+
   const resultsPayload = results.map((r) => ({
     id: r.id,
     title: r.observation.title,
@@ -89,10 +98,7 @@ export function get(ctx: ToolContext, input: z.infer<typeof GetInput>): object {
   };
 }
 
-export function remember(
-  ctx: ToolContext,
-  input: z.infer<typeof RememberInput>,
-): object {
+export function remember(ctx: ToolContext, input: z.infer<typeof RememberInput>): object {
   const store = new MemoryStore(ctx.db);
   const obs = store.insert(
     {
@@ -116,10 +122,15 @@ export function remember(
 
 export function cacheLookup(ctx: ToolContext, input: z.infer<typeof CacheLookupInput>): object {
   const cache = new PromptCache(ctx.db);
+  const statsStore = new RetrievalStatsStore(ctx.db);
   const hash = hashPrompt(input.prompt);
   const hit = cache.lookupByHash(hash);
-  if (!hit) return { hit: false, tokens: 0 };
+  if (!hit) {
+    statsStore.incrementCacheMiss(ctx.projectId);
+    return { hit: false, tokens: 0 };
+  }
   cache.touch(hit.id);
+  statsStore.incrementCacheHit(ctx.projectId);
   return {
     hit: true,
     id: hit.id,
@@ -139,13 +150,20 @@ export function forget(ctx: ToolContext, input: z.infer<typeof ForgetInput>): ob
 export function stats(ctx: ToolContext): object {
   const store = new MemoryStore(ctx.db);
   const cache = new PromptCache(ctx.db);
+  const statsStore = new RetrievalStatsStore(ctx.db);
   const saved = store.totalTokensSaved(ctx.projectId);
   const spent = store.totalTokensSpent(ctx.projectId);
+  const cacheHits = statsStore.getCacheHitSummary(ctx.projectId);
+  const retrievalBreakdown = statsStore.getRetrievalBreakdown(ctx.projectId);
   return {
     project_id: ctx.projectId,
     memories: store.countByProject(ctx.projectId),
     by_kind: store.countByKind(ctx.projectId),
     cache_entries: cache.count(),
+    cache_hits: cacheHits.hit_count,
+    cache_misses: cacheHits.miss_count,
+    cache_hit_rate: cacheHits.hit_rate,
+    retrieval_by_strategy: retrievalBreakdown,
     tokens_saved_estimated: saved,
     tokens_spent_estimated: spent,
     net_estimated: saved - spent,

@@ -36,7 +36,7 @@ const CANNED_EXTRACTION = {
     {
       kind: 'decision',
       title: 'Use pnpm for this project',
-      body: "Picked pnpm for its workspaces and strict hoisting.",
+      body: 'Picked pnpm for its workspaces and strict hoisting.',
       files: ['package.json'],
       tags: ['tooling'],
     },
