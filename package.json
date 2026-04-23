@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "description": "Local-first memory and prompt-cache layer for Claude Code",
   "type": "module",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "author": {
     "name": "Rizwanul Islam Rudra",
     "url": "https://github.com/riz007"
