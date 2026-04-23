@@ -21,7 +21,25 @@
     "memory",
     "prompt-cache",
     "sqlite",
-    "cli"
+    "cli",
+    "embeddings",
+    "artifical-intelligence",
+    "local-first",
+    "anthropic",
+    "agentic-ai",
+    "rag",
+    "retrieval-augmented-generation",
+    "claude-code-plugin",
+    "claude-agents",
+    "claude-skills",
+    "memory-engine",
+    "agentic-coding",
+    "long-term-memory",
+    "context-management",
+    "knowledge-graph",
+    "semantic-search",
+    "vector-database",
+    "open-source"
   ],
   "engines": {
     "node": ">=20"
