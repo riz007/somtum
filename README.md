@@ -71,6 +71,27 @@ Zero-config: one `somtum init` in an existing Claude Code project and every sess
 
 ## Install
 
+### From npm / yarn / pnpm
+
+```bash
+# npm
+npm install -g somtum
+
+# yarn
+yarn global add somtum
+
+# pnpm
+pnpm add -g somtum
+```
+
+Or as a project dependency:
+
+```bash
+npm install somtum
+yarn add somtum
+pnpm add somtum
+```
+
 ### From source
 
 ```bash
@@ -82,11 +103,13 @@ pnpm build
 pnpm link --global
 ```
 
-### As a dependency in another project
+### Native module note
 
-```bash
-pnpm add somtum
-```
+Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically — no extra tools needed. On Alpine Linux / musl or unusual architectures the addon compiles from source, which requires `python`, `make`, and `gcc` to be available. If the install fails with a node-gyp error, install those build tools and retry.
+
+### Package contents note
+
+Only `dist/` and `README.md` are published to the registry — source code, tests, and docs are excluded via the `files` whitelist in `package.json`. If you need the source, clone from GitHub.
 
 ---
 
