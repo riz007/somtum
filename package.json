@@ -38,6 +38,7 @@
     "README.md"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm build",
     "build": "tsc -p tsconfig.build.json && pnpm run build:copy-migrations",
     "build:copy-migrations": "node -e \"import('node:fs').then(({mkdirSync,cpSync})=>{mkdirSync('dist/db/migrations',{recursive:true});cpSync('src/db/migrations','dist/db/migrations',{recursive:true});})\"",
     "test": "vitest run",
