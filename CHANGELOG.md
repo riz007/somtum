@@ -1,5 +1,12 @@
 # somtum
 
+## 0.1.3
+
+### Patch Changes
+
+- 3b7dfbd: added keywords
+- cf6d5a1: Add github pages and contributing guideline
+
 ## 0.1.2
 
 ### Patch Changes
