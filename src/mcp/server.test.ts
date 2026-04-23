@@ -112,7 +112,8 @@ describe('MCP server', () => {
       const gotPayload = parseText(got as never) as {
         observations: { id: string; body: string }[];
       };
-      expect(gotPayload.observations[0]?.body).toBe('Body text here');
+      expect(gotPayload.observations[0]?.body).toContain('Body text here');
+      expect(gotPayload.observations[0]?.body).toContain('[Somtum memory');
 
       const forgotten = await client.callTool({
         name: 'forget',
