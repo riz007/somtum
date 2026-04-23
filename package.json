@@ -1,6 +1,6 @@
 {
   "name": "somtum",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local-first memory and prompt-cache layer for Claude Code",
   "type": "module",
   "license": "AGPL-3.0",
