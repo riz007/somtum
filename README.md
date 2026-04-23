@@ -2,9 +2,42 @@
 
 **Local-first memory and prompt-cache layer for Claude Code.**
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
+
 Somtum captures durable observations from your Claude Code sessions — decisions, bugfixes, learnings, file summaries — stores them in a local SQLite database, and injects the relevant ones back into context the next time you need them. It also caches repeated prompt→response pairs so identical (or near-identical) prompts never hit the model twice.
 
 Zero-config: one `somtum init` in an existing Claude Code project and every session end is captured automatically. No server, no cloud account, no mandatory tuning.
+
+---
+
+## Table of Contents
+- [Why Somtum?](#why-somtum)
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [CLI Reference](#cli-reference)
+- [MCP Server](#mcp-server)
+- [Storage Layout](#storage-layout)
+- [Configuration](#configuration)
+- [Privacy](#privacy)
+- [Token Accounting](#token-accounting)
+- [Performance](#performance)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+---
+
+## Why Somtum?
+
+LLM agents like Claude Code typically start every session with a "blank slate." This leads to:
+*   **Repetitive Explanations:** Having to re-explain architectural choices or local conventions.
+*   **Regressions:** Claude might suggest a fix you've already tried and discarded.
+*   **Context Waste:** Large codebases eat up tokens just to "set the scene."
+
+**Somtum gives Claude a long-term memory.** It ensures that once a decision is made or a bug is fixed, it stays "remembered" across all future sessions without bloating your context window.
 
 ---
 
@@ -105,11 +138,7 @@ pnpm link --global
 
 ### Native module note
 
-Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically — no extra tools needed. On Alpine Linux / musl or unusual architectures the addon compiles from source, which requires `python`, `make`, and `gcc` to be available. If the install fails with a node-gyp error, install those build tools and retry.
-
-### Package contents note
-
-Only `dist/` and `README.md` are published to the registry — source code, tests, and docs are excluded via the `files` whitelist in `package.json`. If you need the source, clone from GitHub.
+Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically. On Alpine Linux / musl or unusual architectures the addon compiles from source, which requires `python`, `make`, and `gcc` to be available. If the install fails with a node-gyp error, install those build tools and retry.
 
 ---
 
@@ -218,13 +247,18 @@ somtum init --all
 
 Remote configured in config: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`
 
-### MCP server
+---
 
-```bash
-somtum mcp   # Run over stdio — invoked automatically via .mcp.json
-```
+## MCP Server
 
-MCP tools exposed: `recall`, `get`, `remember`, `cache_lookup`, `forget`, `stats`.
+Somtum includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server. When you run `somtum init --all`, it registers tools that Claude can use autonomously:
+
+- `recall`: Claude can search your memories when it's unsure about a project detail.
+- `get`: Retrieve the full body of specific observations.
+- `remember`: Claude can manually store a specific observation.
+- `cache_lookup`: Used internally to check the prompt cache.
+- `forget`: Soft-delete an observation.
+- `stats`: Claude can report on how much it has "learned" from you.
 
 ---
 
@@ -404,6 +438,22 @@ test/
 
 ---
 
+## Troubleshooting
+
+### Installation fails (node-gyp / better-sqlite3)
+If you see errors related to building `better-sqlite3`, ensure you have build tools installed:
+*   **macOS:** `xcode-select --install`
+*   **Ubuntu/Debian:** `sudo apt-get install build-essential python3`
+*   **Windows:** `npm install --global --production windows-build-tools`
+
+### "Anthropic API Key not found"
+The capture hook requires `ANTHROPIC_API_KEY` to be set in your environment. Add it to your `.zshrc`, `.bashrc`, or `.env` file.
+
+### Claude isn't using the memories
+Run `somtum doctor` to verify that hooks are correctly installed in your project.
+
+---
+
 ## License
 
-MIT
+Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
