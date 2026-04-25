@@ -87,7 +87,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
 
     // 6. All expected migrations applied
     const applied = appliedVersions(db);
-    const expectedVersions = [1, 2];
+    const expectedVersions = [1, 2, 3];
     const missing = expectedVersions.filter((v) => !applied.includes(v));
     checks.push({
       name: 'migrations',

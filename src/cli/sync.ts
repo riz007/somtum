@@ -3,10 +3,9 @@
 // locally the remote copy is skipped (ULIDs are unique across machines).
 // Relies on `scp` being available in PATH.
 import { execFileSync, execSync } from 'node:child_process';
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
+import { unlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { join as pathJoin } from 'node:path';
+import { tmpdir, hostname } from 'node:os';
 import { openDb } from '../core/db.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { loadConfig, projectDir } from '../config.js';
@@ -16,7 +15,8 @@ import { runImport } from './import.js';
 // Parses "user@host:/remote/path" or "host:/remote/path"
 function parseRemote(remote: string): { userHost: string; path: string } {
   const colonIdx = remote.indexOf(':');
-  if (colonIdx === -1) throw new Error(`invalid sync.remote: "${remote}". Expected user@host:/path`);
+  if (colonIdx === -1)
+    throw new Error(`invalid sync.remote: "${remote}". Expected user@host:/path`);
   return { userHost: remote.slice(0, colonIdx), path: remote.slice(colonIdx + 1) };
 }
 
@@ -28,15 +28,33 @@ function scpFrom(remote: string, localPath: string): void {
   execFileSync('scp', ['-q', remote, localPath], { stdio: ['ignore', 'ignore', 'pipe'] });
 }
 
-function remoteCount(userHost: string, remotePath: string): number | null {
+function remoteList(userHost: string, remotePath: string): string[] {
   try {
     const out = execSync(
-      `ssh -o BatchMode=yes -o ConnectTimeout=5 ${userHost} "wc -l < '${remotePath}' 2>/dev/null || echo 0"`,
+      `ssh -o BatchMode=yes -o ConnectTimeout=5 ${userHost} "ls '${remotePath}'/observations.*.jsonl 2>/dev/null"`,
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
-    return Number.parseInt(out.trim(), 10);
+    return out
+      .trim()
+      .split('\n')
+      .filter((s) => s.length > 0);
   } catch {
-    return null;
+    return [];
+  }
+}
+
+function remoteLineCount(userHost: string, remotePaths: string[]): number {
+  if (remotePaths.length === 0) return 0;
+  try {
+    const paths = remotePaths.map((p) => `'${p}'`).join(' ');
+    const out = execSync(
+      `ssh -o BatchMode=yes -o ConnectTimeout=5 ${userHost} "wc -l ${paths} 2>/dev/null | tail -n 1"`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    const match = out.trim().match(/^(\d+)/);
+    return match && match[1] ? Number.parseInt(match[1], 10) : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -66,8 +84,11 @@ export async function runSync(opts: {
   }
 
   const { userHost, path: remotePath } = parseRemote(remote);
-  const remoteJsonl = `${remotePath}/observations.jsonl`;
-  const localJsonl = join(projectDir(projectId), 'observations.jsonl');
+  const host = hostname()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-');
+  const remoteJsonl = `${remotePath}/observations.${host}.jsonl`;
+  const localJsonl = join(projectDir(projectId), `observations.${host}.jsonl`);
 
   const db = openDb({ path: dbPath });
   let localCount: number;
@@ -79,11 +100,12 @@ export async function runSync(opts: {
   }
 
   if (opts.direction === 'status') {
-    const remoteLineCount = remoteCount(userHost, remoteJsonl);
+    const files = remoteList(userHost, remotePath);
+    const count = remoteLineCount(userHost, files);
     return {
       direction: 'status',
       local_count: localCount,
-      remote_count: remoteLineCount,
+      remote_count: count,
       transferred: 0,
       remote,
     };
@@ -94,10 +116,9 @@ export async function runSync(opts: {
     runExport({ format: 'jsonl', output: localJsonl, cwd });
     try {
       // Ensure remote directory exists via SSH mkdir.
-      execSync(
-        `ssh -o BatchMode=yes ${userHost} "mkdir -p '${remotePath}'"`,
-        { stdio: ['ignore', 'ignore', 'pipe'] },
-      );
+      execSync(`ssh -o BatchMode=yes ${userHost} "mkdir -p '${remotePath}'"`, {
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
       scpTo(localJsonl, `${userHost}:${remoteJsonl}`);
     } finally {
       if (existsSync(localJsonl)) unlinkSync(localJsonl);
@@ -111,21 +132,31 @@ export async function runSync(opts: {
     };
   }
 
-  // pull: copy remote JSONL locally and merge.
-  const tmpPath = join(tmpdir(), `somtum-pull-${projectId}.jsonl`);
-  try {
-    scpFrom(`${userHost}:${remoteJsonl}`, tmpPath);
-    const importResult = runImport({ input: tmpPath, format: 'jsonl', cwd });
-    return {
-      direction: 'pull',
-      local_count: localCount + importResult.imported,
-      remote_count: localCount + importResult.imported + importResult.skipped,
-      transferred: importResult.imported,
-      remote,
-    };
-  } finally {
-    if (existsSync(tmpPath)) unlinkSync(tmpPath);
+  // pull: copy ALL remote JSONL files locally and merge.
+  const files = remoteList(userHost, remotePath);
+  let importedTotal = 0;
+  let skippedTotal = 0;
+
+  for (const remoteFile of files) {
+    const base = remoteFile.split('/').pop()!;
+    const tmpPath = join(tmpdir(), `somtum-pull-${projectId}-${base}`);
+    try {
+      scpFrom(`${userHost}:${remoteFile}`, tmpPath);
+      const importResult = runImport({ input: tmpPath, format: 'jsonl', cwd });
+      importedTotal += importResult.imported;
+      skippedTotal += importResult.skipped;
+    } finally {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
+    }
   }
+
+  return {
+    direction: 'pull',
+    local_count: localCount + importedTotal,
+    remote_count: localCount + importedTotal + skippedTotal,
+    transferred: importedTotal,
+    remote,
+  };
 }
 
 export async function syncCommand(
