@@ -6,18 +6,18 @@
     <title>Somtum — Local-first memory for Claude Code</title>
     <meta
       name="description"
-      content="Somtum captures durable observations from your Claude Code sessions, stores them in a local SQLite database, and injects the relevant ones back into context. Zero-config, no cloud."
+      content="Somtum captures durable observations from your Claude Code sessions, stores them in a local SQLite database, and injects the relevant ones back into context. Just like the vibrant Thai salad, it's a perfect blend of your best work."
     />
-    <meta property="og:title" content="Somtum — Local-first memory for Claude Code" />
+    <meta property="og:title" content="Somtum — The Flavor of Your Code" />
     <meta
       property="og:description"
-      content="Zero-config memory and prompt-cache layer for Claude Code. No server. No cloud. Just `somtum init`."
+      content="Zero-config memory and prompt-cache layer for Claude Code. No server. No cloud. Just robust, multi-device memory."
     />
     <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -30,26 +30,29 @@
       }
 
       :root {
-        --bg: #0d0f14;
-        --bg-card: #13161e;
-        --bg-raised: #1a1e2a;
-        --border: #242836;
-        --border-hi: #2e3446;
-        --text: #e8eaf0;
-        --text-muted: #8891a8;
-        --text-dim: #5a6278;
-        --accent: #7c6af7;
-        --accent-2: #5b9cf6;
-        --accent-3: #4ecdc4;
-        --accent-glow: rgba(124, 106, 247, 0.18);
-        --green: #4ade80;
-        --yellow: #fbbf24;
-        --red: #f87171;
-        --radius: 10px;
-        --radius-lg: 16px;
-        --mono: 'JetBrains Mono', 'Fira Code', monospace;
-        --sans: 'Inter', system-ui, sans-serif;
-        --nav-h: 64px;
+        --bg: #090b0f;
+        --bg-card: #11141b;
+        --bg-raised: #181c25;
+        --border: #1e242f;
+        --border-hi: #2a3241;
+        --text: #f0f2f5;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        
+        /* Somtum Palette */
+        --papaya: #4ade80; /* Fresh Green */
+        --chili: #f87171;  /* Vibrant Red */
+        --carrot: #fbbf24; /* Zesty Orange */
+        --lime: #a3e635;   /* Bright Lime */
+        
+        --accent: var(--papaya);
+        --accent-glow: rgba(74, 222, 128, 0.15);
+        
+        --radius: 12px;
+        --radius-lg: 20px;
+        --mono: 'JetBrains Mono', monospace;
+        --sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+        --nav-h: 72px;
       }
 
       html {
@@ -63,14 +66,38 @@
         font-family: var(--sans);
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* ── Background Elements ── */
+      .bg-glow-1 {
+        position: fixed;
+        top: -10%;
+        left: -10%;
+        width: 50%;
+        height: 50%;
+        background: radial-gradient(circle, rgba(74, 222, 128, 0.08) 0%, transparent 70%);
+        z-index: -1;
+        pointer-events: none;
+      }
+      .bg-glow-2 {
+        position: fixed;
+        bottom: -10%;
+        right: -10%;
+        width: 50%;
+        height: 50%;
+        background: radial-gradient(circle, rgba(248, 113, 113, 0.05) 0%, transparent 70%);
+        z-index: -1;
+        pointer-events: none;
       }
 
       a {
         color: var(--accent);
         text-decoration: none;
+        transition: opacity 0.2s;
       }
       a:hover {
-        text-decoration: underline;
+        opacity: 0.8;
       }
 
       /* ── Nav ── */
@@ -79,992 +106,299 @@
         top: 0;
         left: 0;
         right: 0;
-        z-index: 100;
+        z-index: 1000;
         height: var(--nav-h);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 clamp(1rem, 5vw, 3rem);
-        background: rgba(13, 15, 20, 0.82);
-        backdrop-filter: blur(18px);
+        padding: 0 clamp(1.5rem, 6vw, 4rem);
+        background: rgba(9, 11, 15, 0.7);
+        backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
       }
       .nav-logo {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+        font-weight: 800;
+        font-size: 1.4rem;
+        letter-spacing: -0.03em;
       }
-      .nav-logo img {
-        height: 30px;
-      }
-      .nav-logo span {
-        font-size: 1.1rem;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      .logo-text {
+        background: linear-gradient(90deg, var(--papaya), var(--chili));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 1.5rem;
+        gap: 2.5rem;
       }
       .nav-links a {
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         color: var(--text-muted);
-        font-weight: 500;
-        transition: color 0.2s;
+        font-weight: 600;
       }
       .nav-links a:hover {
         color: var(--text);
-        text-decoration: none;
       }
       .nav-gh {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
-        border-radius: 8px;
+        gap: 8px;
+        padding: 8px 18px;
+        border-radius: 10px;
         border: 1px solid var(--border-hi);
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 0.9rem;
+        font-weight: 600;
         color: var(--text) !important;
         background: var(--bg-raised);
-        transition:
-          border-color 0.2s,
-          background 0.2s;
+        transition: all 0.2s;
       }
       .nav-gh:hover {
-        border-color: var(--accent);
-        background: var(--accent-glow);
-        text-decoration: none !important;
-      }
-      .nav-gh svg {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
+        border-color: var(--papaya);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(74, 222, 128, 0.1);
       }
 
-      /* ── Sections layout ── */
+      /* ── Sections ── */
       section {
-        padding: 5rem clamp(1rem, 5vw, 3rem);
+        padding: 6rem clamp(1.5rem, 6vw, 4rem);
+        position: relative;
       }
       .container {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: 0 auto;
       }
 
       /* ── Hero ── */
       #hero {
-        padding-top: calc(var(--nav-h) + 5rem);
-        padding-bottom: 5rem;
+        padding-top: calc(var(--nav-h) + 6rem);
+        padding-bottom: 8rem;
         text-align: center;
-        position: relative;
-        overflow: hidden;
       }
-      .hero-glow {
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 900px;
-        height: 500px;
-        background: radial-gradient(
-          ellipse at 50% 0%,
-          rgba(124, 106, 247, 0.22) 0%,
-          transparent 70%
-        );
-        pointer-events: none;
-      }
-      .badge {
+      .hero-tagline {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 14px;
-        border-radius: 99px;
-        border: 1px solid rgba(124, 106, 247, 0.35);
-        background: rgba(124, 106, 247, 0.1);
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #a99ffb;
-        letter-spacing: 0.04em;
+        gap: 8px;
+        padding: 6px 16px;
+        border-radius: 100px;
+        background: rgba(163, 230, 53, 0.08);
+        border: 1px solid rgba(163, 230, 53, 0.2);
+        color: var(--lime);
+        font-size: 0.85rem;
+        font-weight: 700;
         text-transform: uppercase;
-        margin-bottom: 1.5rem;
-      }
-      .badge-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--accent);
+        letter-spacing: 0.05em;
+        margin-bottom: 2rem;
       }
       h1 {
-        font-size: clamp(2.2rem, 5vw, 3.8rem);
-        font-weight: 800;
-        line-height: 1.1;
-        letter-spacing: -0.03em;
-        max-width: 760px;
-        margin: 0 auto 1.25rem;
+        font-size: clamp(2.5rem, 7vw, 4.5rem);
+        font-weight: 850;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+        margin-bottom: 1.5rem;
       }
-      h1 span {
-        background: linear-gradient(
-          135deg,
-          var(--accent) 0%,
-          var(--accent-2) 60%,
-          var(--accent-3) 100%
-        );
+      h1 .gradient {
+        background: linear-gradient(135deg, var(--papaya) 0%, var(--lime) 50%, var(--carrot) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
       .hero-sub {
-        font-size: clamp(1rem, 2vw, 1.2rem);
+        font-size: clamp(1.1rem, 2.5vw, 1.35rem);
         color: var(--text-muted);
-        max-width: 580px;
-        margin: 0 auto 2.5rem;
-        line-height: 1.7;
+        max-width: 700px;
+        margin: 0 auto 3.5rem;
+        font-weight: 500;
       }
       .hero-actions {
         display: flex;
-        gap: 12px;
+        gap: 16px;
         justify-content: center;
         flex-wrap: wrap;
-        margin-bottom: 3rem;
+        margin-bottom: 4rem;
       }
       .btn {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 12px 24px;
+        gap: 10px;
+        padding: 14px 32px;
         border-radius: var(--radius);
-        font-size: 0.95rem;
-        font-weight: 600;
+        font-size: 1.05rem;
+        font-weight: 700;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
-        transition: all 0.2s;
-        border: none;
-        text-decoration: none;
       }
       .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        box-shadow: 0 0 28px rgba(124, 106, 247, 0.4);
+        background: var(--papaya);
+        color: #052e16;
+        box-shadow: 0 10px 30px rgba(74, 222, 128, 0.25);
       }
       .btn-primary:hover {
-        background: #9181f9;
-        box-shadow: 0 0 36px rgba(124, 106, 247, 0.55);
-        text-decoration: none;
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 15px 40px rgba(74, 222, 128, 0.35);
       }
       .btn-secondary {
-        background: var(--bg-raised);
+        background: var(--bg-card);
         color: var(--text);
         border: 1px solid var(--border-hi);
       }
       .btn-secondary:hover {
-        border-color: var(--accent);
-        background: var(--accent-glow);
-        text-decoration: none;
-      }
-
-      .install-box {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 12px 20px;
-        font-family: var(--mono);
-        font-size: 0.9rem;
-        color: var(--text-muted);
-        cursor: pointer;
-        transition: border-color 0.2s;
-        position: relative;
-      }
-      .install-box:hover {
-        border-color: var(--border-hi);
-      }
-      .install-box .prompt {
-        color: var(--accent);
-        user-select: none;
-      }
-      .install-box .cmd {
-        color: var(--text);
-      }
-      .copy-btn {
         background: var(--bg-raised);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 3px 8px;
-        font-size: 0.72rem;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-family: var(--sans);
-        transition: all 0.15s;
-        white-space: nowrap;
-      }
-      .copy-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-      .copy-btn.copied {
-        border-color: var(--green);
-        color: var(--green);
-      }
-
-      /* ── Marquee strip ── */
-      .marquee-wrap {
-        overflow: hidden;
-        border-top: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
-        padding: 14px 0;
-        background: var(--bg-card);
-      }
-      .marquee-track {
-        display: flex;
-        gap: 2.5rem;
-        width: max-content;
-        animation: marquee 32s linear infinite;
-      }
-      .marquee-wrap:hover .marquee-track {
-        animation-play-state: paused;
-      }
-      @keyframes marquee {
-        from {
-          transform: translateX(0);
-        }
-        to {
-          transform: translateX(-50%);
-        }
-      }
-      .marquee-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.82rem;
-        font-weight: 500;
-        color: var(--text-muted);
-        white-space: nowrap;
-      }
-      .marquee-item svg {
-        width: 14px;
-        height: 14px;
-        opacity: 0.7;
-      }
-
-      /* ── Features ── */
-      #features {
-        background: var(--bg);
-      }
-      .section-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--accent);
-        margin-bottom: 0.6rem;
-      }
-      .section-title {
-        font-size: clamp(1.6rem, 3vw, 2.4rem);
-        font-weight: 800;
-        letter-spacing: -0.025em;
-        line-height: 1.2;
-        margin-bottom: 1rem;
-      }
-      .section-sub {
-        font-size: 1.05rem;
-        color: var(--text-muted);
-        max-width: 540px;
-        margin-bottom: 3rem;
-      }
-      .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1px;
-        background: var(--border);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-      }
-      .feature-card {
-        background: var(--bg-card);
-        padding: 2rem;
-        transition: background 0.2s;
-      }
-      .feature-card:hover {
-        background: var(--bg-raised);
-      }
-      .feat-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        margin-bottom: 1rem;
-      }
-      .feat-title {
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.4rem;
-      }
-      .feat-desc {
-        font-size: 0.9rem;
-        color: var(--text-muted);
-        line-height: 1.65;
-      }
-
-      /* ── How it works ── */
-      #how {
-        background: var(--bg);
-      }
-
-      .arch-diagram {
-        display: flex;
-        flex-direction: column;
-        max-width: 860px;
-        margin: 0 auto;
-      }
-
-      /* Agent box */
-      .arch-agent-box {
-        text-align: center;
-        background: linear-gradient(
-          135deg,
-          rgba(124, 106, 247, 0.1) 0%,
-          rgba(91, 156, 246, 0.07) 100%
-        );
-        border: 1px solid rgba(124, 106, 247, 0.4);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 2rem;
-      }
-      .arch-agent-label {
-        font-size: 1rem;
-        font-weight: 700;
-      }
-      .arch-agent-sub {
-        font-size: 0.78rem;
-        color: var(--text-dim);
-        margin-top: 3px;
-      }
-
-      /* Split connector (agent → two columns) */
-      .arch-split-connector {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        height: 56px;
-        position: relative;
-      }
-      .arch-split-connector::before {
-        content: '';
-        position: absolute;
-        left: calc(25% + 1px);
-        right: calc(25% + 1px);
-        top: 0;
-        height: 1px;
-        background: var(--border-hi);
-      }
-      .arch-split-line {
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        padding-bottom: 6px;
-        position: relative;
-      }
-      .arch-split-line::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
-        width: 1px;
-        background: linear-gradient(to bottom, var(--border-hi), rgba(124, 106, 247, 0.5));
-        transform: translateX(-50%);
-      }
-      .arch-split-tag {
-        background: var(--bg);
-        padding: 2px 8px;
-        font-size: 0.68rem;
-        font-family: var(--mono);
-        color: var(--text-dim);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        position: relative;
-        z-index: 1;
-      }
-
-      /* Two-column row */
-      .arch-two-col {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-
-      /* Generic box */
-      .arch-box {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 1.5rem;
-      }
-      .arch-hooks-box {
-        border-color: rgba(124, 106, 247, 0.35);
-      }
-      .arch-mcp-box {
-        border-color: rgba(91, 156, 246, 0.35);
-      }
-      .arch-core-box {
-        border-color: rgba(78, 205, 196, 0.25);
-      }
-      .arch-storage-box {
-        border-color: rgba(74, 222, 128, 0.2);
-      }
-
-      .arch-box-title {
-        font-size: 0.68rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--text-dim);
-        margin-bottom: 0.85rem;
-      }
-      .arch-box-title-center {
-        text-align: center;
-      }
-
-      .arch-hook {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.82rem;
-        color: var(--text-muted);
-        padding: 6px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .arch-hook:last-child {
-        border-bottom: none;
-      }
-      .hook-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-      .hook-dot.purple {
-        background: var(--accent);
-      }
-      .hook-dot.green {
-        background: var(--green);
-      }
-      .hook-dot.yellow {
-        background: var(--yellow);
-      }
-      .hook-dot.blue {
-        background: var(--accent-2);
-      }
-
-      /* Merge connector (two columns → core) */
-      .arch-merge-connector {
-        height: 52px;
-        position: relative;
-      }
-      .arch-merge-connector::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: calc(25% + 1px);
-        width: calc(25% - 1px);
-        height: 55%;
-        border-bottom: 1px solid var(--border-hi);
-        border-left: 1px solid var(--border-hi);
-        border-radius: 0 0 0 6px;
-      }
-      .arch-merge-connector::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: calc(25% + 1px);
-        width: calc(25% - 1px);
-        height: 55%;
-        border-bottom: 1px solid var(--border-hi);
-        border-right: 1px solid var(--border-hi);
-        border-radius: 0 0 6px 0;
-      }
-      .arch-merge-stem {
-        position: absolute;
-        top: 55%;
-        bottom: 0;
-        left: 50%;
-        width: 1px;
-        background: linear-gradient(to bottom, var(--border-hi), var(--accent));
-        transform: translateX(-50%);
-      }
-      .arch-merge-stem::after {
-        content: '';
-        position: absolute;
-        bottom: -5px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 6px solid var(--accent);
-      }
-
-      /* Core modules grid */
-      .arch-core-modules {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.75rem;
-      }
-      .arch-core-mod {
-        background: var(--bg-raised);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 0.85rem 1rem;
-      }
-      .arch-core-mod-name {
-        font-size: 0.85rem;
-        font-weight: 700;
-        margin-bottom: 0.3rem;
-      }
-      .arch-core-mod-desc {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        line-height: 1.55;
-      }
-
-      /* Down connector (core → storage) */
-      .arch-down-connector {
-        height: 48px;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .arch-down-connector::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
-        width: 1px;
-        background: linear-gradient(to bottom, var(--border-hi), var(--green));
-        transform: translateX(-50%);
-      }
-      .arch-down-connector::after {
-        content: '';
-        position: absolute;
-        bottom: -1px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 6px solid var(--green);
-      }
-      .arch-down-tag {
-        background: var(--bg);
-        padding: 1px 8px;
-        font-size: 0.68rem;
-        font-family: var(--mono);
-        color: var(--text-dim);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        position: relative;
-        z-index: 1;
-      }
-
-      /* Storage file tree */
-      .arch-storage-tree {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-      }
-      .tree-item {
-        font-size: 0.8rem;
-        font-family: var(--mono);
-        color: var(--text-muted);
-        line-height: 1.9;
-      }
-      .tree-root {
-        color: var(--text);
-        font-weight: 600;
-      }
-      .tree-l1 {
-        padding-left: 1.2rem;
-      }
-      .tree-l2 {
-        padding-left: 2.4rem;
-      }
-      .tree-l3 {
-        padding-left: 3.6rem;
-      }
-      .tree-tag {
-        display: inline-block;
-        margin-left: 8px;
-        font-size: 0.68rem;
-        font-family: var(--sans);
-        padding: 1px 6px;
-        border-radius: 3px;
-        background: rgba(74, 222, 128, 0.1);
-        color: var(--green);
-      }
-
-      /* ── Quickstart ── */
-      #quickstart {
-        background: var(--bg);
-      }
-      .steps {
-        display: flex;
-        flex-direction: column;
-        gap: 2rem;
-        max-width: 760px;
-      }
-      .step {
-        display: flex;
-        gap: 1.25rem;
-      }
-      .step-num {
-        flex-shrink: 0;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: var(--accent-glow);
-        border: 1px solid rgba(124, 106, 247, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8rem;
-        font-weight: 700;
-        color: var(--accent);
-        margin-top: 2px;
-      }
-      .step-body {
-      }
-      .step-title {
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-      }
-      .step-desc {
-        font-size: 0.9rem;
-        color: var(--text-muted);
-        margin-bottom: 0.75rem;
-      }
-      pre {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 1rem 1.25rem;
-        font-family: var(--mono);
-        font-size: 0.85rem;
-        overflow-x: auto;
-        line-height: 1.7;
-        position: relative;
-      }
-      pre .c {
-        color: var(--text-dim);
-      }
-      pre .s {
-        color: var(--accent-3);
-      }
-      pre .k {
-        color: var(--accent);
-      }
-      pre .cmd {
-        color: var(--green);
-      }
-      pre .flag {
-        color: var(--yellow);
-      }
-      pre .val {
-        color: var(--accent-2);
-      }
-
-      /* ── Retrieval strategies ── */
-      #strategies {
-        background: var(--bg);
-      }
-      .strat-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 1rem;
-      }
-      .strat-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        transition:
-          border-color 0.2s,
-          transform 0.2s;
-      }
-      .strat-card:hover {
-        border-color: var(--accent);
+        border-color: var(--text-muted);
         transform: translateY(-2px);
       }
-      .strat-card.default {
-        border-color: rgba(124, 106, 247, 0.5);
-      }
-      .strat-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-family: var(--mono);
-        font-size: 0.75rem;
-        font-weight: 500;
-        margin-bottom: 0.8rem;
-      }
-      .strat-name {
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: 0.4rem;
-      }
-      .strat-desc {
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-bottom: 1rem;
-        line-height: 1.6;
-      }
-      .strat-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .meta-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 0.78rem;
-      }
-      .meta-label {
-        color: var(--text-dim);
-      }
-      .meta-val {
-        font-weight: 500;
-      }
-      .pill {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.72rem;
-        font-weight: 600;
-      }
-      .pill-green {
-        background: rgba(74, 222, 128, 0.12);
-        color: var(--green);
-      }
-      .pill-yellow {
-        background: rgba(251, 191, 36, 0.12);
-        color: var(--yellow);
-      }
-      .pill-blue {
-        background: rgba(91, 156, 246, 0.12);
-        color: var(--accent-2);
-      }
-      .pill-purple {
-        background: rgba(124, 106, 247, 0.15);
-        color: var(--accent);
-      }
 
-      /* ── Performance ── */
-      #perf {
-        background: var(--bg);
-      }
-      .perf-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
-        margin-bottom: 2rem;
-      }
-      .perf-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        text-align: center;
-      }
-      .perf-num {
-        font-size: 2.2rem;
-        font-weight: 800;
-        letter-spacing: -0.04em;
-      }
-      .perf-label {
-        font-size: 0.82rem;
-        color: var(--text-muted);
-        margin-top: 0.25rem;
-      }
-
-      /* ── Privacy ── */
-      #privacy {
-        background: var(--bg);
-      }
-      .privacy-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 0.75rem;
-      }
-      .privacy-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 1rem 1.25rem;
-      }
-      .priv-icon {
-        font-size: 1.1rem;
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-      .priv-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 0.2rem;
-      }
-      .priv-desc {
-        font-size: 0.82rem;
-        color: var(--text-muted);
-      }
-
-      /* ── CTA ── */
-      #cta {
-        background: var(--bg);
-        text-align: center;
-      }
-      .cta-card {
-        background: linear-gradient(
-          135deg,
-          rgba(124, 106, 247, 0.12) 0%,
-          rgba(91, 156, 246, 0.08) 100%
-        );
-        border: 1px solid rgba(124, 106, 247, 0.3);
-        border-radius: var(--radius-lg);
-        padding: 4rem 2rem;
-        max-width: 700px;
+      /* ── Terminal Box ── */
+      .terminal-window {
+        max-width: 800px;
         margin: 0 auto;
+        background: #0d1117;
+        border: 1px solid var(--border-hi);
+        border-radius: 14px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        text-align: left;
       }
-      .cta-title {
-        font-size: clamp(1.5rem, 3vw, 2rem);
-        font-weight: 800;
-        margin-bottom: 0.75rem;
+      .terminal-header {
+        background: #161b22;
+        padding: 12px 18px;
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
       }
-      .cta-sub {
-        color: var(--text-muted);
-        margin-bottom: 2rem;
+      .dot { width: 12px; height: 12px; border-radius: 50%; }
+      .dot.red { background: #ff5f56; }
+      .dot.yellow { background: #ffbd2e; }
+      .dot.green { background: #27c93f; }
+      
+      .terminal-body {
+        padding: 24px;
+        font-family: var(--mono);
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: #c9d1d9;
       }
+      .t-green { color: var(--papaya); }
+      .t-red { color: var(--chili); }
+      .t-orange { color: var(--carrot); }
+      .t-blue { color: #58a6ff; }
+      .t-dim { color: #484f58; }
+      .cursor { display: inline-block; width: 8px; height: 1.2em; background: var(--papaya); vertical-align: middle; margin-left: 4px; animation: blink 1s infinite; }
+      @keyframes blink { 50% { opacity: 0; } }
+
+      /* ── Features Grid ── */
+      #features { background: #0b0e14; }
+      .section-header { text-align: center; margin-bottom: 5rem; }
+      .section-label { color: var(--chili); font-weight: 800; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1rem; display: block; }
+      .section-title { font-size: clamp(2rem, 5vw, 3rem); font-weight: 850; letter-spacing: -0.03em; }
+      
+      .flavor-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 2rem;
+      }
+      .flavor-card {
+        background: var(--bg-card);
+        padding: 3rem 2.5rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .flavor-card:hover {
+        border-color: var(--border-hi);
+        transform: translateY(-5px);
+        background: var(--bg-raised);
+      }
+      .flavor-card::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; width: 60px; height: 60px;
+        background: radial-gradient(circle at 100% 0%, var(--card-glow, transparent), transparent 70%);
+        opacity: 0.5;
+      }
+      .flavor-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        display: block;
+      }
+      .flavor-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 1rem; color: var(--text); }
+      .flavor-desc { color: var(--text-muted); font-size: 1.05rem; line-height: 1.7; }
+
+      /* ── Sync Animation ── */
+      .sync-visual {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 3rem;
+        margin-top: 4rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 2rem;
+      }
+      .device { text-align: center; width: 120px; }
+      .device-icon { font-size: 3rem; margin-bottom: 1rem; display: block; filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); }
+      .device-name { font-weight: 700; font-size: 0.9rem; color: var(--text-dim); }
+      .sync-path {
+        flex: 1;
+        height: 2px;
+        background: repeating-linear-gradient(90deg, var(--border), var(--border) 10px, transparent 10px, transparent 20px);
+        position: relative;
+        min-width: 100px;
+      }
+      .sync-packet {
+        width: 10px; height: 10px; background: var(--papaya); border-radius: 50%;
+        position: absolute; top: -4px; left: 0;
+        box-shadow: 0 0 15px var(--papaya);
+        animation: slide 3s infinite linear;
+      }
+      @keyframes slide { to { left: 100%; } }
 
       /* ── Footer ── */
       footer {
+        padding: 5rem clamp(1.5rem, 6vw, 4rem);
         border-top: 1px solid var(--border);
-        padding: 2.5rem clamp(1rem, 5vw, 3rem);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 1rem;
+        text-align: center;
       }
-      .footer-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .footer-logo {
-        font-size: 0.95rem;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        background: linear-gradient(90deg, var(--accent), var(--accent-2));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        opacity: 0.75;
-      }
-      .footer-copy {
-        font-size: 0.82rem;
-        color: var(--text-dim);
-      }
-      .footer-links {
-        display: flex;
-        gap: 1.25rem;
-      }
-      .footer-links a {
-        font-size: 0.82rem;
-        color: var(--text-dim);
-        transition: color 0.2s;
-      }
-      .footer-links a:hover {
-        color: var(--text);
-        text-decoration: none;
-      }
+      .footer-logo { font-weight: 900; font-size: 2rem; margin-bottom: 1.5rem; display: inline-block; }
+      .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 3rem; }
+      .footer-links a { color: var(--text-muted); font-weight: 600; }
+      .footer-links a:hover { color: var(--text); }
+      .footer-copy { color: var(--text-dim); font-size: 0.9rem; }
 
-      /* ── Responsive ── */
+      /* ── Animations ── */
+      .fade-up { opacity: 0; transform: translateY(30px); transition: all 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .fade-up.visible { opacity: 1; transform: translateY(0); }
+
       @media (max-width: 768px) {
-        .arch-two-col {
-          grid-template-columns: 1fr;
-        }
-        .arch-split-connector {
-          display: none;
-        }
-        .arch-merge-connector {
-          display: none;
-        }
-        .arch-core-modules {
-          grid-template-columns: 1fr;
-        }
-        .nav-links {
-          display: none;
-        }
-        h1 {
-          font-size: 2rem;
-        }
-      }
-      @media (max-width: 480px) {
-        .hero-actions {
-          flex-direction: column;
-          align-items: center;
-        }
-        .btn {
-          width: 100%;
-          justify-content: center;
-        }
-      }
-
-      /* ── Divider ── */
-      .divider {
-        height: 1px;
-        background: var(--border);
-        margin: 0 clamp(1rem, 5vw, 3rem);
-      }
-
-      /* ── Fade-in animation ── */
-      .fade-up {
-        opacity: 0;
-        transform: translateY(24px);
-        transition:
-          opacity 0.55s ease,
-          transform 0.55s ease;
-      }
-      .fade-up.visible {
-        opacity: 1;
-        transform: none;
+        .nav-links { display: none; }
+        h1 { font-size: 3rem; }
+        .hero-sub { font-size: 1.1rem; }
+        .flavor-grid { grid-template-columns: 1fr; }
+        .sync-visual { flex-direction: column; }
+        .sync-path { height: 60px; width: 2px; background: repeating-linear-gradient(0deg, var(--border), var(--border) 10px, transparent 10px, transparent 20px); }
+        .sync-packet { top: 0; left: -4px; animation: slideV 3s infinite linear; }
+        @keyframes slideV { to { top: 100%; } }
       }
     </style>
   </head>
   <body>
+    <div class="bg-glow-1"></div>
+    <div class="bg-glow-2"></div>
+
     <!-- ── Nav ──────────────────────────────────────────────── -->
     <nav>
       <a class="nav-logo" href="#hero">
-        <span>Somtum</span>
+        <span class="logo-text">Somtum</span>
       </a>
       <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="#strategies">Strategies</a>
-        <a href="#quickstart">Quickstart</a>
+        <a href="#features">Flavors</a>
+        <a href="#sync">Multi-Device</a>
         <a href="https://github.com/riz007/somtum" class="nav-gh" target="_blank" rel="noopener">
-          <svg viewBox="0 0 16 16">
-            <path
-              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-            />
-          </svg>
           GitHub
         </a>
       </div>
@@ -1072,704 +406,140 @@
 
     <!-- ── Hero ──────────────────────────────────────────────── -->
     <section id="hero">
-      <div class="hero-glow"></div>
       <div class="container">
-        <div class="badge">
-          <span class="badge-dot"></span>Local-first · Zero cloud · Open source
+        <div class="hero-tagline fade-up">
+          🥗 FRESHLY BLENDED FOR CLAUDE CODE
         </div>
-        <h1>Memory that stays<br /><span>where your code does</span></h1>
-        <p class="hero-sub">
-          Somtum captures decisions, bugfixes, and learnings from every Claude Code session — stores
-          them in a local SQLite database — and injects the right ones back when you need them.
+        <h1 class="fade-up">The long-term memory<br /><span class="gradient">your agent craves.</span></h1>
+        <p class="hero-sub fade-up">
+          Somtum shreds session transcripts into vibrant memories. 
+          Stop repeating yourself and start building deeper project knowledge 
+          where it belongs—right in your local SQLite mortar.
         </p>
-        <div class="hero-actions">
-          <a href="#quickstart" class="btn btn-primary">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="4 6 8 10 12 6" />
-            </svg>
-            Get started
-          </a>
-          <a
-            href="https://github.com/riz007/somtum"
-            class="btn btn-secondary"
-            target="_blank"
-            rel="noopener"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-              />
-            </svg>
-            View on GitHub
-          </a>
+        <div class="hero-actions fade-up">
+          <a href="#install" class="btn btn-primary">Start Seasoning</a>
+          <a href="https://github.com/riz007/somtum" class="btn btn-secondary">View the Recipe</a>
         </div>
-        <div class="install-box" onclick="copyInstall(this)">
-          <span class="prompt">$</span>
-          <span class="cmd" id="install-cmd">pnpm add somtum &amp;&amp; somtum init</span>
-          <button class="copy-btn" id="copy-btn">Copy</button>
+
+        <!-- Terminal Visualization -->
+        <div class="terminal-window fade-up" style="transition-delay: 200ms;">
+          <div class="terminal-header">
+            <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+          </div>
+          <div class="terminal-body">
+            <div class="t-dim">$ somtum stats</div>
+            <br>
+            <div class="t-green">   _____ ____  __  __________  __  ___</div>
+            <div class="t-red">  / ___/ / __ \/  |/  /_  __/ / / /  |/  /</div>
+            <div class="t-orange">  \__ \ / / / / /|_/ / / / / / / / /|_/ / </div>
+            <div class="t-green"> ___/ / /_/ / /  / / / / / /_/ / /  / /  </div>
+            <div class="t-red">/____/ \____/ /_/  /_/ /_/  \____/ /_/  /_/   </div>
+            <br>
+            <div class="t-orange">Local-first memory for Claude Code</div>
+            <br>
+            <div class="t-dim">----------------------------------------</div>
+            <div>project        <span class="t-blue">e394f483</span></div>
+            <div>memories       <span class="t-green">142</span></div>
+            <div>cache entries  <span class="t-green">892</span></div>
+            <div>tokens saved   <span class="t-orange">42.5k (estimated)</span></div>
+            <div>breakeven      <span class="t-green">4.2x (zesty!)</span></div>
+            <br>
+            <div class="t-dim">$ somtum sync push<span class="cursor"></span></div>
+          </div>
         </div>
       </div>
     </section>
-
-    <!-- ── Marquee ─────────────────────────────────────────────── -->
-    <div class="marquee-wrap">
-      <div class="marquee-track">
-        <!-- set 1 -->
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm0 1v10h10V3H3zm2 2h6v1H5V5zm0 2h6v1H5V7zm0 2h4v1H5V9z"
-            /></svg
-          >SQLite WAL · No server</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3v4.5l3.5 2-.5.866L7 10V5h.5z"
-            /></svg
-          >p95 &lt;2ms at 1k memories</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-            /></svg
-          >Open source · AGPL-3.0</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M2 4h12v8H2V4zm0-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm4.5 3.5a.5.5 0 0 0-1 0v3a.5.5 0 0 0 1 0v-3zm3 0a.5.5 0 0 0-1 0v3a.5.5 0 0 0 1 0v-3z"
-            /></svg
-          >BM25 · Embeddings · Hybrid</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm1 10H7v-4h2v4zm0-5H7V5h2v1z" /></svg
-          >Zero-config · `somtum init`</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M11 5H5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1z"
-            /></svg
-          >Prompt injection hardened</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M13 1H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zM3 2h10a1 1 0 0 1 1 1v2H2V3a1 1 0 0 1 1-1zM2 13V6h5v7H3a1 1 0 0 1-1-1zm6 1V6h5v7H9a1 1 0 0 0 1-1v.001z"
-            /></svg
-          >MCP server included</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M9.5 2A1.5 1.5 0 0 1 11 3.5v9A1.5 1.5 0 0 1 9.5 14h-3A1.5 1.5 0 0 1 5 12.5v-9A1.5 1.5 0 0 1 6.5 2h3zm0 1h-3a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5z"
-            /></svg
-          >Node 20+ · pnpm · TypeScript</span
-        >
-        <!-- set 2 (duplicate for seamless loop) -->
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm0 1v10h10V3H3zm2 2h6v1H5V5zm0 2h6v1H5V7zm0 2h4v1H5V9z"
-            /></svg
-          >SQLite WAL · No server</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3v4.5l3.5 2-.5.866L7 10V5h.5z"
-            /></svg
-          >p95 &lt;2ms at 1k memories</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-            /></svg
-          >Open source · AGPL-3.0</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M2 4h12v8H2V4zm0-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm4.5 3.5a.5.5 0 0 0-1 0v3a.5.5 0 0 0 1 0v-3zm3 0a.5.5 0 0 0-1 0v3a.5.5 0 0 0 1 0v-3z"
-            /></svg
-          >BM25 · Embeddings · Hybrid</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm1 10H7v-4h2v4zm0-5H7V5h2v1z" /></svg
-          >Zero-config · `somtum init`</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M11 5H5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1z"
-            /></svg
-          >Prompt injection hardened</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M13 1H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zM3 2h10a1 1 0 0 1 1 1v2H2V3a1 1 0 0 1 1-1zM2 13V6h5v7H3a1 1 0 0 1-1-1zm6 1V6h5v7H9a1 1 0 0 0 1-1v.001z"
-            /></svg
-          >MCP server included</span
-        >
-        <span class="marquee-item"
-          ><svg viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M9.5 2A1.5 1.5 0 0 1 11 3.5v9A1.5 1.5 0 0 1 9.5 14h-3A1.5 1.5 0 0 1 5 12.5v-9A1.5 1.5 0 0 1 6.5 2h3zm0 1h-3a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5z"
-            /></svg
-          >Node 20+ · pnpm · TypeScript</span
-        >
-      </div>
-    </div>
 
     <!-- ── Features ──────────────────────────────────────────── -->
     <section id="features">
       <div class="container">
-        <p class="section-label fade-up">Features</p>
-        <h2 class="section-title fade-up">
-          Everything your sessions forget, <br />remembered for next time
-        </h2>
-        <p class="section-sub fade-up">
-          One command to install. No account, no sync server, no API key required for basic use.
-        </p>
-        <div class="features-grid fade-up">
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(124, 106, 247, 0.15)">🧠</div>
-            <div class="feat-title">Durable observations</div>
-            <div class="feat-desc">
-              Decisions, bugfixes, learnings, and file summaries extracted from every SessionEnd
-              transcript via Claude Haiku — automatically.
-            </div>
+        <div class="section-header">
+          <span class="section-label fade-up">Ingredients</span>
+          <h2 class="section-title fade-up">A perfect blend of context</h2>
+        </div>
+
+        <div class="flavor-grid">
+          <div class="flavor-card fade-up" style="--card-glow: var(--papaya);">
+            <span class="flavor-icon">🥣</span>
+            <h3 class="flavor-title">Freshly Shredded Context</h3>
+            <p class="flavor-desc">
+              Automatically shreds session transcripts into durable observations. 
+              Decisions, bugfixes, and architecture patterns are captured fresh, 
+              ready to be tossed back into context.
+            </p>
           </div>
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(74, 222, 128, 0.12)">⚡</div>
-            <div class="feat-title">Prompt cache</div>
-            <div class="feat-desc">
-              Exact-hash and fuzzy-embedding cache means identical (or near-identical) prompts never
-              hit the model twice. Token savings tracked and reported.
-            </div>
+
+          <div class="flavor-card fade-up" style="--card-glow: var(--chili); transition-delay: 100ms;">
+            <span class="flavor-icon">🌶️</span>
+            <h3 class="flavor-title">Zesty Prompt Cache</h3>
+            <p class="flavor-desc">
+              Identical or near-identical prompts never hit the model twice. 
+              Our fuzzy-embedding cache saves your API credits and keeps 
+              your sessions spicy and fast.
+            </p>
           </div>
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(91, 156, 246, 0.12)">🔍</div>
-            <div class="feat-title">Four retrieval strategies</div>
-            <div class="feat-desc">
-              BM25 (offline), embeddings (semantic), index (Haiku catalog), and hybrid (BM25 +
-              embeddings + Haiku rerank). All first-class.
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(78, 205, 196, 0.12)">🔒</div>
-            <div class="feat-title">Privacy-first</div>
-            <div class="feat-desc">
-              No network traffic except to the Anthropic API. Regex redaction at capture time.
-              Embedding model runs fully local via ONNX Runtime.
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(251, 191, 36, 0.1)">🛠</div>
-            <div class="feat-title">MCP server built-in</div>
-            <div class="feat-desc">
-              Six MCP tools — recall, get, remember, cache_lookup, forget, stats — wired
-              automatically via .mcp.json on `somtum init --all`.
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feat-icon" style="background: rgba(248, 113, 113, 0.1)">📦</div>
-            <div class="feat-title">Zero-config setup</div>
-            <div class="feat-desc">
-              One `somtum init` in any Claude Code project installs the hook. No YAML, no server, no
-              Docker. Just SQLite WAL and your filesystem.
-            </div>
+
+          <div class="flavor-card fade-up" style="--card-glow: var(--carrot); transition-delay: 200ms;">
+            <span class="flavor-icon">🥕</span>
+            <h3 class="flavor-title">Local Mortar & Pestle</h3>
+            <p class="flavor-desc">
+              Everything is pounded into a local SQLite WAL database. 
+              No cloud accounts, no telemetry, no leaks. Your data stays 
+              as private as your secret recipe.
+            </p>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="divider"></div>
-
-    <!-- ── How it works ───────────────────────────────────────── -->
-    <section id="how">
+    <!-- ── Multi-Device Sync ──────────────────────────────────── -->
+    <section id="sync">
       <div class="container">
-        <p class="section-label fade-up">Architecture</p>
-        <h2 class="section-title fade-up">How it works</h2>
-        <p class="section-sub fade-up">
-          Hooks capture, MCP tools query, SQLite stores — all locally.
-        </p>
+        <div class="section-header">
+          <span class="section-label fade-up">The Blend</span>
+          <h2 class="section-title fade-up">Multi-device, Zero friction</h2>
+          <p class="hero-sub fade-up" style="margin-top: 1rem;">
+            Synchronize your memories across machines using simple SSH. 
+            Hostname-aware merging ensures your home office and your 
+            coffee shop sessions blend perfectly.
+          </p>
+        </div>
 
-        <div class="arch-diagram fade-up">
-          <!-- Layer 0: Agent -->
-          <div class="arch-agent-box">
-            <div class="arch-agent-label">Claude Code / Agent</div>
-            <div class="arch-agent-sub">your existing workflow — no changes required</div>
+        <div class="sync-visual fade-up">
+          <div class="device">
+            <span class="device-icon">💻</span>
+            <span class="device-name">Work Station</span>
           </div>
-
-          <!-- Split connector: hooks left, MCP right -->
-          <div class="arch-split-connector">
-            <div class="arch-split-line"><span class="arch-split-tag">hooks</span></div>
-            <div class="arch-split-line"><span class="arch-split-tag">MCP tools</span></div>
+          <div class="sync-path">
+            <div class="sync-packet"></div>
           </div>
-
-          <!-- Layer 1: Hooks + MCP columns -->
-          <div class="arch-two-col">
-            <div class="arch-box arch-hooks-box">
-              <div class="arch-box-title">Capture hooks</div>
-              <div class="arch-hook">
-                <span class="hook-dot purple"></span>UserPromptSubmit → cache lookup
-              </div>
-              <div class="arch-hook">
-                <span class="hook-dot green"></span>SessionEnd → extract &amp; store
-              </div>
-              <div class="arch-hook">
-                <span class="hook-dot yellow"></span>PreCompact → extract &amp; store
-              </div>
-              <div class="arch-hook">
-                <span class="hook-dot blue"></span>PreToolUse → file gating
-              </div>
-            </div>
-            <div class="arch-box arch-mcp-box">
-              <div class="arch-box-title">MCP query tools</div>
-              <div class="arch-hook">
-                <span class="hook-dot purple"></span>recall — semantic search
-              </div>
-              <div class="arch-hook"><span class="hook-dot green"></span>get — fetch by ID</div>
-              <div class="arch-hook">
-                <span class="hook-dot yellow"></span>remember — manual insert
-              </div>
-              <div class="arch-hook">
-                <span class="hook-dot blue"></span>forget · stats · cache_lookup
-              </div>
-            </div>
+          <div class="device">
+            <span class="device-icon">☁️</span>
+            <span class="device-name">Remote SSH</span>
           </div>
-
-          <!-- Merge connector → core -->
-          <div class="arch-merge-connector"><div class="arch-merge-stem"></div></div>
-
-          <!-- Layer 2: Core -->
-          <div class="arch-box arch-core-box">
-            <div class="arch-box-title arch-box-title-center">Core (TypeScript)</div>
-            <div class="arch-core-modules">
-              <div class="arch-core-mod">
-                <div class="arch-core-mod-name">PromptCache</div>
-                <div class="arch-core-mod-desc">
-                  Exact hash · fuzzy embed · fingerprint invalidation
-                </div>
-              </div>
-              <div class="arch-core-mod">
-                <div class="arch-core-mod-name">MemoryStore</div>
-                <div class="arch-core-mod-desc">
-                  Observations · embeddings · redaction · soft delete
-                </div>
-              </div>
-              <div class="arch-core-mod">
-                <div class="arch-core-mod-name">Retriever</div>
-                <div class="arch-core-mod-desc">BM25 · embeddings · index (Haiku) · hybrid RRF</div>
-              </div>
-            </div>
+          <div class="sync-path">
+            <div class="sync-packet" style="animation-delay: -1.5s;"></div>
           </div>
-
-          <!-- Down connector → storage -->
-          <div class="arch-down-connector"><span class="arch-down-tag">SQLite WAL</span></div>
-
-          <!-- Layer 3: Storage -->
-          <div class="arch-box arch-storage-box">
-            <div class="arch-box-title arch-box-title-center">Storage</div>
-            <div class="arch-storage-tree">
-              <div class="tree-item tree-root">~/.somtum/</div>
-              <div class="tree-item tree-l1">├── config.json</div>
-              <div class="tree-item tree-l1">└── projects/</div>
-              <div class="tree-item tree-l2">└── &lt;project_id&gt;/</div>
-              <div class="tree-item tree-l3">
-                ├── db.sqlite<span class="tree-tag">source of truth</span>
-              </div>
-              <div class="tree-item tree-l3">
-                ├── index.md<span class="tree-tag">regenerated mirror</span>
-              </div>
-              <div class="tree-item tree-l3">└── memories/YYYY-MM/&lt;ulid&gt;.md</div>
-            </div>
+          <div class="device">
+            <span class="device-icon">🍎</span>
+            <span class="device-name">MacBook Pro</span>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="divider"></div>
-
-    <!-- ── Quickstart ─────────────────────────────────────────── -->
-    <section id="quickstart">
-      <div class="container">
-        <p class="section-label fade-up">Quickstart</p>
-        <h2 class="section-title fade-up">Up and running in 60 seconds</h2>
-        <p class="section-sub fade-up">
-          Requires Node 20+, pnpm, and an
-          <code
-            style="
-              font-family: var(--mono);
-              font-size: 0.9em;
-              background: var(--bg-raised);
-              padding: 2px 6px;
-              border-radius: 4px;
-            "
-            >ANTHROPIC_API_KEY</code
-          >.
-        </p>
-
-        <div class="steps fade-up">
-          <div class="step">
-            <div class="step-num">1</div>
-            <div class="step-body">
-              <div class="step-title">Install</div>
-              <div class="step-desc">Clone and build from source, or add as a dependency.</div>
-              <pre><span class="c"># from source</span>
-<span class="cmd">git</span> clone https://github.com/riz007/somtum
-<span class="cmd">cd</span> somtum &amp;&amp; <span class="cmd">pnpm</span> install &amp;&amp; <span class="cmd">pnpm</span> build
-<span class="cmd">pnpm</span> link <span class="flag">--global</span>
-
-<span class="c"># or as a dep</span>
-<span class="cmd">pnpm</span> add somtum</pre>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="step-num">2</div>
-            <div class="step-body">
-              <div class="step-title">Initialise inside your Claude Code project</div>
-              <div class="step-desc">
-                Installs the SessionEnd hook in
-                <code style="font-family: var(--mono); font-size: 0.9em">.claude/settings.json</code
-                >. Use <code style="font-family: var(--mono); font-size: 0.9em">--all</code> to
-                enable every feature at once.
-              </div>
-              <pre><span class="c"># minimal — just the capture hook</span>
-<span class="cmd">somtum</span> init
-
-<span class="c"># everything: hooks + MCP server</span>
-<span class="cmd">somtum</span> init <span class="flag">--all</span></pre>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="step-num">3</div>
-            <div class="step-body">
-              <div class="step-title">Search your accumulated memory</div>
-              <div class="step-desc">
-                After a few sessions, your observations are queryable in milliseconds.
-              </div>
-              <pre><span class="cmd">somtum</span> search <span class="s">"auth jwt rotation"</span>
-<span class="cmd">somtum</span> search <span class="s">"why we use pnpm"</span> <span class="flag">--strategy</span> hybrid
-<span class="cmd">somtum</span> show <span class="val">01JBZ...</span>         <span class="c"># full body</span>
-<span class="cmd">somtum</span> stats                   <span class="c"># tokens saved</span>
-<span class="cmd">somtum</span> doctor                  <span class="c"># health check</span></pre>
-            </div>
-          </div>
-
-          <div class="step">
-            <div class="step-num">4</div>
-            <div class="step-body">
-              <div class="step-title">Enable semantic search (optional)</div>
-              <div class="step-desc">
-                Downloads a 30 MB ONNX embedding model — runs fully local, no API call needed.
-              </div>
-              <pre><span class="cmd">somtum</span> config set retrieval.embeddings.enabled <span class="val">true</span>
-<span class="cmd">somtum</span> reindex    <span class="c"># embed existing observations</span></pre>
-            </div>
-          </div>
+    <!-- ── Install ───────────────────────────────────────────── -->
+    <section id="install">
+      <div class="container" style="text-align: center;">
+        <div class="section-header">
+          <span class="section-label fade-up">Ready to Eat?</span>
+          <h2 class="section-title fade-up">One command to start remembering</h2>
         </div>
-      </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- ── Strategies ─────────────────────────────────────────── -->
-    <section id="strategies">
-      <div class="container">
-        <p class="section-label fade-up">Retrieval</p>
-        <h2 class="section-title fade-up">Four strategies, all first-class</h2>
-        <p class="section-sub fade-up">Switch with a single config key — no code changes needed.</p>
-
-        <div class="strat-grid fade-up">
-          <div class="strat-card">
-            <span class="strat-badge" style="background: rgba(74, 222, 128, 0.12); color: #4ade80"
-              >bm25</span
-            >
-            <div class="strat-name">BM25 Lexical</div>
-            <div class="strat-desc">
-              SQLite FTS5 full-text search over title, body, and tags. Works offline. Near-zero
-              cost.
-            </div>
-            <div class="strat-meta">
-              <div class="meta-row">
-                <span class="meta-label">Best for</span
-                ><span class="meta-val">Keyword queries</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Cost</span><span class="pill pill-green">Near-zero</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Offline</span><span class="pill pill-green">Always</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="strat-card">
-            <span class="strat-badge" style="background: rgba(91, 156, 246, 0.12); color: #5b9cf6"
-              >embeddings</span
-            >
-            <div class="strat-name">Vector Similarity</div>
-            <div class="strat-desc">
-              384-dim cosine similarity via bge-small-en-v1.5 (ONNX, 30 MB). Finds semantically
-              related observations your keywords miss.
-            </div>
-            <div class="strat-meta">
-              <div class="meta-row">
-                <span class="meta-label">Best for</span
-                ><span class="meta-val">Semantic queries</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Cost</span><span class="pill pill-blue">~5ms at 10k</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Offline</span
-                ><span class="pill pill-green">Yes (ONNX)</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="strat-card">
-            <span class="strat-badge" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24"
-              >index</span
-            >
-            <div class="strat-name">Haiku Catalog</div>
-            <div class="strat-desc">
-              A compact catalog is sent to Claude Haiku, which selects the most relevant IDs.
-              Handles paraphrased and ambiguous queries best.
-            </div>
-            <div class="strat-meta">
-              <div class="meta-row">
-                <span class="meta-label">Best for</span
-                ><span class="meta-val">Paraphrased queries</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Cost</span
-                ><span class="pill pill-yellow">1 Haiku call</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Offline</span><span class="pill pill-yellow">No</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="strat-card default">
-            <span class="strat-badge" style="background: rgba(124, 106, 247, 0.15); color: #a99ffb"
-              >hybrid ★</span
-            >
-            <div class="strat-name">Hybrid RRF</div>
-            <div class="strat-desc">
-              BM25 top-50 ∪ embeddings top-50 → Reciprocal Rank Fusion → Haiku rerank. The default.
-              Best recall across all query types.
-            </div>
-            <div class="strat-meta">
-              <div class="meta-row">
-                <span class="meta-label">Best for</span><span class="meta-val">General use</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Cost</span
-                ><span class="pill pill-purple">BM25 + emb + Haiku</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Default</span><span class="pill pill-purple">Yes</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- ── Performance ────────────────────────────────────────── -->
-    <section id="perf">
-      <div class="container">
-        <p class="section-label fade-up">Performance</p>
-        <h2 class="section-title fade-up">Fast enough to be invisible</h2>
-        <p class="section-sub fade-up">
-          The UserPromptSubmit hot path is measured on every build. Numbers are p95 from the
-          benchmark suite.
-        </p>
-
-        <div class="perf-grid fade-up">
-          <div class="perf-card">
-            <div class="perf-num" style="color: var(--green)">&lt;2ms</div>
-            <div class="perf-label">
-              BM25 k=8 at 1k memories<br /><span style="color: var(--text-dim)"
-                >p95 budget: 150ms</span
-              >
-            </div>
-          </div>
-          <div class="perf-card">
-            <div class="perf-num" style="color: var(--green)">&lt;30ms</div>
-            <div class="perf-label">
-              BM25 k=8 at 10k memories<br /><span style="color: var(--text-dim)"
-                >p95 budget: 300ms</span
-              >
-            </div>
-          </div>
-          <div class="perf-card">
-            <div class="perf-num" style="color: var(--accent-2)">&lt;0.1ms</div>
-            <div class="perf-label">
-              Exact cache hash lookup<br /><span style="color: var(--text-dim)"
-                >SQLite rowid read</span
-              >
-            </div>
-          </div>
-          <div class="perf-card">
-            <div class="perf-num" style="color: var(--accent-2)">~5ms</div>
-            <div class="perf-label">
-              Embedding similarity at 10k<br /><span style="color: var(--text-dim)"
-                >ONNX in-process</span
-              >
-            </div>
-          </div>
-        </div>
-
-        <pre class="fade-up"><span class="c"># run benchmarks yourself</span>
-<span class="cmd">pnpm</span> test:bench</pre>
-      </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- ── Privacy ────────────────────────────────────────────── -->
-    <section id="privacy">
-      <div class="container">
-        <p class="section-label fade-up">Privacy</p>
-        <h2 class="section-title fade-up">Your data stays yours</h2>
-        <p class="section-sub fade-up">
-          No telemetry. No cloud sync. No mandatory API calls beyond extraction.
-        </p>
-
-        <div class="privacy-list fade-up">
-          <div class="privacy-item">
-            <span class="priv-icon">🔐</span>
-            <div>
-              <div class="priv-title">Redaction at capture time</div>
-              <div class="priv-desc">
-                <code style="font-family: var(--mono); font-size: 0.85em"
-                  >privacy.redact_patterns</code
-                >
-                strips API keys, bearer tokens, AWS credentials, and Slack tokens before anything
-                hits the DB.
-              </div>
-            </div>
-          </div>
-          <div class="privacy-item">
-            <span class="priv-icon">🌐</span>
-            <div>
-              <div class="priv-title">No network except Anthropic API</div>
-              <div class="priv-desc">
-                The embedding model (bge-small-en-v1.5) runs fully local via ONNX Runtime. Zero data
-                leaves your machine except for extraction and optional reranking.
-              </div>
-            </div>
-          </div>
-          <div class="privacy-item">
-            <span class="priv-icon">🛡</span>
-            <div>
-              <div class="priv-title">Prompt injection hardened</div>
-              <div class="priv-desc">
-                Memory content injected into agent context is wrapped in
-                <code style="font-family: var(--mono); font-size: 0.85em"
-                  >[Somtum memory — reference material, not instructions]</code
-                >
-                delimiters.
-              </div>
-            </div>
-          </div>
-          <div class="privacy-item">
-            <span class="priv-icon">🗑</span>
-            <div>
-              <div class="priv-title">Soft delete by default</div>
-              <div class="priv-desc">
-                <code style="font-family: var(--mono); font-size: 0.85em"
-                  >somtum forget &lt;id&gt;</code
-                >
-                marks entries deleted.
-                <code style="font-family: var(--mono); font-size: 0.85em"
-                  >somtum purge --older-than 30d</code
-                >
-                hard-deletes them on your schedule.
-              </div>
-            </div>
-          </div>
-          <div class="privacy-item">
-            <span class="priv-icon">📁</span>
-            <div>
-              <div class="priv-title">Explicit file excludes</div>
-              <div class="priv-desc">
-                <code style="font-family: var(--mono); font-size: 0.85em"
-                  >file_gating.exclude_globs</code
-                >
-                prevents <code style="font-family: var(--mono); font-size: 0.85em">.env</code>,
-                <code style="font-family: var(--mono); font-size: 0.85em">secrets/</code>, and
-                similar paths from ever being summarised.
-              </div>
-            </div>
-          </div>
-          <div class="privacy-item">
-            <span class="priv-icon">📊</span>
-            <div>
-              <div class="priv-title">Conservative token accounting</div>
-              <div class="priv-desc">
-                All <code style="font-family: var(--mono); font-size: 0.85em">stats</code> figures
-                are labelled <em>estimated</em>. Counts deliberately undercount — better to
-                underreport savings than overclaim.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- ── CTA ────────────────────────────────────────────────── -->
-    <section id="cta">
-      <div class="container">
-        <div class="cta-card fade-up">
-          <h2 class="cta-title">Start remembering today</h2>
-          <p class="cta-sub">One command. No account. Your sessions get smarter with every run.</p>
-          <div class="hero-actions" style="justify-content: center">
-            <a
-              href="https://github.com/riz007/somtum"
-              class="btn btn-primary"
-              target="_blank"
-              rel="noopener"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path
-                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-                />
-              </svg>
-              View on GitHub
-            </a>
-            <a
-              href="https://github.com/riz007/somtum/blob/main/README.md"
-              class="btn btn-secondary"
-              target="_blank"
-              rel="noopener"
-            >
-              Read the docs
-            </a>
+        
+        <div class="terminal-window fade-up" style="max-width: 600px; display: inline-block; width: 100%;">
+          <div class="terminal-body" style="text-align: center; cursor: pointer;" onclick="copyInstall()">
+            <span class="t-dim">$</span> <span id="install-cmd">pnpm add -g somtum && somtum init --all</span>
+            <div id="copy-msg" style="font-size: 0.7rem; margin-top: 10px; color: var(--papaya); opacity: 0;">Copied to clipboard!</div>
           </div>
         </div>
       </div>
@@ -1777,70 +547,38 @@
 
     <!-- ── Footer ─────────────────────────────────────────────── -->
     <footer>
-      <div class="footer-left">
-        <span class="footer-logo">Somtum</span>
-        <span class="footer-copy">© 2026 Rizwanul Islam Rudra · AGPL-3.0</span>
-      </div>
-      <div class="footer-links">
-        <a href="https://github.com/riz007/somtum" target="_blank" rel="noopener">GitHub</a>
-        <a
-          href="https://github.com/riz007/somtum/blob/main/README.md"
-          target="_blank"
-          rel="noopener"
-          >Docs</a
-        >
-        <a href="https://github.com/riz007/somtum/blob/main/LICENSE" target="_blank" rel="noopener"
-          >License</a
-        >
-        <a
-          href="https://github.com/riz007/somtum/blob/main/CONTRIBUTING.md"
-          target="_blank"
-          rel="noopener"
-          >Contributing</a
-        >
+      <div class="container">
+        <div class="footer-logo logo-text">Somtum</div>
+        <div class="footer-links">
+          <a href="https://github.com/riz007/somtum">GitHub</a>
+          <a href="https://github.com/riz007/somtum/blob/main/README.md">Docs</a>
+          <a href="https://github.com/riz007/somtum/blob/main/CONTRIBUTING.md">Contribute</a>
+        </div>
+        <div class="footer-copy">
+          Built with 🌶️ by Rizwanul Islam Rudra · MIT Licensed
+        </div>
       </div>
     </footer>
 
     <script>
-      // Copy install command
-      function copyInstall(el) {
-        const cmd = 'pnpm add somtum && somtum init';
-        navigator.clipboard.writeText(cmd).catch(() => {});
-        const btn = document.getElementById('copy-btn');
-        btn.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-          btn.classList.remove('copied');
-        }, 2000);
-      }
-
       // Intersection observer for fade-up animations
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              observer.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
-      );
-
-      document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el));
-
-      // Stagger children of grids
-      document
-        .querySelectorAll('.features-grid, .strat-grid, .perf-grid, .privacy-list')
-        .forEach((grid) => {
-          const children = grid.querySelectorAll(
-            '.feature-card, .strat-card, .perf-card, .privacy-item',
-          );
-          children.forEach((child, i) => {
-            child.style.transitionDelay = `${i * 60}ms`;
-          });
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
         });
+      }, { threshold: 0.1 });
+
+      document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+      function copyInstall() {
+        const cmd = document.getElementById('install-cmd').innerText;
+        navigator.clipboard.writeText(cmd);
+        const msg = document.getElementById('copy-msg');
+        msg.style.opacity = 1;
+        setTimeout(() => msg.style.opacity = 0, 2000);
+      }
     </script>
   </body>
 </html>

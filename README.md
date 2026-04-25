@@ -2,6 +2,8 @@
 
 **Local-first memory and prompt-cache layer for Claude Code.**
 
+[**Landing Page & Demo**](https://riz007.github.io/somtum/)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
 
@@ -473,4 +475,4 @@ Contributions are welcome! If you'd like to help improve Somtum, please see our 
 
 ## License
 
-Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+Licensed under the [MIT License](LICENSE).
