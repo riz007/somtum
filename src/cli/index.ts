@@ -16,6 +16,7 @@ import { syncCommand } from './sync.js';
 import { doctorCommand } from './doctor.js';
 import { configGetCommand, configSetCommand } from './config_cmd.js';
 import { runMcpServer } from '../mcp/server.js';
+import { printLogo } from './ui.js';
 
 const program = new Command();
 
@@ -23,6 +24,12 @@ program
   .name('somtum')
   .description('Local-first memory and prompt-cache layer for Claude Code')
   .version('0.1.0');
+
+// Show logo unless it's an internal hook call or MCP server.
+const isInternal = process.argv.includes('hook') || process.argv.includes('mcp');
+if (!isInternal) {
+  printLogo();
+}
 
 program
   .command('init')
