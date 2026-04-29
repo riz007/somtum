@@ -39,7 +39,7 @@ describe('sync', () => {
   });
 
   it('correctly identifies local hostname in push path', async () => {
-    const host = hostname().toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const _host = hostname().toLowerCase().replace(/[^a-z0-9]/g, '-');
     const result = await runSync({ direction: 'status', remote: 'user@host:/path' });
     expect(result.remote).toBe('user@host:/path');
   });

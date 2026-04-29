@@ -1,6 +1,6 @@
 {
   "name": "somtum",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-first memory and prompt-cache layer for Claude Code",
   "type": "module",
   "license": "MIT",
@@ -61,8 +61,9 @@
   ],
   "scripts": {
     "prepublishOnly": "pnpm build",
-    "build": "tsc -p tsconfig.build.json && pnpm run build:copy-migrations",
+    "build": "tsc -p tsconfig.build.json && pnpm run build:copy-migrations && pnpm run build:copy-dashboard",
     "build:copy-migrations": "node -e \"import('node:fs').then(({mkdirSync,cpSync})=>{mkdirSync('dist/db/migrations',{recursive:true});cpSync('src/db/migrations','dist/db/migrations',{recursive:true});})\"",
+    "build:copy-dashboard": "node -e \"import('node:fs').then(({mkdirSync,cpSync})=>{mkdirSync('dist/dashboard',{recursive:true});cpSync('src/dashboard','dist/dashboard',{recursive:true});})\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:golden": "vitest run test/golden",
@@ -80,6 +81,9 @@
     "better-sqlite3": "^11.5.0",
     "commander": "^12.1.0",
     "gpt-tokenizer": "^2.5.1",
+    "h3": "2.0.1-rc.20",
+    "listhen": "^1.9.1",
+    "sirv": "^3.0.2",
     "ulid": "^2.3.0",
     "zod": "^3.23.8"
   },

@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   ExtractorResponseSchema,
   type ExtractorResponse,
@@ -26,9 +26,7 @@ export function anthropicCaller(client: Anthropic): LlmCaller {
         system,
         messages: [{ role: 'user', content: user }],
       });
-      const text = resp.content
-        .map((b) => (b.type === 'text' ? b.text : ''))
-        .join('');
+      const text = resp.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
       return {
         text,
         inputTokens: resp.usage.input_tokens,
@@ -139,8 +137,9 @@ export async function extract(
       continue;
     }
 
-    const validation: { success: true; data: ExtractorResponse } | { success: false; error: { message: string } } =
-      ExtractorResponseSchema.safeParse(parsed);
+    const validation:
+      | { success: true; data: ExtractorResponse }
+      | { success: false; error: { message: string } } = ExtractorResponseSchema.safeParse(parsed);
     if (!validation.success) {
       lastError = validation.error.message;
       attempt += 1;
