@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Somtum</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              bg: '#07080b',
+              surface: '#0d0f14',
+              surface2: '#131720',
+              border: '#1a1f2c',
+              'border-s': '#252d3e',
+              papaya: '#4ade80',
+              chili: '#f87171',
+              carrot: '#fbbf24',
+              teal: '#22d3ee',
+              cobalt: '#60a5fa',
+              violet: '#a78bfa',
+            },
+            fontFamily: {
+              display: ['Syne', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        margin: 0;
+      }
+      body {
+        background: #07080b;
+        color: #c5c9d4;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Scrollbars ────────────────────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #252d3e;
+        border-radius: 2px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #333d52;
+      }
+
+      /* ── Stat chips ────────────────────────────────────────────── */
+      .stat-chip {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 5px 12px;
+        background: #0d0f14;
+        border: 1px solid #1a1f2c;
+        border-radius: 6px;
+        min-width: 76px;
+        cursor: default;
+      }
+      .stat-chip .lbl {
+        font-size: 8.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #333d52;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
+      }
+      .stat-chip .val {
+        font-size: 15px;
+        font-weight: 700;
+        font-family: 'Syne', sans-serif;
+        line-height: 1.2;
+        margin-top: 1px;
+      }
+
+      /* ── Tab buttons ───────────────────────────────────────────── */
+      .tab-btn {
+        padding: 9px 16px;
+        font-family: 'Syne', sans-serif;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #333d52;
+        border: none;
+        border-bottom: 2px solid transparent;
+        background: none;
+        cursor: pointer;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .tab-btn:hover {
+        color: #7a8299;
+      }
+      .tab-btn.active {
+        color: #4ade80;
+        border-bottom-color: #4ade80;
+      }
+
+      /* ── Strategy buttons ──────────────────────────────────────── */
+      .strat-btn {
+        padding: 2px 8px;
+        font-size: 9.5px;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        border: 1px solid #1a1f2c;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #0d0f14;
+        color: #333d52;
+        transition: all 0.12s;
+      }
+      .strat-btn:hover {
+        border-color: #252d3e;
+        color: #7a8299;
+      }
+      .strat-btn.active {
+        background: rgba(34, 211, 238, 0.08);
+        border-color: rgba(34, 211, 238, 0.4);
+        color: #22d3ee;
+      }
+
+      /* ── Kind filter chips ─────────────────────────────────────── */
+      .kind-chip {
+        padding: 2px 7px;
+        font-size: 9.5px;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 0.12s;
+        background: #131720;
+        color: #333d52;
+      }
+      .kind-chip:hover {
+        color: #7a8299;
+        border-color: #252d3e;
+      }
+
+      /* ── Memory cards ──────────────────────────────────────────── */
+      .mem-card {
+        padding: 9px 10px;
+        background: #0d0f14;
+        border: 1px solid #1a1f2c;
+        border-radius: 6px;
+        cursor: pointer;
+        transition:
+          border-color 0.12s,
+          background 0.12s;
+        position: relative;
+      }
+      .mem-card:hover {
+        border-color: #252d3e;
+        background: #101318;
+      }
+      .mem-card.selected {
+        border-color: #4ade80 !important;
+        background: rgba(74, 222, 128, 0.035) !important;
+      }
+      .forget-btn {
+        display: none;
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        width: 18px;
+        height: 18px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        background: rgba(248, 113, 113, 0.08);
+        border: 1px solid rgba(248, 113, 113, 0.2);
+        color: #f87171;
+        font-size: 9px;
+        cursor: pointer;
+        transition: background 0.12s;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
+      }
+      .mem-card:hover .forget-btn {
+        display: flex;
+      }
+      .forget-btn:hover {
+        background: rgba(248, 113, 113, 0.16) !important;
+      }
+
+      /* ── Analytics cards ───────────────────────────────────────── */
+      .a-card {
+        background: #0d0f14;
+        border: 1px solid #1a1f2c;
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .a-title {
+        font-size: 9px;
+        font-family: 'Syne', sans-serif;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #333d52;
+        margin-bottom: 14px;
+      }
+
+      /* ── Progress bars ─────────────────────────────────────────── */
+      .bar-track {
+        height: 3px;
+        background: #1a1f2c;
+        border-radius: 2px;
+        flex: 1;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        width: 0;
+        transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      /* ── Graph ─────────────────────────────────────────────────── */
+      #graph-wrap {
+        flex: 1;
+        min-height: 0;
+        margin: 10px;
+        border: 1px solid #1a1f2c;
+        border-radius: 8px;
+        background: #09090d;
+        overflow: hidden;
+      }
+
+      /* ── Detail drawer ─────────────────────────────────────────── */
+      #detail-drawer {
+        border-top: 1px solid #1a1f2c;
+        background: #0b0d11;
+        overflow-y: auto;
+        flex-shrink: 0;
+        max-height: 40vh;
+      }
+
+      /* ── Animations ────────────────────────────────────────────── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fade-up {
+        animation: fadeUp 0.18s ease forwards;
+      }
+
+      @keyframes shimmer {
+        0%,
+        100% {
+          opacity: 0.35;
+        }
+        50% {
+          opacity: 0.65;
+        }
+      }
+      .skel {
+        background: #131720;
+        border-radius: 5px;
+        animation: shimmer 1.4s ease-in-out infinite;
+      }
+
+      /* ── Empty states ──────────────────────────────────────────── */
+      .empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: #333d52;
+        font-family: 'Syne', sans-serif;
+        font-weight: 700;
+        font-size: 11px;
+        text-align: center;
+        gap: 8px;
+      }
+      .empty svg {
+        opacity: 0.25;
+      }
+
+      /* ── File rows ─────────────────────────────────────────────── */
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid #13161e;
+      }
+      .file-row:last-child {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════ HEADER ═══════════════════════════ -->
+    <header
+      style="
+        height: 49px;
+        border-bottom: 1px solid #1a1f2c;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      "
+    >
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span
+          style="
+            font-family: Syne;
+            font-size: 18px;
+            font-weight: 800;
+            color: #4ade80;
+            letter-spacing: -0.02em;
+          "
+          >somtum</span
+        >
+        <span style="width: 1px; height: 16px; background: #1a1f2c"></span>
+        <span
+          id="project-id"
+          style="
+            font-size: 10px;
+            color: #2e3547;
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          "
+        ></span>
+      </div>
+      <div id="stat-chips" style="display: flex; gap: 6px">
+        <div class="stat-chip">
+          <span class="lbl">memories</span
+          ><span id="s-mem" class="val" style="color: #4ade80">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="lbl">saved</span
+          ><span id="s-saved" class="val" style="color: #fbbf24">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="lbl">spent</span
+          ><span id="s-spent" class="val" style="color: #c5c9d4">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="lbl">roi</span><span id="s-roi" class="val" style="color: #22d3ee">—</span>
+        </div>
+        <div class="stat-chip">
+          <span class="lbl">cache hit</span
+          ><span id="s-cache" class="val" style="color: #a78bfa">—</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══════════════════════ BODY ════════════════════════════= -->
+    <div style="display: flex; height: calc(100vh - 49px); overflow: hidden">
+      <!-- ─── LEFT SIDEBAR: Memory browser ────────────────────── -->
+      <aside
+        style="
+          width: 296px;
+          flex-shrink: 0;
+          border-right: 1px solid #1a1f2c;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        "
+      >
+        <!-- Search + strategy -->
+        <div
+          style="
+            padding: 10px;
+            border-bottom: 1px solid #1a1f2c;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+          "
+        >
+          <div style="position: relative">
+            <svg
+              style="
+                position: absolute;
+                left: 8px;
+                top: 6.5px;
+                width: 13px;
+                height: 13px;
+                color: #2e3547;
+                pointer-events: none;
+              "
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"
+              />
+            </svg>
+            <input
+              id="search-input"
+              type="text"
+              placeholder="search memories…"
+              autocomplete="off"
+              style="
+                width: 100%;
+                background: #0a0c10;
+                border: 1px solid #1a1f2c;
+                border-radius: 5px;
+                padding: 6px 8px 6px 26px;
+                font-size: 12px;
+                font-family: 'JetBrains Mono', monospace;
+                color: #c5c9d4;
+                outline: none;
+                transition: border-color 0.15s;
+              "
+              onfocus="this.style.borderColor = '#22d3ee'"
+              onblur="this.style.borderColor = '#1a1f2c'"
+            />
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px">
+            <span
+              style="
+                font-size: 8.5px;
+                color: #2e3547;
+                font-family: Syne;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                white-space: nowrap;
+              "
+              >via</span
+            >
+            <div id="strategy-btns" style="display: flex; gap: 4px"></div>
+            <div id="search-spinner" style="display: none; margin-left: 4px">
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#22d3ee"
+                stroke-width="2.5"
+                style="animation: spin 0.8s linear infinite"
+              >
+                <path
+                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kind filter -->
+        <div
+          id="kind-filter"
+          style="
+            padding: 8px 10px;
+            border-bottom: 1px solid #1a1f2c;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            flex-shrink: 0;
+          "
+        ></div>
+
+        <!-- List header -->
+        <div
+          style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #13161e;
+          "
+        >
+          <span
+            style="
+              font-size: 9px;
+              font-family: Syne;
+              font-weight: 800;
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+              color: #2e3547;
+            "
+            >memories</span
+          >
+          <span
+            id="list-count"
+            style="font-size: 9px; font-family: 'JetBrains Mono'; color: #2e3547"
+          ></span>
+        </div>
+
+        <!-- Memory list -->
+        <div
+          id="memory-list"
+          style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          "
+        ></div>
+      </aside>
+
+      <!-- ─── RIGHT PANEL ───────────────────────────────────────── -->
+      <main style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0">
+        <!-- Tab bar -->
+        <div
+          style="
+            border-bottom: 1px solid #1a1f2c;
+            padding: 0 6px;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            background: #07080b;
+          "
+        >
+          <button class="tab-btn active" data-tab="graph">Graph</button>
+          <button class="tab-btn" data-tab="analytics">Analytics</button>
+          <div style="flex: 1"></div>
+          <span
+            id="tab-info"
+            style="
+              font-size: 9px;
+              font-family: Syne;
+              font-weight: 700;
+              color: #2e3547;
+              padding-right: 14px;
+            "
+          ></span>
+        </div>
+
+        <!-- Tab content -->
+        <div
+          style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0"
+        >
+          <!-- GRAPH TAB -->
+          <div
+            id="tab-graph"
+            style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0"
+          >
+            <div id="graph-wrap"></div>
+          </div>
+
+          <!-- ANALYTICS TAB (hidden) -->
+          <div id="tab-analytics" style="display: none; flex: 1; overflow-y: auto; padding: 12px">
+            <div
+              id="analytics-grid"
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
+            >
+              <div class="skel" style="height: 180px"></div>
+              <div class="skel" style="height: 180px"></div>
+              <div class="skel" style="height: 200px"></div>
+              <div class="skel" style="height: 200px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail drawer (hidden by default) -->
+        <div id="detail-drawer" style="display: none">
+          <div style="padding: 14px 18px">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 10px;
+              "
+            >
+              <div>
+                <span
+                  id="d-kind"
+                  style="
+                    font-family: Syne;
+                    font-size: 9px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    display: inline-block;
+                    margin-bottom: 5px;
+                  "
+                ></span>
+                <h3
+                  id="d-title"
+                  style="
+                    font-family: Syne;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #dde2ee;
+                    line-height: 1.3;
+                    margin: 0;
+                  "
+                ></h3>
+                <div style="display: flex; gap: 14px; margin-top: 5px">
+                  <span id="d-date" style="font-size: 10px; color: #2e3547"></span>
+                  <span id="d-tokens" style="font-size: 10px; color: #333d52"></span>
+                </div>
+              </div>
+              <button
+                onclick="closeDetail()"
+                style="
+                  color: #2e3547;
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  padding: 3px;
+                  border-radius: 4px;
+                  line-height: 1;
+                  flex-shrink: 0;
+                  transition: color 0.12s;
+                "
+                onmouseover="this.style.color = '#7a8299'"
+                onmouseout="this.style.color = '#2e3547'"
+              >
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div
+              id="d-body"
+              style="
+                color: #8a91a8;
+                font-size: 12px;
+                line-height: 1.75;
+                white-space: pre-wrap;
+                margin-bottom: 12px;
+                max-height: 180px;
+                overflow-y: auto;
+              "
+            ></div>
+            <div
+              id="d-footer"
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                padding-top: 10px;
+                border-top: 1px solid #13161e;
+              "
+            ></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- spin keyframes (for search spinner) -->
+    <style>
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+
+    <script>
+      // ──────────────────────────────────────────────────────────────────────────────
+      // State
+      // ──────────────────────────────────────────────────────────────────────────────
+      const S = {
+        data: null, // /api/data response
+        fullStats: null, // /api/stats/full response
+        activeTab: 'graph',
+        activeKind: null, // kind filter
+        selectedId: null,
+        searchQuery: '',
+        searchResults: null,
+        strategy: 'bm25',
+        debounce: null,
+        network: null,
+        analyticsRendered: false,
+      };
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Kind → color
+      // ──────────────────────────────────────────────────────────────────────────────
+      const KC = {
+        decision: '#4ade80',
+        bugfix: '#f87171',
+        learning: '#fbbf24',
+        command: '#60a5fa',
+        file_summary: '#a78bfa',
+        other: '#52576a',
+      };
+      function kc(kind) {
+        return KC[kind] ?? '#52576a';
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Helpers
+      // ──────────────────────────────────────────────────────────────────────────────
+      function fmtN(n) {
+        if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+        return n.toLocaleString();
+      }
+
+      function relTime(ts) {
+        const d = Date.now() - ts;
+        const s = d / 1000,
+          m = s / 60,
+          h = m / 60,
+          day = h / 24;
+        if (s < 60) return 'just now';
+        if (m < 60) return Math.floor(m) + 'm ago';
+        if (h < 24) return Math.floor(h) + 'h ago';
+        if (day < 30) return Math.floor(day) + 'd ago';
+        return new Date(ts).toLocaleDateString();
+      }
+
+      function trunc(s, n) {
+        return s.length > n ? s.slice(0, n - 1) + '…' : s;
+      }
+
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Boot
+      // ──────────────────────────────────────────────────────────────────────────────
+      async function init() {
+        buildStrategyButtons();
+        buildKindFilter([]);
+
+        try {
+          const r = await fetch('/api/data');
+          S.data = await r.json();
+          renderHeaderStats(S.data.stats);
+          buildKindFilter(Object.keys(KC));
+          renderList(visibleMemories());
+          renderGraph(S.data.graph);
+          updateListCount();
+        } catch (e) {
+          console.error('init failed', e);
+        }
+
+        // Load cache hit for header without blocking
+        loadFullStats().catch(() => {});
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Header
+      // ──────────────────────────────────────────────────────────────────────────────
+      function renderHeaderStats(stats) {
+        document.getElementById('project-id').textContent = stats.projectId;
+        document.getElementById('s-mem').textContent = fmtN(stats.memories);
+        document.getElementById('s-saved').textContent = fmtN(stats.tokensSaved);
+        document.getElementById('s-spent').textContent = fmtN(stats.tokensSpent);
+        const roi =
+          stats.tokensSpent > 0 ? '×' + (stats.tokensSaved / stats.tokensSpent).toFixed(1) : '—';
+        document.getElementById('s-roi').textContent = roi;
+      }
+
+      async function loadFullStats() {
+        if (S.fullStats) return S.fullStats;
+        const r = await fetch('/api/stats/full');
+        S.fullStats = await r.json();
+        const hr = S.fullStats.cache.hit_rate;
+        document.getElementById('s-cache').textContent =
+          hr !== null ? Math.round(hr * 100) + '%' : '—';
+        return S.fullStats;
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Strategy buttons
+      // ──────────────────────────────────────────────────────────────────────────────
+      function buildStrategyButtons() {
+        const el = document.getElementById('strategy-btns');
+        el.innerHTML = '';
+        ['bm25', 'hybrid', 'embeddings'].forEach((s) => {
+          const b = document.createElement('button');
+          b.className = 'strat-btn' + (s === S.strategy ? ' active' : '');
+          b.textContent = s;
+          b.onclick = () => {
+            S.strategy = s;
+            buildStrategyButtons();
+            if (S.searchQuery) doSearch();
+          };
+          el.appendChild(b);
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Kind filter
+      // ──────────────────────────────────────────────────────────────────────────────
+      function buildKindFilter(kinds) {
+        const el = document.getElementById('kind-filter');
+        el.innerHTML = '';
+        const chips = [
+          { kind: null, label: 'all' },
+          ...kinds.map((k) => ({ kind: k, label: k.replace('_', ' ') })),
+        ];
+        chips.forEach(({ kind, label }) => {
+          const b = document.createElement('button');
+          b.className = 'kind-chip';
+          b.textContent = label;
+          const active = S.activeKind === kind;
+          if (active) {
+            const c = kind ? kc(kind) : '#4ade80';
+            b.style.cssText = `background:${c}14;border-color:${c}50;color:${c};`;
+          }
+          b.onclick = () => {
+            S.activeKind = kind;
+            buildKindFilter(kinds);
+            renderList(visibleMemories());
+            updateListCount();
+          };
+          el.appendChild(b);
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Visible memory list
+      // ──────────────────────────────────────────────────────────────────────────────
+      function visibleMemories() {
+        let mems =
+          S.searchResults !== null
+            ? S.searchResults.map((r) => r.observation ?? r)
+            : (S.data?.memories ?? []);
+        if (S.activeKind) mems = mems.filter((m) => m.kind === S.activeKind);
+        return mems;
+      }
+
+      function updateListCount() {
+        const vis = visibleMemories().length;
+        const total = S.data?.stats?.memories ?? 0;
+        const el = document.getElementById('list-count');
+        el.textContent = S.searchQuery || S.activeKind ? `${vis} / ${total}` : `${total}`;
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Memory list
+      // ──────────────────────────────────────────────────────────────────────────────
+      function renderList(mems) {
+        const el = document.getElementById('memory-list');
+        if (!mems.length) {
+          el.innerHTML = `<div class="empty">
+      <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <span>${S.searchQuery ? 'no results' : 'no memories'}</span>
+    </div>`;
+          return;
+        }
+
+        el.innerHTML = '';
+        mems.forEach((m) => {
+          const card = document.createElement('div');
+          card.className = 'mem-card fade-up' + (S.selectedId === m.id ? ' selected' : '');
+          card.dataset.id = m.id;
+
+          const c = kc(m.kind);
+          const tags = (m.tags ?? [])
+            .slice(0, 3)
+            .map(
+              (t) =>
+                `<span style="font-size:9px;background:#131720;border:1px solid #1a1f2c;color:#3d4757;padding:1px 5px;border-radius:3px;">${esc(t)}</span>`,
+            )
+            .join('');
+          const score =
+            m.score != null
+              ? `<span style="font-size:9px;color:#2e3547;font-family:JetBrains Mono;">↑${m.score.toFixed(2)}</span>`
+              : '';
+
+          card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;padding-right:20px;">
+        <span style="font-size:9px;font-family:Syne;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;padding:1px 5px;border-radius:3px;background:${c}12;color:${c};border:1px solid ${c}28;">${esc(m.kind.replace('_', ' '))}</span>
+        <div style="display:flex;align-items:center;gap:6px;">${score}<span style="font-size:9px;color:#2e3547;">${relTime(m.created_at)}</span></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:#b8bfd4;line-height:1.35;margin-bottom:${tags ? '6px' : '0'};font-family:Syne;padding-right:4px;">${esc(trunc(m.title, 65))}</div>
+      ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;">${tags}</div>` : ''}
+      <button class="forget-btn" onclick="event.stopPropagation();forgetMemory('${esc(m.id)}')">✕</button>
+    `;
+          card.onclick = () => selectMemory(m.id);
+          el.appendChild(card);
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Search
+      // ──────────────────────────────────────────────────────────────────────────────
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        S.searchQuery = e.target.value.trim();
+        clearTimeout(S.debounce);
+        if (!S.searchQuery) {
+          S.searchResults = null;
+          renderList(visibleMemories());
+          updateListCount();
+          document.getElementById('tab-info').textContent = '';
+          return;
+        }
+        S.debounce = setTimeout(doSearch, 320);
+      });
+
+      async function doSearch() {
+        if (!S.searchQuery) return;
+        const spinner = document.getElementById('search-spinner');
+        spinner.style.display = 'block';
+        try {
+          const url = `/api/search?q=${encodeURIComponent(S.searchQuery)}&strategy=${S.strategy}&k=20`;
+          const r = await fetch(url);
+          const d = await r.json();
+          S.searchResults = d.results ?? [];
+          // Attach score to each result's observation for display
+          S.searchResults = S.searchResults.map((r) => ({
+            ...r.observation,
+            score: r.score,
+            id: r.id,
+          }));
+          renderList(visibleMemories());
+          updateListCount();
+          document.getElementById('tab-info').textContent =
+            `${S.searchResults.length} hits via ${d.strategy}`;
+        } catch (e) {
+          console.error('search error', e);
+        } finally {
+          spinner.style.display = 'none';
+        }
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Graph
+      // ──────────────────────────────────────────────────────────────────────────────
+      function renderGraph(graph) {
+        const wrap = document.getElementById('graph-wrap');
+        if (!graph?.nodes?.length) {
+          wrap.innerHTML = `<div class="empty" style="height:100%;">
+      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:0.2;">
+        <circle cx="5" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="12" r="2"/>
+        <line x1="7" y1="12" x2="10" y2="12"/><line x1="12" y1="7" x2="12" y2="10"/>
+        <line x1="12" y1="14" x2="12" y2="17"/><line x1="14" y1="12" x2="17" y2="12"/>
+      </svg>
+      <span>no connections yet</span>
+    </div>`;
+          return;
+        }
+
+        const nodes = new vis.DataSet(
+          graph.nodes.map((n) => ({
+            ...n,
+            font: { color: '#636b85', face: 'JetBrains Mono', size: 10.5 },
+            shape: 'dot',
+            size: 9,
+            borderWidth: 1.5,
+            borderWidthSelected: 3,
+            color: {
+              background: kc(n.kind),
+              border: '#1a1f2c',
+              highlight: { background: kc(n.kind), border: '#dde2ee' },
+              hover: { background: kc(n.kind), border: '#252d3e' },
+            },
+          })),
+        );
+
+        const edges = new vis.DataSet(
+          graph.edges.map((e) => ({
+            ...e,
+            color: { color: '#1a1f2c', opacity: 0.7, highlight: '#4ade80' },
+            width: 1,
+            smooth: { type: 'curvedCW', roundness: 0.08 },
+          })),
+        );
+
+        S.network = new vis.Network(
+          wrap,
+          { nodes, edges },
+          {
+            physics: {
+              forceAtlas2Based: {
+                gravitationalConstant: -42,
+                centralGravity: 0.012,
+                springLength: 130,
+                springConstant: 0.055,
+              },
+              maxVelocity: 50,
+              solver: 'forceAtlas2Based',
+              timestep: 0.35,
+              stabilization: { iterations: 130 },
+            },
+            interaction: { hover: true, tooltipDelay: 120 },
+          },
+        );
+
+        S.network.on('click', (params) => {
+          if (params.nodes.length) selectMemory(params.nodes[0]);
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Select memory (syncs list ↔ graph ↔ detail)
+      // ──────────────────────────────────────────────────────────────────────────────
+      function selectMemory(id) {
+        S.selectedId = id;
+        document
+          .querySelectorAll('.mem-card')
+          .forEach((c) => c.classList.toggle('selected', c.dataset.id === id));
+        const card = document.querySelector(`.mem-card[data-id="${id}"]`);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (S.network) {
+          try {
+            S.network.selectNodes([id], true);
+            S.network.focus(id, {
+              animation: { duration: 350, easingFunction: 'easeInOutQuad' },
+              scale: 1.2,
+            });
+          } catch {}
+        }
+        const obs = findMemory(id);
+        if (obs) showDetail(obs);
+      }
+
+      function findMemory(id) {
+        return (
+          S.data?.memories?.find((m) => m.id === id) ??
+          S.searchResults?.find((m) => m.id === id) ??
+          null
+        );
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Detail drawer
+      // ──────────────────────────────────────────────────────────────────────────────
+      function showDetail(obs) {
+        const drawer = document.getElementById('detail-drawer');
+        drawer.style.display = 'block';
+        const c = kc(obs.kind);
+        const kindEl = document.getElementById('d-kind');
+        kindEl.textContent = obs.kind.replace('_', ' ');
+        kindEl.style.cssText = `font-family:Syne;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;background:${c}12;color:${c};border:1px solid ${c}28;`;
+        document.getElementById('d-title').textContent = obs.title;
+        document.getElementById('d-date').textContent = new Date(obs.created_at).toLocaleString();
+        const ts = obs.tokens_saved ?? 0;
+        document.getElementById('d-tokens').textContent = ts ? fmtN(ts) + ' tokens saved' : '';
+        document.getElementById('d-body').textContent = obs.body;
+
+        const footer = document.getElementById('d-footer');
+        footer.innerHTML = '';
+        (obs.files ?? []).forEach((f) => {
+          const s = document.createElement('span');
+          s.style.cssText =
+            'font-size:10px;font-family:JetBrains Mono;background:#131720;border:1px solid #1a1f2c;color:#4a5168;padding:2px 7px;border-radius:3px;';
+          s.textContent = f;
+          footer.appendChild(s);
+        });
+        (obs.tags ?? []).forEach((t) => {
+          const s = document.createElement('span');
+          s.style.cssText =
+            'font-size:9.5px;font-family:Syne;font-weight:700;background:#0a0c10;border:1px solid #1a1f2c;color:#2e3547;padding:2px 7px;border-radius:3px;';
+          s.textContent = '#' + t;
+          footer.appendChild(s);
+        });
+        drawer.scrollTop = 0;
+      }
+
+      function closeDetail() {
+        document.getElementById('detail-drawer').style.display = 'none';
+        S.selectedId = null;
+        document.querySelectorAll('.mem-card').forEach((c) => c.classList.remove('selected'));
+        if (S.network)
+          try {
+            S.network.unselectAll();
+          } catch {}
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Forget
+      // ──────────────────────────────────────────────────────────────────────────────
+      async function forgetMemory(id) {
+        try {
+          const r = await fetch(`/api/memories/${id}`, { method: 'DELETE' });
+          const d = await r.json();
+          if (!d.ok) return;
+          if (S.data) {
+            S.data.memories = S.data.memories.filter((m) => m.id !== id);
+            S.data.stats.memories = S.data.memories.length;
+            document.getElementById('s-mem').textContent = fmtN(S.data.stats.memories);
+          }
+          if (S.searchResults) S.searchResults = S.searchResults.filter((m) => m.id !== id);
+          if (S.selectedId === id) closeDetail();
+          renderList(visibleMemories());
+          updateListCount();
+          if (S.network)
+            try {
+              S.network.body.data.nodes.remove(id);
+            } catch {}
+        } catch (e) {
+          console.error('forget failed', e);
+        }
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Tabs
+      // ──────────────────────────────────────────────────────────────────────────────
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          S.activeTab = tab;
+          document
+            .querySelectorAll('.tab-btn')
+            .forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+          document.getElementById('tab-graph').style.display = tab === 'graph' ? 'flex' : 'none';
+          document.getElementById('tab-analytics').style.display =
+            tab === 'analytics' ? 'block' : 'none';
+          if (tab === 'analytics' && !S.analyticsRendered) openAnalytics();
+          if (tab !== 'graph') document.getElementById('tab-info').textContent = '';
+        });
+      });
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Analytics
+      // ──────────────────────────────────────────────────────────────────────────────
+      async function openAnalytics() {
+        try {
+          const stats = await loadFullStats();
+          renderAnalytics(stats);
+          S.analyticsRendered = true;
+        } catch (e) {
+          document.getElementById('analytics-grid').innerHTML =
+            '<div class="empty" style="grid-column:span 2;">failed to load analytics</div>';
+        }
+      }
+
+      function renderAnalytics({ kindBreakdown, topFiles, retrieval, cache }) {
+        const grid = document.getElementById('analytics-grid');
+
+        // ── Kind breakdown ───────────────────────────────────────────
+        const total = Object.values(kindBreakdown).reduce((a, b) => a + b, 0);
+        const maxKind = Math.max(...Object.values(kindBreakdown), 1);
+        const kindRows = Object.entries(kindBreakdown)
+          .filter(([, n]) => n > 0)
+          .sort(([, a], [, b]) => b - a)
+          .map(([kind, n]) => {
+            const c = kc(kind);
+            return `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+          <span style="font-size:9.5px;font-family:Syne;font-weight:800;width:76px;color:${c};flex-shrink:0;letter-spacing:0.02em;">${kind.replace('_', ' ')}</span>
+          <div class="bar-track"><div class="bar-fill" data-w="${Math.round((n / maxKind) * 100)}" style="background:${c};"></div></div>
+          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;width:24px;text-align:right;">${n}</span>
+        </div>`;
+          })
+          .join('');
+
+        // ── Cache stats ──────────────────────────────────────────────
+        const hr = cache.hit_rate;
+        const hrPct = hr !== null ? Math.round(hr * 100) : null;
+        const cColor =
+          hrPct !== null
+            ? hrPct >= 60
+              ? '#4ade80'
+              : hrPct >= 30
+                ? '#fbbf24'
+                : '#f87171'
+            : '#52576a';
+        const cacheBar =
+          hrPct !== null
+            ? `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:9px;font-family:Syne;font-weight:800;color:#2e3547;text-transform:uppercase;letter-spacing:0.08em;">hit rate</span><span style="font-size:10px;font-family:JetBrains Mono;color:${cColor};">${hrPct}%</span></div><div class="bar-track" style="height:5px;"><div class="bar-fill" data-w="${hrPct}" style="background:${cColor};height:5px;"></div></div></div>`
+            : '';
+
+        // ── Retrieval usage ──────────────────────────────────────────
+        const maxRetr = Math.max(...retrieval.map((r) => r.call_count), 1);
+        const retriRows = retrieval.length
+          ? retrieval
+              .map(
+                (r) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+          <span style="font-size:9.5px;font-family:Syne;font-weight:800;color:#22d3ee;width:70px;flex-shrink:0;">${r.strategy}</span>
+          <div class="bar-track"><div class="bar-fill" data-w="${Math.round((r.call_count / maxRetr) * 100)}" style="background:#22d3ee88;"></div></div>
+          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;width:24px;text-align:right;">${r.call_count}</span>
+        </div>`,
+              )
+              .join('')
+          : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no retrieval calls recorded</div>';
+
+        // ── Top files ────────────────────────────────────────────────
+        const fileRows = topFiles.length
+          ? topFiles
+              .slice(0, 14)
+              .map(
+                (f) => `
+        <div class="file-row">
+          <span style="font-size:10px;font-family:JetBrains Mono;color:#7a8299;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(f.file)}">${esc(f.file)}</span>
+          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;flex-shrink:0;padding-left:8px;">${f.count}</span>
+        </div>`,
+              )
+              .join('')
+          : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no file references</div>';
+
+        grid.innerHTML = `
+    <div class="a-card">
+      <div class="a-title">memories by kind ${total ? `<span style="color:#1e2330;font-weight:600;">· ${total}</span>` : ''}</div>
+      ${total ? kindRows : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no memories yet</div>'}
+    </div>
+
+    <div class="a-card">
+      <div class="a-title">prompt cache</div>
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div>
+          <div style="font-family:Syne;font-size:32px;font-weight:800;color:${cColor};line-height:1;">${hrPct !== null ? hrPct + '%' : '—'}</div>
+          <div style="font-size:8.5px;font-family:Syne;font-weight:800;color:#2e3547;text-transform:uppercase;letter-spacing:0.1em;margin-top:3px;">hit rate</div>
+        </div>
+        <div style="border-left:1px solid #1a1f2c;padding-left:16px;display:flex;flex-direction:column;gap:5px;margin-top:3px;">
+          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.hit_count.toLocaleString()} <span style="color:#4ade80;font-size:9.5px;">hits</span></div>
+          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.miss_count.toLocaleString()} <span style="color:#f87171;font-size:9.5px;">misses</span></div>
+          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.entry_count.toLocaleString()} <span style="color:#52576a;font-size:9.5px;">entries</span></div>
+        </div>
+      </div>
+      ${cacheBar}
+    </div>
+
+    <div class="a-card">
+      <div class="a-title">retrieval usage</div>
+      ${retriRows}
+    </div>
+
+    <div class="a-card">
+      <div class="a-title">top files <span style="color:#1e2330;font-weight:600;">· by reference count</span></div>
+      ${fileRows}
+    </div>
+  `;
+
+        // Animate bars on next frame
+        requestAnimationFrame(() => {
+          document.querySelectorAll('.bar-fill[data-w]').forEach((el) => {
+            const w = el.dataset.w;
+            el.style.width = '0';
+            requestAnimationFrame(() => {
+              el.style.width = w + '%';
+            });
+          });
+        });
+      }
+
+      // ──────────────────────────────────────────────────────────────────────────────
+      // Go
+      // ──────────────────────────────────────────────────────────────────────────────
+      init();
+    </script>
+  </body>
+</html>

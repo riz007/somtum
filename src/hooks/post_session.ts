@@ -110,6 +110,11 @@ function collectSessionFiles(turns: ReturnType<typeof parseTranscript>): string[
   return [...set];
 }
 
+// At most this many file-summary LLM calls run concurrently. Serial was the
+// original behaviour; 3 parallel cuts wall-clock time by ~3× for busy sessions
+// without saturating the Haiku rate limit.
+const SUMMARY_CONCURRENCY = 3;
+
 async function populateFileSummaries(
   db: DB,
   turns: ReturnType<typeof parseTranscript>,
@@ -119,16 +124,20 @@ async function populateFileSummaries(
   if (paths.length === 0) return 0;
   const store = new FileFingerprintStore(db);
   const { exclude_globs, min_file_size_tokens } = opts.config.file_gating;
-  let generated = 0;
 
+  // Build the work list synchronously (no I/O yet).
+  interface WorkItem {
+    path: string;
+    contents: string;
+    stat: NonNullable<ReturnType<typeof statFile>>;
+  }
+  const work: WorkItem[] = [];
   for (const path of paths) {
     if (matchesAnyGlob(path, exclude_globs)) continue;
     const stat = statFile(path, { cwd: opts.cwd });
     if (!stat || stat.tokens < min_file_size_tokens) continue;
-
     const existing = store.get(opts.projectId, path);
     if (existing && existing.content_hash === stat.contentHash && existing.summary) continue;
-
     const abs = isAbsolute(path) ? path : resolvePath(opts.cwd, path);
     let contents: string;
     try {
@@ -136,25 +145,43 @@ async function populateFileSummaries(
     } catch {
       continue;
     }
+    work.push({ path, contents, stat });
+  }
 
-    try {
-      const { summary } = await summarizeFile(path, contents, {
-        model: opts.config.extraction.model,
-        caller: opts.caller,
-      });
-      store.upsert({
-        project_id: opts.projectId,
-        path,
-        content_hash: stat.contentHash,
-        mtime: stat.mtime,
-        tokens: stat.tokens,
-        summary,
-        summary_hash: summaryHash(summary),
-      });
-      generated += 1;
-    } catch (err) {
-      console.error(`[somtum] summarize ${path} failed: ${(err as Error).message}`);
-    }
+  if (work.length === 0) return 0;
+
+  // Process in concurrent batches to avoid the N×serial-latency problem while
+  // still keeping pressure on the Haiku rate limit manageable.
+  let generated = 0;
+  for (let i = 0; i < work.length; i += SUMMARY_CONCURRENCY) {
+    const batch = work.slice(i, i + SUMMARY_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(({ path, contents }) =>
+        summarizeFile(path, contents, {
+          model: opts.config.extraction.model,
+          caller: opts.caller,
+        }),
+      ),
+    );
+    results.forEach((result, j) => {
+      const item = batch[j]!;
+      if (result.status === 'fulfilled') {
+        store.upsert({
+          project_id: opts.projectId,
+          path: item.path,
+          content_hash: item.stat.contentHash,
+          mtime: item.stat.mtime,
+          tokens: item.stat.tokens,
+          summary: result.value.summary,
+          summary_hash: summaryHash(result.value.summary),
+        });
+        generated += 1;
+      } else {
+        console.error(
+          `[somtum] summarize ${item.path} failed: ${(result.reason as Error).message}`,
+        );
+      }
+    });
   }
   return generated;
 }
@@ -205,9 +232,13 @@ export async function runPostSession(
     const transcript = resolved.text;
     const transcriptTokens = countTokens(transcript);
 
+    // 25 s per API call — the SDK default is 600 s which lets a single slow
+    // Haiku call block the hook process for 10 minutes.
     const caller =
       opts.caller ??
-      anthropicCaller(new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] ?? '' }));
+      anthropicCaller(
+        new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] ?? '', timeout: 25_000 }),
+      );
 
     const outcome = await extract(transcript, caller, {
       model: config.extraction.model,

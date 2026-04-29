@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { loadConfig, PROJECT_CONFIG_RELATIVE, GLOBAL_CONFIG_PATH, GLOBAL_DIR } from '../config.js';
+import { loadConfig, PROJECT_CONFIG_RELATIVE, GLOBAL_CONFIG_PATH } from '../config.js';
 
 function parseDotPath(path: string): string[] {
   return path.split('.');

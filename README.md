@@ -22,6 +22,7 @@ Zero-config: one `somtum init` in an existing Claude Code project and every sess
 - [Quickstart](#quickstart)
 - [CLI Reference](#cli-reference)
 - [MCP Server](#mcp-server)
+- [Dashboard](#dashboard)
 - [Storage Layout](#storage-layout)
 - [Configuration](#configuration)
 - [Privacy](#privacy)
@@ -165,7 +166,10 @@ somtum show 01JBZ...
 # 4. Check your token savings
 somtum stats
 
-# 5. Diagnose any issues
+# 5. Open the visual dashboard
+somtum serve
+
+# 6. Diagnose any issues
 somtum doctor
 ```
 
@@ -206,6 +210,7 @@ somtum init --all
 | `somtum forget <id>`                    | Soft-delete an observation                       |
 | `somtum edit <id>`                      | Open an observation body in `$EDITOR`            |
 | `somtum rebuild`                        | Regenerate `index.md` from all observations      |
+| `somtum reindex`                        | Recompute embeddings (after a model change)      |
 
 ### Data management
 
@@ -219,18 +224,15 @@ somtum init --all
 | `somtum purge --older-than 30d`                   | Hard-delete soft-deleted entries older than 30 days |
 | `somtum purge --older-than 30d --dry-run`         | Preview without deleting                            |
 
-### Embeddings
+### Stats & visibility
 
-| Command          | Description                                 |
-| ---------------- | ------------------------------------------- |
-| `somtum reindex` | Embed observations that are missing vectors |
-
-### Stats
-
-| Command               | Description                                       |
-| --------------------- | ------------------------------------------------- |
-| `somtum stats`        | Tokens saved, cache hit rate, retrieval breakdown |
-| `somtum stats --json` | Machine-readable JSON output                      |
+| Command                    | Description                                                 |
+| -------------------------- | ----------------------------------------------------------- |
+| `somtum stats`             | Tokens saved, cache hit rate, retrieval breakdown           |
+| `somtum stats --json`      | Machine-readable JSON output                                |
+| `somtum serve`             | Open local web dashboard — memory browser, graph, analytics |
+| `somtum serve --port 4000` | Specify a custom port (default: 3000)                       |
+| `somtum serve --no-open`   | Start the server without opening the browser                |
 
 ### Configuration
 
@@ -250,7 +252,6 @@ somtum init --all
 | `somtum sync pull`   | scp from remote and merge into local DB   |
 
 Remote configured in config: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`
-Somtum uses hostname-aware syncing to prevent data loss when using multiple devices.
 
 ---
 
@@ -258,12 +259,33 @@ Somtum uses hostname-aware syncing to prevent data loss when using multiple devi
 
 Somtum includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server. When you run `somtum init --all`, it registers tools that Claude can use autonomously:
 
-- `recall`: Claude can search your memories when it's unsure about a project detail.
-- `get`: Retrieve the full body of specific observations.
-- `remember`: Claude can manually store a specific observation.
-- `cache_lookup`: Used internally to check the prompt cache.
-- `forget`: Soft-delete an observation.
-- `stats`: Claude can report on how much it has "learned" from you.
+| Tool           | What Claude can do with it                                             |
+| -------------- | ---------------------------------------------------------------------- |
+| `recall`       | Search memories by natural language when unsure about a project detail |
+| `get`          | Retrieve the full body of specific observations by ID                  |
+| `remember`     | Manually store an observation from within a session                    |
+| `cache_lookup` | Check the prompt cache directly                                        |
+| `forget`       | Soft-delete an observation                                             |
+| `stats`        | Report on tokens saved, cache hit rate, and corpus size                |
+
+Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
+
+---
+
+## Dashboard
+
+`somtum serve` opens a local web dashboard at `http://localhost:3000`:
+
+- **Memory browser** — search across all observations using BM25, hybrid, or embedding-based retrieval; filter by kind (decision, bugfix, learning, command, file_summary); forget memories directly from the UI.
+- **Knowledge graph** — vis-network graph where nodes are observations, edges represent shared files or tags. Clicking a node selects the memory in the list and vice versa.
+- **Analytics tab** — kind breakdown, token ROI (saved vs. spent), cache hit rate + entry count, retrieval strategy usage, and top files by reference count.
+- **Stat bar** — live counts for total memories, tokens saved, tokens spent, ROI ratio, and cache hit %.
+
+```bash
+somtum serve              # opens on port 3000
+somtum serve --port 4000  # custom port
+somtum serve --no-open    # don't auto-open the browser
+```
 
 ---
 
@@ -299,7 +321,7 @@ Global config lives at `~/.somtum/config.json`. Per-project config at `.somtum/c
   "cache": {
     "enabled": true,
     "fuzzy_match": true,
-    "fuzzy_threshold": 0.92, // conservative — raise to 0.95 once you have signal
+    "fuzzy_threshold": 0.92, // raise to 0.95 once you have signal
     "max_entries": 10000,
     "ttl_days": 90,
   },
@@ -363,17 +385,18 @@ somtum reindex   # embed existing observations
 
 Every `stats` figure is labelled _estimated_. Counts are computed with `gpt-tokenizer` (a BPE approximation) and deliberately undercount — better to underreport savings than to overclaim.
 
-The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction cost is paying off. A ratio below 1.5x triggers a warning in `somtum stats` and `somtum doctor`.
+The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction cost is paying off. A ratio below 1.5× triggers a warning in `somtum stats` and `somtum doctor`.
 
 ---
 
 ## Performance
 
-| Scenario                                | p95 budget | Actual (benchmark) |
-| --------------------------------------- | ---------- | ------------------ |
-| `UserPromptSubmit` hook at 1k memories  | 150 ms     | < 2 ms (BM25 k=8)  |
-| `UserPromptSubmit` hook at 10k memories | 300 ms     | < 30 ms (BM25 k=8) |
-| Exact cache hash lookup                 | —          | < 0.1 ms           |
+| Scenario                                | p95 budget | Notes                                 |
+| --------------------------------------- | ---------- | ------------------------------------- |
+| `UserPromptSubmit` hook at 1k memories  | 150 ms     | SQLite hash lookup — typically < 2 ms |
+| `UserPromptSubmit` hook at 10k memories | 300 ms     | BM25 k=8 — typically < 30 ms          |
+| Exact cache hash lookup                 | —          | < 0.1 ms                              |
+| `SessionEnd` hook (capture + embed)     | —          | Hard capped at 90 s; exits cleanly    |
 
 Run benchmarks yourself:
 
@@ -393,7 +416,7 @@ pnpm test:golden      # retrieval recall@k per strategy
 pnpm test:bench       # hot-path latency benchmarks
 pnpm lint             # eslint
 pnpm fmt              # prettier
-pnpm build            # tsc + copy migrations → dist/
+pnpm build            # tsc + copy migrations + copy dashboard → dist/
 ```
 
 ### Project layout
@@ -401,6 +424,7 @@ pnpm build            # tsc + copy migrations → dist/
 ```
 src/
   cli/            # commander-based CLI commands
+    serve.ts      # local web dashboard (h3 + sirv)
   core/
     db.ts         # SQLite setup, migration runner
     store.ts      # MemoryStore — CRUD for observations
@@ -408,16 +432,18 @@ src/
     retriever/    # bm25, embeddings, hybrid, index, factory
     extractor.ts  # session transcript → observations (Claude)
     index_gen.ts  # renders index.md (incremental past 1k obs)
-    memory_files.ts  # writes memories/<YYYY-MM>/<ulid>.md
-    retrieval_stats.ts  # per-strategy call counters
-    embeddings.ts    # Embedder interface + encode/decode utils
-    privacy.ts       # redact() — runs on every capture
-    tokens.ts        # gpt-tokenizer wrapper
+    memory_files.ts      # writes memories/<YYYY-MM>/<ulid>.md
+    retrieval_stats.ts   # per-strategy call counters
+    embeddings.ts        # Embedder interface + encode/decode utils
+    embeddings_xenova.ts # @xenova/transformers ONNX backend
+    privacy.ts           # redact() — runs on every capture
+    tokens.ts            # gpt-tokenizer wrapper
   hooks/
-    post_session.ts  # SessionEnd: extract → store → index
+    post_session.ts  # SessionEnd: extract → store → embed → index
     pre_prompt.ts    # UserPromptSubmit: cache lookup
     pre_read.ts      # PreToolUse: file gating
   mcp/             # MCP server + tool implementations
+  dashboard/       # Single-file web UI (index.html)
   config.ts        # global + project config merge
   index.ts         # public API for embedding Somtum
 src/db/migrations/ # NNN_name.sql migration files
@@ -443,9 +469,18 @@ test/
 
 ---
 
-...
-
 ## Troubleshooting
+
+### Agent appears to keep running after a session ends
+
+The `SessionEnd` hook runs after every session to extract and store observations. On first install with embeddings enabled, it also downloads a ~30 MB ONNX model. The hook has a hard 90-second cap — it will always exit within that window. If you see a `somtum hook post_session` process in your process list, it is working normally in the background and will exit on its own.
+
+To reduce hook duration, disable file summaries or embeddings:
+
+```bash
+somtum config set file_gating.enabled false
+somtum config set retrieval.embeddings.enabled false
+```
 
 ### Installation fails (node-gyp / better-sqlite3)
 
@@ -457,11 +492,21 @@ If you see errors related to building `better-sqlite3`, ensure you have build to
 
 ### "Anthropic API Key not found"
 
-The capture hook requires `ANTHROPIC_API_KEY` to be set in your environment. Add it to your `.zshrc`, `.bashrc`, or `.env` file.
+The capture hook requires `ANTHROPIC_API_KEY` to be set in your environment. Add it to your shell profile (`.zshrc`, `.bashrc`) or a `.env` file loaded by your shell.
 
 ### Claude isn't using the memories
 
-Run `somtum doctor` to verify that hooks are correctly installed in your project.
+Run `somtum doctor` to verify that hooks are correctly installed in `.claude/settings.json` and that the MCP server is registered in `.mcp.json`.
+
+### Embeddings are slow or the model won't download
+
+The `bge-small-en-v1.5` model (~30 MB) downloads to `~/.somtum/models/` on first use. If the download stalls, disable embeddings and fall back to BM25:
+
+```bash
+somtum config set retrieval.embeddings.enabled false
+```
+
+BM25 retrieval is near-zero cost and works fully offline.
 
 ---
 

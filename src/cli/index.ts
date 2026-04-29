@@ -17,13 +17,14 @@ import { doctorCommand } from './doctor.js';
 import { configGetCommand, configSetCommand } from './config_cmd.js';
 import { runMcpServer } from '../mcp/server.js';
 import { printLogo } from './ui.js';
+import { serveCommand } from './serve.js';
 
 const program = new Command();
 
 program
   .name('somtum')
   .description('Local-first memory and prompt-cache layer for Claude Code')
-  .version('0.1.0');
+  .version('1.0.0');
 
 // Show logo unless it's an internal hook call or MCP server.
 const isInternal = process.argv.includes('hook') || process.argv.includes('mcp');
@@ -39,16 +40,18 @@ program
   .option('--file-gating', 'Also install the PreToolUse file-gating hook', false)
   .option('--no-mcp', 'Do not register the somtum MCP server in .mcp.json')
   .option('--all', 'Enable cache + file-gating + MCP', false)
-  .action((opts: { force: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
-    const code = initCommand({
-      force: opts.force,
-      cache: opts.cache,
-      fileGating: opts.fileGating,
-      mcp: opts.mcp,
-      all: opts.all,
-    });
-    process.exit(code);
-  });
+  .action(
+    (opts: { force: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
+      const code = initCommand({
+        force: opts.force,
+        cache: opts.cache,
+        fileGating: opts.fileGating,
+        mcp: opts.mcp,
+        all: opts.all,
+      });
+      process.exit(code);
+    },
+  );
 
 program
   .command('reindex')
@@ -133,15 +136,17 @@ program
   .option('--output <path>', 'Write to file instead of stdout')
   .option('--include-deleted', 'Include soft-deleted observations', false)
   .option('--json', 'Alias for --format json')
-  .action((opts: { format?: string; output?: string; includeDeleted?: boolean; json?: boolean }) => {
-    const exportOpts: Parameters<typeof exportCommand>[0] = {};
-    const fmt = opts.json ? 'json' : opts.format;
-    if (fmt !== undefined) exportOpts.format = fmt;
-    if (opts.output !== undefined) exportOpts.output = opts.output;
-    if (opts.includeDeleted !== undefined) exportOpts.includeDeleted = opts.includeDeleted;
-    const code = exportCommand(exportOpts);
-    process.exit(code);
-  });
+  .action(
+    (opts: { format?: string; output?: string; includeDeleted?: boolean; json?: boolean }) => {
+      const exportOpts: Parameters<typeof exportCommand>[0] = {};
+      const fmt = opts.json ? 'json' : opts.format;
+      if (fmt !== undefined) exportOpts.format = fmt;
+      if (opts.output !== undefined) exportOpts.output = opts.output;
+      if (opts.includeDeleted !== undefined) exportOpts.includeDeleted = opts.includeDeleted;
+      const code = exportCommand(exportOpts);
+      process.exit(code);
+    },
+  );
 
 program
   .command('import <file>')
@@ -153,9 +158,7 @@ program
     process.exit(code);
   });
 
-const configCmd = program
-  .command('config')
-  .description('Read or write somtum configuration');
+const configCmd = program.command('config').description('Read or write somtum configuration');
 
 configCmd
   .command('get [key]')
@@ -230,6 +233,16 @@ program
   .option('--json', 'Emit JSON')
   .action(async (opts: { json?: boolean }) => {
     const code = await doctorCommand(opts);
+    process.exit(code);
+  });
+
+program
+  .command('serve')
+  .description('Open a local web dashboard to browse memories and project knowledge graph')
+  .option('--port <n>', 'Port to listen on', (v) => Number.parseInt(v, 10), 3000)
+  .option('--no-open', 'Do not open browser automatically')
+  .action(async (opts: { port: number; open: boolean }) => {
+    const code = await serveCommand({ port: opts.port, open: opts.open });
     process.exit(code);
   });
 
