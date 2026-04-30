@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { openDb, hasFts5, appliedVersions } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { PromptCache } from '../core/cache.js';
@@ -136,15 +137,26 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         : 'disabled (set retrieval.embeddings.enabled=true to enable)',
     });
 
-    // 11. ANTHROPIC_API_KEY present
+    // 11. Extraction auth: ANTHROPIC_API_KEY or claude CLI fallback
     const apiKey = process.env['ANTHROPIC_API_KEY'];
+    const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+    let claudeCliAvailable = false;
+    if (!hasApiKey) {
+      try {
+        execSync('claude --version', { stdio: 'pipe' });
+        claudeCliAvailable = true;
+      } catch {
+        // not in PATH
+      }
+    }
     checks.push({
       name: 'api_key',
-      ok: Boolean(apiKey && apiKey.trim().length > 0),
-      detail:
-        apiKey && apiKey.trim().length > 0
-          ? 'ANTHROPIC_API_KEY is set'
-          : 'ANTHROPIC_API_KEY is not set — the SessionEnd hook needs it to extract observations. Set it in your shell profile (e.g. export ANTHROPIC_API_KEY=sk-ant-...).',
+      ok: hasApiKey || claudeCliAvailable,
+      detail: hasApiKey
+        ? 'ANTHROPIC_API_KEY is set'
+        : claudeCliAvailable
+          ? 'No ANTHROPIC_API_KEY — using claude CLI fallback (Claude Code subscription)'
+          : 'Neither ANTHROPIC_API_KEY nor claude CLI available — extraction will fail',
     });
 
     // 12. Hook files in .claude/settings.json

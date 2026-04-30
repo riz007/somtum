@@ -11,7 +11,7 @@ export {
 } from './core/cache.js';
 export { Bm25Retriever } from './core/retriever/bm25.js';
 export type { Retriever, RetrievalResult, SearchOptions } from './core/retriever/types.js';
-export { extract, anthropicCaller, estimateTokensSaved } from './core/extractor.js';
+export { extract, anthropicCaller, claudeCodeCaller, estimateTokensSaved } from './core/extractor.js';
 export type { LlmCaller, ExtractOptions, ExtractionOutcome } from './core/extractor.js';
 export { countTokens, sumTokens } from './core/tokens.js';
 export { redact, redactAll, REDACTION_PLACEHOLDER } from './core/privacy.js';
