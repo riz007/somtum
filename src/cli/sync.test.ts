@@ -10,30 +10,30 @@ vi.mock('node:child_process', () => ({
 vi.mock('../config.js', () => ({
   loadConfig: () => ({
     sync: {
-      remote: 'user@host:/remote/path'
-    }
+      remote: 'user@host:/remote/path',
+    },
   }),
-  projectDir: () => '/tmp/somtum/proj'
+  projectDir: () => '/tmp/somtum/proj',
 }));
 
 vi.mock('../core/project_id.js', () => ({
-  resolveProjectId: () => 'test-proj'
+  resolveProjectId: () => 'test-proj',
 }));
 
 vi.mock('../core/db.js', () => ({
   openDb: () => ({
     prepare: () => ({
-      get: () => ({ n: 10 })
+      get: () => ({ n: 10 }),
     }),
-    close: vi.fn()
-  })
+    close: vi.fn(),
+  }),
 }));
 
 describe('sync', () => {
   it('throws error if remote is not configured', async () => {
     vi.mock('../config.js', () => ({
       loadConfig: () => ({ sync: { remote: null } }),
-      projectDir: () => '/tmp/somtum/proj'
+      projectDir: () => '/tmp/somtum/proj',
     }));
     await expect(runSync({ direction: 'status' })).rejects.toThrow(/sync.remote is not configured/);
   });

@@ -20,9 +20,10 @@ Zero-config: one `somtum init` in an existing Claude Code project and every sess
 - [Requirements](#requirements)
 - [Install](#install)
 - [Quickstart](#quickstart)
+- [Verifying the setup](#verifying-the-setup)
+- [Dashboard](#dashboard)
 - [CLI Reference](#cli-reference)
 - [MCP Server](#mcp-server)
-- [Dashboard](#dashboard)
 - [Storage Layout](#storage-layout)
 - [Configuration](#configuration)
 - [Privacy](#privacy)
@@ -102,17 +103,17 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
 ## Requirements
 
 - **Node 20+**
-- **pnpm** (`npm i -g pnpm`)
-- **`ANTHROPIC_API_KEY`** — used by the capture hook to summarise session transcripts via Claude Haiku, and optionally by the `index` and `hybrid` retrieval strategies
+- **Claude Code** — Somtum hooks into Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` events
+- **`ANTHROPIC_API_KEY`** — used by the capture hook to summarise session transcripts via Claude Haiku, and optionally by the `index` and `hybrid` retrieval strategies. **Must be exported in your shell profile** (see [Quickstart](#quickstart) — step 1 explains why)
+
+> `pnpm` is only required if building from source. Global npm/yarn installs have no pnpm dependency.
 
 ---
 
 ## Install
 
-### From npm / yarn / pnpm
-
 ```bash
-# npm
+# npm (recommended for global install)
 npm install -g somtum
 
 # yarn
@@ -126,8 +127,6 @@ Or as a project dependency:
 
 ```bash
 npm install somtum
-yarn add somtum
-pnpm add somtum
 ```
 
 ### From source
@@ -137,67 +136,173 @@ git clone https://github.com/riz007/somtum
 cd somtum
 pnpm install
 pnpm build
-# Optional: link globally
 pnpm link --global
 ```
 
 ### Native module note
 
-Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically. On Alpine Linux / musl or unusual architectures the addon compiles from source, which requires `python`, `make`, and `gcc` to be available. If the install fails with a node-gyp error, install those build tools and retry.
+Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically. On Alpine Linux / musl or unusual architectures the addon compiles from source — `python`, `make`, and `gcc` must be available. If the install fails with a node-gyp error, install those build tools and retry.
 
 ---
 
 ## Quickstart
 
+### Step 1 — Set your Anthropic API key in your shell profile
+
+> **This is the most important step.** When a Claude Code session ends, the `SessionEnd` hook runs as a subprocess launched by Claude Code. That subprocess inherits its environment from the shell that _started_ Claude Code — not from the current terminal window. If the key is only `export`-ed in an interactive session, the hook will not see it and extraction will silently fail.
+
+Add to `~/.zshrc` (or `~/.bashrc`, `~/.bash_profile`):
+
 ```bash
-# 1. Inside an existing Claude Code project:
-somtum init
-
-# Installs a SessionEnd hook in .claude/settings.json.
-# Use Claude Code as normal — observations are captured at session end.
-
-# 2. Search your memory
-somtum search "auth jwt rotation"
-somtum search "why we use pnpm" --strategy hybrid
-
-# 3. Read a full observation
-somtum show 01JBZ...
-
-# 4. Check your token savings
-somtum stats
-
-# 5. Open the visual dashboard
-somtum serve
-
-# 6. Diagnose any issues
-somtum doctor
+export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-### Enable all features at once
+Then reload your shell:
+
+```bash
+source ~/.zshrc   # or open a new terminal
+```
+
+Confirm it's available:
+
+```bash
+echo $ANTHROPIC_API_KEY   # should print your key
+```
+
+### Step 2 — Install inside a Claude Code project
+
+Run this from the **root of the project you work in with Claude Code**:
+
+```bash
+somtum init
+```
+
+This writes a `SessionEnd` hook into `.claude/settings.json` in the current directory. Claude Code reads that file automatically when you open a session from the same directory.
+
+To enable all features at once:
 
 ```bash
 somtum init --all
 # Installs:
-#   - SessionEnd capture hook
-#   - UserPromptSubmit prompt-cache hook
-#   - PreToolUse file-gating hook
-#   - MCP server registration in .mcp.json
+#   - SessionEnd capture hook     (memory extraction)
+#   - UserPromptSubmit cache hook (prompt cache lookup)
+#   - PreToolUse file-gating hook (file read summaries)
+#   - MCP server in .mcp.json     (Claude can call recall/remember tools)
 ```
+
+### Step 3 — Use Claude Code normally
+
+Open a Claude Code session **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds so it never blocks you).
+
+### Step 4 — Check your memory
+
+```bash
+# How many observations were captured?
+somtum stats
+
+# Search memory
+somtum search "auth jwt rotation"
+somtum search "why we use pnpm" --strategy hybrid
+
+# Open the visual dashboard
+somtum serve
+```
+
+If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](#troubleshooting).
+
+### Step 5 — Diagnose any issues
+
+```bash
+somtum doctor
+```
+
+This checks your API key, DB health, hook installation, migrations, cache, and breakeven ratio. It will tell you exactly what is misconfigured and how to fix it.
 
 ---
 
-## CLI reference
+## Verifying the setup
+
+After your **first** Claude Code session ends:
+
+**1. Check the hook log**
+
+Every hook run appends a timestamped line to `~/.somtum/hook.log`:
+
+```bash
+cat ~/.somtum/hook.log
+```
+
+A successful run looks like:
+
+```
+2026-04-30T10:15:42.123Z [post_session] starting
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+```
+
+A failed run with a missing API key looks like:
+
+```
+2026-04-30T10:15:42.123Z [post_session] WARN: ANTHROPIC_API_KEY not set — extraction will fail
+2026-04-30T10:15:42.131Z [post_session] ERROR: 401 authentication_error
+```
+
+**2. Check stats**
+
+```bash
+somtum stats
+```
+
+You should see `memories` > 0 after a substantive session. Short test sessions may yield 0 observations if there is nothing worth extracting (Claude Code did not make decisions, fix bugs, or learn anything the extractor considers durable).
+
+**3. Run doctor**
+
+```bash
+somtum doctor
+```
+
+All checks should show `✓`. The `api_key` and `hooks_installed` checks are the two most commonly failing.
+
+---
+
+## Dashboard
+
+Somtum includes a visual memory browser you can open at any time:
+
+```bash
+somtum serve
+# Opens http://localhost:3000 in your browser
+```
+
+The dashboard provides:
+
+- **Memory browser** — searchable, filterable list of all captured observations. Supports BM25, hybrid, and embeddings strategies live. Click any memory to see its full body, files touched, and tags.
+- **Knowledge graph** — vis-network graph where nodes are memories and edges connect memories that share files or tags. Clicking a node opens the detail panel.
+- **Analytics** — kind breakdown, cache hit rate, retrieval strategy usage, and top-referenced files.
+- **Forget button** — soft-delete any memory directly from the browser.
+
+Options:
+
+| Flag         | Description                            |
+| ------------ | -------------------------------------- |
+| `--port <n>` | Listen on a custom port (default 3000) |
+| `--no-open`  | Don't auto-open the browser            |
+
+Press `Ctrl-C` to stop the server.
+
+---
+
+## CLI Reference
 
 ### Setup
 
-| Command                     | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `somtum init`               | Install the SessionEnd capture hook                 |
-| `somtum init --cache`       | Also install the UserPromptSubmit cache hook        |
-| `somtum init --file-gating` | Also install the PreToolUse file-gating hook        |
-| `somtum init --all`         | Install all hooks + MCP server                      |
-| `somtum init --force`       | Reinstall even if hooks already present             |
-| `somtum doctor`             | Check DB health, migrations, hooks, breakeven ratio |
+| Command                     | Description                                                  |
+| --------------------------- | ------------------------------------------------------------ |
+| `somtum init`               | Install the SessionEnd capture hook                          |
+| `somtum init --cache`       | Also install the UserPromptSubmit cache hook                 |
+| `somtum init --file-gating` | Also install the PreToolUse file-gating hook                 |
+| `somtum init --all`         | Install all hooks + MCP server                               |
+| `somtum init --force`       | Reinstall even if hooks already present                      |
+| `somtum doctor`             | Check DB health, migrations, hooks, API key, breakeven ratio |
 
 ### Memory
 
@@ -211,6 +316,16 @@ somtum init --all
 | `somtum edit <id>`                      | Open an observation body in `$EDITOR`            |
 | `somtum rebuild`                        | Regenerate `index.md` from all observations      |
 | `somtum reindex`                        | Recompute embeddings (after a model change)      |
+
+### Stats & Visibility
+
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `somtum stats`            | Tokens saved, cache hit rate, retrieval breakdown |
+| `somtum stats --json`     | Machine-readable JSON output                      |
+| `somtum serve`            | Open the visual dashboard in the browser          |
+| `somtum serve --port <n>` | Use a custom port (default 3000)                  |
+| `somtum serve --no-open`  | Start server without opening the browser          |
 
 ### Data management
 
@@ -226,13 +341,9 @@ somtum init --all
 
 ### Stats & visibility
 
-| Command                    | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `somtum stats`             | Tokens saved, cache hit rate, retrieval breakdown           |
-| `somtum stats --json`      | Machine-readable JSON output                                |
-| `somtum serve`             | Open local web dashboard — memory browser, graph, analytics |
-| `somtum serve --port 4000` | Specify a custom port (default: 3000)                       |
-| `somtum serve --no-open`   | Start the server without opening the browser                |
+| Command          | Description                                 |
+| ---------------- | ------------------------------------------- |
+| `somtum reindex` | Embed observations that are missing vectors |
 
 ### Configuration
 
@@ -251,7 +362,8 @@ somtum init --all
 | `somtum sync push`   | Export and scp observations to remote     |
 | `somtum sync pull`   | scp from remote and merge into local DB   |
 
-Remote configured in config: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`
+Remote configured in config: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`  
+Somtum uses hostname-aware syncing to prevent data loss when using multiple devices.
 
 ---
 
@@ -294,6 +406,7 @@ somtum serve --no-open    # don't auto-open the browser
 ```
 ~/.somtum/
 ├── config.json                    ← global config (overridden by project config)
+├── hook.log                       ← timestamped log of every hook execution
 └── projects/
     └── <project_id>/
         ├── db.sqlite              ← source of truth (SQLite WAL)
@@ -302,6 +415,8 @@ somtum serve --no-open    # don't auto-open the browser
             └── YYYY-MM/
                 └── <ulid>.md      ← per-observation markdown files
 ```
+
+The project ID is derived from the git remote URL (if present) or the directory path — the same project always maps to the same ID regardless of which machine you're on, as long as the remote URL matches.
 
 SQLite is the source of truth. `index.md` and `memories/*.md` are derived mirrors regenerated on each capture. Edit observations with `somtum edit <id>`, not by hand.
 
@@ -391,12 +506,12 @@ The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction 
 
 ## Performance
 
-| Scenario                                | p95 budget | Notes                                 |
-| --------------------------------------- | ---------- | ------------------------------------- |
-| `UserPromptSubmit` hook at 1k memories  | 150 ms     | SQLite hash lookup — typically < 2 ms |
-| `UserPromptSubmit` hook at 10k memories | 300 ms     | BM25 k=8 — typically < 30 ms          |
-| Exact cache hash lookup                 | —          | < 0.1 ms                              |
-| `SessionEnd` hook (capture + embed)     | —          | Hard capped at 90 s; exits cleanly    |
+| Scenario                                | p95 budget    | Actual (benchmark)       |
+| --------------------------------------- | ------------- | ------------------------ |
+| `UserPromptSubmit` hook at 1k memories  | 150 ms        | < 2 ms (BM25 k=8)        |
+| `UserPromptSubmit` hook at 10k memories | 300 ms        | < 30 ms (BM25 k=8)       |
+| Exact cache hash lookup                 | —             | < 0.1 ms                 |
+| `SessionEnd` hook (extract + embed)     | 90 s hard cap | Exits cleanly on timeout |
 
 Run benchmarks yourself:
 
@@ -423,34 +538,42 @@ pnpm build            # tsc + copy migrations + copy dashboard → dist/
 
 ```
 src/
-  cli/            # commander-based CLI commands
-    serve.ts      # local web dashboard (h3 + sirv)
+  cli/
+    index.ts          # commander CLI entry point
+    init.ts           # somtum init — installs hooks + MCP config
+    serve.ts          # somtum serve — local dashboard server
+    stats.ts          # somtum stats
+    doctor.ts         # somtum doctor — health checks
+    hook.ts           # internal: dispatches hook events by name
+    search.ts / show.ts / forget.ts / edit.ts
+    export.ts / import.ts / purge.ts / sync.ts / rebuild.ts / reindex.ts
+    config_cmd.ts
   core/
-    db.ts         # SQLite setup, migration runner
-    store.ts      # MemoryStore — CRUD for observations
-    cache.ts      # PromptCache — exact + fuzzy lookup
-    retriever/    # bm25, embeddings, hybrid, index, factory
-    extractor.ts  # session transcript → observations (Claude)
-    index_gen.ts  # renders index.md (incremental past 1k obs)
-    memory_files.ts      # writes memories/<YYYY-MM>/<ulid>.md
-    retrieval_stats.ts   # per-strategy call counters
-    embeddings.ts        # Embedder interface + encode/decode utils
-    embeddings_xenova.ts # @xenova/transformers ONNX backend
-    privacy.ts           # redact() — runs on every capture
-    tokens.ts            # gpt-tokenizer wrapper
+    db.ts             # SQLite setup, migration runner
+    store.ts          # MemoryStore — CRUD for observations
+    cache.ts          # PromptCache — exact + fuzzy lookup
+    retriever/        # bm25, embeddings, hybrid, index, factory
+    extractor.ts      # session transcript → observations (Claude Haiku)
+    index_gen.ts      # renders index.md (incremental past 1k obs)
+    memory_files.ts   # writes memories/<YYYY-MM>/<ulid>.md
+    retrieval_stats.ts
+    embeddings.ts     # Embedder interface + encode/decode utils
+    privacy.ts        # redact() — runs on every capture
+    tokens.ts         # gpt-tokenizer wrapper
   hooks/
-    post_session.ts  # SessionEnd: extract → store → embed → index
-    pre_prompt.ts    # UserPromptSubmit: cache lookup
-    pre_read.ts      # PreToolUse: file gating
-  mcp/             # MCP server + tool implementations
-  dashboard/       # Single-file web UI (index.html)
-  config.ts        # global + project config merge
-  index.ts         # public API for embedding Somtum
-src/db/migrations/ # NNN_name.sql migration files
+    post_session.ts   # SessionEnd: extract → store → index → log
+    pre_prompt.ts     # UserPromptSubmit: cache lookup
+    pre_read.ts       # PreToolUse: file gating
+  mcp/               # MCP server + tool implementations
+  dashboard/
+    index.html        # single-page dashboard (served by somtum serve)
+  config.ts          # global + project config merge
+  index.ts           # public API for embedding Somtum
+src/db/migrations/   # NNN_name.sql migration files
 test/
-  golden/          # per-strategy retrieval golden sets
-  bench/           # hot-path latency benchmarks
-  fixtures/        # synthetic session transcripts
+  golden/            # per-strategy retrieval golden sets
+  bench/             # hot-path latency benchmarks
+  fixtures/          # synthetic session transcripts
 ```
 
 ### Adding a new observation kind
@@ -471,50 +594,150 @@ test/
 
 ## Troubleshooting
 
-### Agent appears to keep running after a session ends
+### `somtum stats` shows `memories 0` after a session
 
-The `SessionEnd` hook runs after every session to extract and store observations. On first install with embeddings enabled, it also downloads a ~30 MB ONNX model. The hook has a hard 90-second cap — it will always exit within that window. If you see a `somtum hook post_session` process in your process list, it is working normally in the background and will exit on its own.
-
-To reduce hook duration, disable file summaries or embeddings:
+This almost always means the hook ran but extraction failed. Check the log first:
 
 ```bash
-somtum config set file_gating.enabled false
-somtum config set retrieval.embeddings.enabled false
+cat ~/.somtum/hook.log
 ```
+
+Common causes:
+
+**`ANTHROPIC_API_KEY` not set in shell profile**
+
+The most common cause. The hook runs as a subprocess of Claude Code and inherits the environment from the shell that launched Claude Code. If you only `export`-ed the key in the current terminal session (not in `.zshrc` / `.bashrc`), the hook won't see it.
+
+Fix:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
+source ~/.zshrc
+
+# Confirm it's set
+echo $ANTHROPIC_API_KEY
+
+# Then open a new Claude session
+```
+
+**Hook not installed in the right directory**
+
+`somtum init` writes the hook to `.claude/settings.json` in the directory where you ran it. If you run Claude Code from a _different_ directory, it reads a different (or absent) settings file.
+
+Fix: run `somtum init` from the same directory you use to launch Claude Code.
+
+```bash
+cd ~/my-project
+somtum init
+claude   # must be launched from ~/my-project
+```
+
+**Short or trivial session**
+
+If the session didn't contain any decisions, bug fixes, or learnings (e.g. you just asked Claude to say hello), the extractor correctly returns 0 observations.
+
+Try a real working session, then re-check.
+
+**Run `somtum doctor`** for a full diagnostic:
+
+```bash
+somtum doctor
+```
+
+It checks the API key, hook installation, DB health, embeddings, breakeven ratio, and more, with specific fix instructions for each failing check.
+
+---
+
+### `somtum serve` opens the browser but shows "Connection refused"
+
+This was a bug fixed in v1.1.0. Upgrade:
+
+```bash
+npm install -g somtum@latest
+```
+
+If you installed from source, rebuild:
+
+```bash
+pnpm build
+```
+
+---
+
+### `somtum serve` — port already in use
+
+If port 3000 is busy, use `--port`:
+
+```bash
+somtum serve --port 3001
+```
+
+---
+
+### Agent appears to keep running after session ends
+
+The `SessionEnd` hook has a hard 90-second timeout — it cannot block Claude Code indefinitely. If sessions appear stuck immediately after installing Somtum, verify you are on v1.1.0+:
+
+```bash
+somtum --version
+```
+
+And check the log for any long-running operations:
+
+```bash
+tail -20 ~/.somtum/hook.log
+```
+
+---
+
 
 ### Installation fails (node-gyp / better-sqlite3)
 
-If you see errors related to building `better-sqlite3`, ensure you have build tools installed:
+If you see errors related to building `better-sqlite3`, ensure build tools are installed:
 
 - **macOS:** `xcode-select --install`
 - **Ubuntu/Debian:** `sudo apt-get install build-essential python3`
 - **Windows:** `npm install --global --production windows-build-tools`
 
-### "Anthropic API Key not found"
-
-The capture hook requires `ANTHROPIC_API_KEY` to be set in your environment. Add it to your shell profile (`.zshrc`, `.bashrc`) or a `.env` file loaded by your shell.
-
-### Claude isn't using the memories
-
-Run `somtum doctor` to verify that hooks are correctly installed in `.claude/settings.json` and that the MCP server is registered in `.mcp.json`.
+---
 
 ### Embeddings are slow or the model won't download
 
-The `bge-small-en-v1.5` model (~30 MB) downloads to `~/.somtum/models/` on first use. If the download stalls, disable embeddings and fall back to BM25:
+The first `somtum reindex` downloads a ~30 MB ONNX model (`bge-small-en-v1.5`) from Hugging Face. This requires internet access and may be slow on first run. Subsequent runs use the cached model.
+
+If you are on an air-gapped machine or prefer not to use embeddings, disable them:
 
 ```bash
 somtum config set retrieval.embeddings.enabled false
+somtum config set retrieval.strategy bm25
 ```
 
-BM25 retrieval is near-zero cost and works fully offline.
+BM25 retrieval works fully offline and is fast at any reasonable corpus size.
+
+---
+
+### Claude isn't using the memories
+
+If you are using the MCP server (`somtum init --all`), Claude will automatically call `recall` when it's uncertain about project details. If it's not happening:
+
+1. Confirm `.mcp.json` exists in your project root: `cat .mcp.json`
+2. Restart Claude Code so it picks up the new MCP config
+3. Try prompting Claude explicitly: _"Check your Somtum memory for anything related to our auth setup"_
+
+If you are not using the MCP server, memories are injected via the `index.md` file — add it to your CLAUDE.md or Claude Code context with:
+
+```
+See ~/.somtum/projects/<project_id>/index.md for prior session learnings.
+```
 
 ---
 
 ## Contributing
 
-Contributions are welcome! If you'd like to help improve Somtum, please see our [CONTRIBUTING.md](CONTRIBUTING.md) for a guide on how to get started.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for the guide.
 
-**Important Note for Contributors:** This project uses `changesets` for versioning. Every PR must include a changeset file generated by running `pnpm changeset`.
+**Important:** This project uses `changesets` for versioning. Every PR must include a changeset file generated by running `pnpm changeset`.
 
 ---
 

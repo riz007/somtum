@@ -4,27 +4,35 @@
 //
 // Reads a JSON payload on stdin and dispatches to the named hook module.
 
+import { appendFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { readToEnd, runPostSession, HookPayloadSchema } from '../hooks/post_session.js';
 import { runPrePrompt, PrePromptPayloadSchema } from '../hooks/pre_prompt.js';
 import { runPreRead, PreReadPayloadSchema } from '../hooks/pre_read.js';
 
-// Maximum wall-clock time each hook is allowed before we abort and exit.
-// Claude Code sessions must not hang because a hook is stuck on a slow API
-// call, a failed embedding-model download, or an unreachable network.
 const HOOK_TIMEOUTS_MS: Record<string, number> = {
-  post_session: 90_000, // extract + embed + file summaries — generous but bounded
-  pre_prompt: 5_000, // hot path: only SQLite lookups in the common case
-  pre_read: 1_000, // synchronous; 1 s is already very generous
+  post_session: 90_000,
+  pre_prompt: 5_000,
+  pre_read: 1_000,
 };
 
-function raceTimeout<T>(p: Promise<T>, ms: number, _label: string): Promise<T> {
+function raceTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     p,
     new Promise<never>((_, reject) =>
-      // Unref so the timer doesn't keep the process alive after natural exit.
-      setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms).unref(),
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms).unref(),
     ),
   ]);
+}
+
+function hookLog(msg: string): void {
+  try {
+    const logPath = join(homedir(), '.somtum', 'hook.log');
+    appendFileSync(logPath, `${new Date().toISOString()} ${msg}\n`, 'utf8');
+  } catch {
+    /* non-fatal */
+  }
 }
 
 export async function hookCommand(name: string): Promise<number> {
@@ -41,9 +49,13 @@ export async function hookCommand(name: string): Promise<number> {
 
   switch (name) {
     case 'post_session': {
+      if (!process.env['ANTHROPIC_API_KEY']) {
+        hookLog('[post_session] WARN: ANTHROPIC_API_KEY not set — extraction will fail');
+      }
       try {
         const payload = HookPayloadSchema.parse(parsed);
         const r = await raceTimeout(runPostSession(payload), timeoutMs, 'post_session');
+        hookLog(`[post_session] ok — inserted=${r.inserted} cache=${r.cacheEntriesAdded}`);
         console.log(
           JSON.stringify({
             ok: true,
@@ -55,7 +67,8 @@ export async function hookCommand(name: string): Promise<number> {
           }),
         );
       } catch (err) {
-        // Exit 0: hook failures must never break the user's Claude Code session.
+        hookLog(`[post_session] ERROR: ${(err as Error).message}`);
+        // Exit 0: hook failures must not break the user's Claude Code session.
         console.error(`[somtum] post_session failed: ${(err as Error).message}`);
       }
       return 0;

@@ -15,9 +15,9 @@ import { purgeCommand } from './purge.js';
 import { syncCommand } from './sync.js';
 import { doctorCommand } from './doctor.js';
 import { configGetCommand, configSetCommand } from './config_cmd.js';
+import { serveCommand } from './serve.js';
 import { runMcpServer } from '../mcp/server.js';
 import { printLogo } from './ui.js';
-import { serveCommand } from './serve.js';
 
 const program = new Command();
 
@@ -238,11 +238,14 @@ program
 
 program
   .command('serve')
-  .description('Open a local web dashboard to browse memories and project knowledge graph')
-  .option('--port <n>', 'Port to listen on', (v) => Number.parseInt(v, 10), 3000)
-  .option('--no-open', 'Do not open browser automatically')
-  .action(async (opts: { port: number; open: boolean }) => {
-    const code = await serveCommand({ port: opts.port, open: opts.open });
+  .description('Open the Somtum dashboard in the browser (memory browser, graph, analytics)')
+  .option('-p, --port <n>', 'Port to listen on', (v) => Number.parseInt(v, 10))
+  .option('--no-open', 'Do not open the browser automatically')
+  .action(async (opts: { port?: number; open?: boolean }) => {
+    const serveOpts: Parameters<typeof serveCommand>[0] = {};
+    if (opts.port !== undefined) serveOpts.port = opts.port;
+    if (opts.open !== undefined) serveOpts.open = opts.open;
+    const code = await serveCommand(serveOpts);
     process.exit(code);
   });
 

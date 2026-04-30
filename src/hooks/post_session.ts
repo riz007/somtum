@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, appendFileSync } from 'node:fs';
 import { isAbsolute, join, resolve as resolvePath } from 'node:path';
+import { homedir } from 'node:os';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
@@ -325,11 +326,30 @@ export async function runPostSession(
   }
 }
 
+function hookLog(msg: string): void {
+  try {
+    const logPath = join(homedir(), '.somtum', 'hook.log');
+    const ts = new Date().toISOString();
+    appendFileSync(logPath, `${ts} ${msg}\n`, 'utf8');
+  } catch {
+    // Non-fatal: logging must never break the hook.
+  }
+}
+
 export async function main(): Promise<void> {
+  hookLog('[post_session] starting');
+  if (!process.env['ANTHROPIC_API_KEY']) {
+    hookLog(
+      '[post_session] WARN: ANTHROPIC_API_KEY is not set — extraction will fail. Add it to your shell profile.',
+    );
+  }
   try {
     const raw = await readToEnd(process.stdin);
     const payload = HookPayloadSchema.parse(JSON.parse(raw));
     const result = await runPostSession(payload);
+    hookLog(
+      `[post_session] ok — inserted=${result.inserted} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
+    );
     // Hooks communicate via stdout; keep output structured.
     console.log(
       JSON.stringify({
@@ -342,6 +362,7 @@ export async function main(): Promise<void> {
       }),
     );
   } catch (err) {
+    hookLog(`[post_session] ERROR: ${(err as Error).message}`);
     console.error(`[somtum] post_session failed: ${(err as Error).message}`);
     // Exit 0: hook failures should never break the user's session.
     process.exit(0);
