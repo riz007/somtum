@@ -17,6 +17,64 @@ export interface LlmCaller {
   }): Promise<{ text: string; inputTokens: number; outputTokens: number }>;
 }
 
+export function claudeCodeCaller(): LlmCaller {
+  return {
+    async complete({ system, user }) {
+      const { spawn } = await import('node:child_process');
+
+      // Combine system + user since the claude CLI doesn't expose a --system flag.
+      // Claude handles <system>…</system> XML delimiters correctly.
+      const fullPrompt = `<system>\n${system}\n</system>\n\n${user}`;
+
+      return new Promise((resolve, reject) => {
+        const child = spawn('claude', ['--print'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        const stdoutChunks: Buffer[] = [];
+        const stderrChunks: Buffer[] = [];
+        child.stdout!.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+        child.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+
+        const timer = setTimeout(() => {
+          child.kill();
+          reject(new Error('claude CLI timed out after 30s'));
+        }, 30_000);
+
+        child.on('error', (err: NodeJS.ErrnoException) => {
+          clearTimeout(timer);
+          reject(
+            err.code === 'ENOENT'
+              ? new Error(
+                  'Neither ANTHROPIC_API_KEY nor the claude CLI is available. ' +
+                    'Set ANTHROPIC_API_KEY in your shell profile or install Claude Code.',
+                )
+              : err,
+          );
+        });
+
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          if (code !== 0) {
+            const errText = Buffer.concat(stderrChunks).toString('utf8').trim();
+            reject(new Error(`claude exited ${code}: ${errText || '(no stderr)'}`));
+            return;
+          }
+          const text = Buffer.concat(stdoutChunks).toString('utf8').trim();
+          resolve({
+            text,
+            inputTokens: countTokens(system + user),
+            outputTokens: countTokens(text),
+          });
+        });
+
+        child.stdin!.write(fullPrompt, 'utf8');
+        child.stdin!.end();
+      });
+    },
+  };
+}
+
 export function anthropicCaller(client: Anthropic): LlmCaller {
   return {
     async complete({ model, system, user }) {

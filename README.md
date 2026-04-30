@@ -104,7 +104,7 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
 
 - **Node 20+**
 - **Claude Code** — Somtum hooks into Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` events
-- **`ANTHROPIC_API_KEY`** — used by the capture hook to summarise session transcripts via Claude Haiku, and optionally by the `index` and `hybrid` retrieval strategies. **Must be exported in your shell profile** (see [Quickstart](#quickstart) — step 1 explains why)
+- **`ANTHROPIC_API_KEY`** _(optional)_ — if set, Somtum uses the Anthropic API directly for extraction (lets you choose the model explicitly). If not set, Somtum falls back to the `claude` CLI that ships with Claude Code, so **no separate API key is required for Claude Code subscribers**.
 
 > `pnpm` is only required if building from source. Global npm/yarn installs have no pnpm dependency.
 
@@ -147,27 +147,29 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ## Quickstart
 
-### Step 1 — Set your Anthropic API key in your shell profile
+### Step 1 — Choose your extraction backend
 
-> **This is the most important step.** When a Claude Code session ends, the `SessionEnd` hook runs as a subprocess launched by Claude Code. That subprocess inherits its environment from the shell that _started_ Claude Code — not from the current terminal window. If the key is only `export`-ed in an interactive session, the hook will not see it and extraction will silently fail.
+Somtum needs to call a Claude model at session end to extract observations. There are two options — pick one:
 
-Add to `~/.zshrc` (or `~/.bashrc`, `~/.bash_profile`):
+**Option A: Claude Code subscription (no extra setup)**
+
+If you already have Claude Code installed, you're done. Somtum calls `claude --print` automatically when no API key is present. Skip to Step 2.
+
+**Option B: Direct Anthropic API key (optional — faster, explicit model choice)**
+
+If you want Somtum to call the API directly (useful if you use Somtum outside of a Claude Code environment, or want to pin a specific model), add to `~/.zshrc` (or `~/.bashrc`):
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-Then reload your shell:
+Then reload:
 
 ```bash
-source ~/.zshrc   # or open a new terminal
+source ~/.zshrc
 ```
 
-Confirm it's available:
-
-```bash
-echo $ANTHROPIC_API_KEY   # should print your key
-```
+> When a `SessionEnd` hook fires, it inherits the environment of the shell that _started_ Claude Code — not the current terminal. So the key must be in your shell profile, not just `export`-ed in an open terminal tab.
 
 ### Step 2 — Install inside a Claude Code project
 
@@ -239,11 +241,20 @@ A successful run looks like:
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
 ```
 
-A failed run with a missing API key looks like:
+A run using the claude CLI fallback (no API key) looks like:
 
 ```
-2026-04-30T10:15:42.123Z [post_session] WARN: ANTHROPIC_API_KEY not set — extraction will fail
-2026-04-30T10:15:42.131Z [post_session] ERROR: 401 authentication_error
+2026-04-30T10:15:42.123Z [post_session] starting
+2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+```
+
+A failed run (neither key nor CLI available) looks like:
+
+```
+2026-04-30T10:15:42.123Z [post_session] starting
+2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
+2026-04-30T10:15:42.131Z [post_session] ERROR: Neither ANTHROPIC_API_KEY nor the claude CLI is available.
 ```
 
 **2. Check stats**
@@ -604,22 +615,14 @@ cat ~/.somtum/hook.log
 
 Common causes:
 
-**`ANTHROPIC_API_KEY` not set in shell profile**
+**`claude` CLI not found and no `ANTHROPIC_API_KEY` set**
 
-The most common cause. The hook runs as a subprocess of Claude Code and inherits the environment from the shell that launched Claude Code. If you only `export`-ed the key in the current terminal session (not in `.zshrc` / `.bashrc`), the hook won't see it.
+Somtum needs one of the two backends available when the `SessionEnd` hook fires. If neither is present, extraction silently fails.
 
-Fix:
+- If you use Claude Code: make sure the `claude` binary is on your `PATH`. Run `which claude` — if it prints nothing, reinstall Claude Code or add it to `PATH`.
+- If you prefer the direct API: add `export ANTHROPIC_API_KEY="sk-ant-..."` to `~/.zshrc` (or `~/.bashrc`) and `source ~/.zshrc`. The key must be in your shell profile because the hook subprocess inherits from the shell that _started_ Claude Code, not the current terminal tab.
 
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
-source ~/.zshrc
-
-# Confirm it's set
-echo $ANTHROPIC_API_KEY
-
-# Then open a new Claude session
-```
+Run `somtum doctor` — the `api_key` check will tell you exactly which path is available.
 
 **Hook not installed in the right directory**
 
@@ -645,7 +648,7 @@ Try a real working session, then re-check.
 somtum doctor
 ```
 
-It checks the API key, hook installation, DB health, embeddings, breakeven ratio, and more, with specific fix instructions for each failing check.
+It checks extraction auth (API key or claude CLI), hook installation, DB health, embeddings, breakeven ratio, and more, with specific fix instructions for each failing check.
 
 ---
 

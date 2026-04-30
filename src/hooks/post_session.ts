@@ -11,6 +11,7 @@ import { generateIndex } from '../core/index_gen.js';
 import {
   extract,
   anthropicCaller,
+  claudeCodeCaller,
   estimateTokensSaved,
   type LlmCaller,
 } from '../core/extractor.js';
@@ -233,13 +234,20 @@ export async function runPostSession(
     const transcript = resolved.text;
     const transcriptTokens = countTokens(transcript);
 
-    // 25 s per API call — the SDK default is 600 s which lets a single slow
-    // Haiku call block the hook process for 10 minutes.
+    // Prefer the direct API when a key is present (faster, explicit model choice).
+    // Fall back to the claude CLI so Claude Code subscribers need no separate key.
     const caller =
       opts.caller ??
-      anthropicCaller(
-        new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] ?? '', timeout: 25_000 }),
-      );
+      (() => {
+        const apiKey = process.env['ANTHROPIC_API_KEY'];
+        if (apiKey && apiKey.trim().length > 0) {
+          // 25 s per API call — the SDK default is 600 s which lets a single
+          // slow Haiku call block the hook process for 10 minutes.
+          return anthropicCaller(new Anthropic({ apiKey, timeout: 25_000 }));
+        }
+        hookLog('[post_session] ANTHROPIC_API_KEY not set — using claude CLI fallback');
+        return claudeCodeCaller();
+      })();
 
     const outcome = await extract(transcript, caller, {
       model: config.extraction.model,
@@ -339,9 +347,7 @@ function hookLog(msg: string): void {
 export async function main(): Promise<void> {
   hookLog('[post_session] starting');
   if (!process.env['ANTHROPIC_API_KEY']) {
-    hookLog(
-      '[post_session] WARN: ANTHROPIC_API_KEY is not set — extraction will fail. Add it to your shell profile.',
-    );
+    hookLog('[post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback');
   }
   try {
     const raw = await readToEnd(process.stdin);
