@@ -136,7 +136,18 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         : 'disabled (set retrieval.embeddings.enabled=true to enable)',
     });
 
-    // 11. Hook files in .claude/settings.json
+    // 11. ANTHROPIC_API_KEY present
+    const apiKey = process.env['ANTHROPIC_API_KEY'];
+    checks.push({
+      name: 'api_key',
+      ok: Boolean(apiKey && apiKey.trim().length > 0),
+      detail:
+        apiKey && apiKey.trim().length > 0
+          ? 'ANTHROPIC_API_KEY is set'
+          : 'ANTHROPIC_API_KEY is not set — the SessionEnd hook needs it to extract observations. Set it in your shell profile (e.g. export ANTHROPIC_API_KEY=sk-ant-...).',
+    });
+
+    // 12. Hook files in .claude/settings.json
     const settingsPath = join(cwd, '.claude', 'settings.json');
     if (existsSync(settingsPath)) {
       try {

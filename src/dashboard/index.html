@@ -1,480 +1,886 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Somtum</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <title>Somtum — Memory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              bg: '#07080b',
-              surface: '#0d0f14',
-              surface2: '#131720',
-              border: '#1a1f2c',
-              'border-s': '#252d3e',
-              papaya: '#4ade80',
-              chili: '#f87171',
-              carrot: '#fbbf24',
-              teal: '#22d3ee',
-              cobalt: '#60a5fa',
-              violet: '#a78bfa',
-            },
-            fontFamily: {
-              display: ['Syne', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            },
-          },
-        },
-      };
-    </script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
     <style>
       *,
       *::before,
       *::after {
         box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
+
+      :root {
+        --bg: #0b0d12;
+        --surface: #111318;
+        --surface2: #181c24;
+        --surface3: #1d2230;
+        --border: #1f2535;
+        --border2: #2a3245;
+        --text: #dde1ea;
+        --muted: #4d5870;
+        --muted2: #6b7a96;
+        --accent: #4f8dff;
+        --accent-g: #27c27d;
+        --accent-a: #f0a638;
+        --accent-r: #ef5858;
+        --accent-v: #9b72f5;
+        --accent-c: #22d0c8;
+        --radius: 8px;
+        --sidebar: 300px;
+        --header: 52px;
+      }
+
       html,
       body {
         height: 100%;
         overflow: hidden;
-        margin: 0;
-      }
-      body {
-        background: #07080b;
-        color: #c5c9d4;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 12.5px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
         -webkit-font-smoothing: antialiased;
       }
 
-      /* ── Scrollbars ────────────────────────────────────────────── */
+      /* ── Scrollbars ─────────────────────────────────────────────── */
       ::-webkit-scrollbar {
-        width: 3px;
-        height: 3px;
+        width: 4px;
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
         background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: #252d3e;
-        border-radius: 2px;
+        background: var(--border2);
+        border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #333d52;
+        background: var(--muted);
       }
 
-      /* ── Stat chips ────────────────────────────────────────────── */
-      .stat-chip {
+      /* ── Mono text ──────────────────────────────────────────────── */
+      .mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* ── Header ─────────────────────────────────────────────────── */
+      #header {
+        height: var(--header);
+        border-bottom: 1px solid var(--border);
+        padding: 0 20px;
         display: flex;
-        flex-direction: column;
         align-items: center;
-        padding: 5px 12px;
-        background: #0d0f14;
-        border: 1px solid #1a1f2c;
+        gap: 14px;
+        flex-shrink: 0;
+        background: var(--surface);
+      }
+      #logo {
+        font-size: 19px;
+        font-weight: 800;
+        color: var(--accent);
+        letter-spacing: -0.04em;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      #logo-mark {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-v) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      #logo-mark svg {
+        width: 14px;
+        height: 14px;
+        color: #fff;
+      }
+      #header-sep {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+      }
+      #project-label {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: 'JetBrains Mono', monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 240px;
+      }
+      #stat-bar {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+      }
+      .stat-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 11px;
         border-radius: 6px;
-        min-width: 76px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
         cursor: default;
       }
-      .stat-chip .lbl {
-        font-size: 8.5px;
+      .stat-pill .s-lbl {
+        font-size: 10px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: #333d52;
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: var(--muted);
       }
-      .stat-chip .val {
-        font-size: 15px;
-        font-weight: 700;
-        font-family: 'Syne', sans-serif;
-        line-height: 1.2;
-        margin-top: 1px;
+      .stat-pill .s-val {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
       }
 
-      /* ── Tab buttons ───────────────────────────────────────────── */
-      .tab-btn {
-        padding: 9px 16px;
-        font-family: 'Syne', sans-serif;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #333d52;
-        border: none;
-        border-bottom: 2px solid transparent;
-        background: none;
-        cursor: pointer;
+      /* ── Layout ─────────────────────────────────────────────────── */
+      #layout {
+        display: flex;
+        height: calc(100vh - var(--header));
+        overflow: hidden;
+      }
+
+      /* ── Sidebar ─────────────────────────────────────────────────── */
+      #sidebar {
+        width: var(--sidebar);
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--surface);
+      }
+
+      /* Search */
+      #search-wrap {
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .search-box {
+        position: relative;
+      }
+      .search-box svg {
+        position: absolute;
+        left: 9px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 14px;
+        height: 14px;
+        color: var(--muted);
+        pointer-events: none;
+      }
+      #search-input {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 7px 9px 7px 30px;
+        font-size: 12.5px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--text);
+        outline: none;
         transition:
-          color 0.15s,
-          border-color 0.15s;
+          border-color 0.15s,
+          box-shadow 0.15s;
       }
-      .tab-btn:hover {
-        color: #7a8299;
+      #search-input::placeholder {
+        color: var(--muted);
       }
-      .tab-btn.active {
-        color: #4ade80;
-        border-bottom-color: #4ade80;
+      #search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(79, 141, 255, 0.12);
       }
-
-      /* ── Strategy buttons ──────────────────────────────────────── */
+      #search-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .strat-row {
+        display: flex;
+        gap: 4px;
+      }
       .strat-btn {
-        padding: 2px 8px;
-        font-size: 9.5px;
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        border: 1px solid #1a1f2c;
+        padding: 3px 8px;
+        font-size: 10px;
+        font-weight: 600;
+        border: 1px solid var(--border);
         border-radius: 4px;
         cursor: pointer;
-        background: #0d0f14;
-        color: #333d52;
+        background: var(--surface2);
+        color: var(--muted2);
         transition: all 0.12s;
+        font-family: 'Bricolage Grotesque', sans-serif;
       }
       .strat-btn:hover {
-        border-color: #252d3e;
-        color: #7a8299;
+        color: var(--text);
+        border-color: var(--border2);
       }
       .strat-btn.active {
-        background: rgba(34, 211, 238, 0.08);
-        border-color: rgba(34, 211, 238, 0.4);
-        color: #22d3ee;
+        background: rgba(79, 141, 255, 0.1);
+        border-color: rgba(79, 141, 255, 0.4);
+        color: var(--accent);
+      }
+      #search-spinner {
+        display: none;
+      }
+      #search-spinner svg {
+        animation: spin 0.7s linear infinite;
+        display: block;
       }
 
-      /* ── Kind filter chips ─────────────────────────────────────── */
-      .kind-chip {
-        padding: 2px 7px;
-        font-size: 9.5px;
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
+      /* Kind filters */
+      #kind-filters {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .kind-tag {
+        padding: 2px 8px;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 4px;
         border: 1px solid transparent;
-        border-radius: 3px;
         cursor: pointer;
         transition: all 0.12s;
-        background: #131720;
-        color: #333d52;
+        color: var(--muted2);
+        background: var(--surface2);
       }
-      .kind-chip:hover {
-        color: #7a8299;
-        border-color: #252d3e;
+      .kind-tag:hover {
+        color: var(--text);
+        border-color: var(--border2);
+      }
+      .kind-tag.active {
+        color: #fff;
       }
 
-      /* ── Memory cards ──────────────────────────────────────────── */
+      /* List header */
+      #list-header {
+        padding: 6px 10px 5px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border);
+      }
+      #list-header .h-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      #list-count {
+        font-size: 10px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--muted);
+      }
+
+      /* Memory list */
+      #memory-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      /* Memory card */
       .mem-card {
         padding: 9px 10px;
-        background: #0d0f14;
-        border: 1px solid #1a1f2c;
         border-radius: 6px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
         cursor: pointer;
         transition:
           border-color 0.12s,
           background 0.12s;
         position: relative;
+        overflow: hidden;
+      }
+      .mem-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        border-radius: 3px 0 0 3px;
       }
       .mem-card:hover {
-        border-color: #252d3e;
-        background: #101318;
+        border-color: var(--border2);
+        background: var(--surface3);
       }
       .mem-card.selected {
-        border-color: #4ade80 !important;
-        background: rgba(74, 222, 128, 0.035) !important;
+        border-color: var(--accent);
       }
-      .forget-btn {
+      .mem-card.selected::before {
+        background: var(--accent);
+      }
+
+      .mc-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        margin-bottom: 3px;
+      }
+      .mc-title {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.35;
+        flex: 1;
+        min-width: 0;
+      }
+      .mc-kind {
+        flex-shrink: 0;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+      .mc-body {
+        font-size: 11px;
+        color: var(--muted2);
+        line-height: 1.4;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+      .mc-footer {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      .mc-time {
+        font-size: 10px;
+        color: var(--muted);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .mc-tags {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+      .mc-tag {
+        font-size: 9px;
+        font-weight: 600;
+        padding: 1px 5px;
+        background: var(--surface3);
+        border: 1px solid var(--border2);
+        border-radius: 3px;
+        color: var(--muted2);
+      }
+      .mc-forget {
         display: none;
+        width: 20px;
+        height: 20px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        cursor: pointer;
+        background: rgba(239, 88, 88, 0.08);
+        border: 1px solid rgba(239, 88, 88, 0.2);
+        color: var(--accent-r);
+        font-size: 10px;
+        transition: background 0.12s;
+        flex-shrink: 0;
         position: absolute;
         top: 7px;
         right: 7px;
-        width: 18px;
-        height: 18px;
-        align-items: center;
-        justify-content: center;
-        border-radius: 3px;
-        background: rgba(248, 113, 113, 0.08);
-        border: 1px solid rgba(248, 113, 113, 0.2);
-        color: #f87171;
-        font-size: 9px;
-        cursor: pointer;
-        transition: background 0.12s;
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
       }
-      .mem-card:hover .forget-btn {
+      .mem-card:hover .mc-forget {
         display: flex;
       }
-      .forget-btn:hover {
-        background: rgba(248, 113, 113, 0.16) !important;
+      .mc-forget:hover {
+        background: rgba(239, 88, 88, 0.18);
       }
 
-      /* ── Analytics cards ───────────────────────────────────────── */
+      /* ── Main panel ──────────────────────────────────────────────── */
+      #main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      /* Tab bar */
+      #tab-bar {
+        height: 42px;
+        border-bottom: 1px solid var(--border);
+        padding: 0 8px;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        background: var(--surface);
+        gap: 2px;
+      }
+      .tab-btn {
+        padding: 6px 14px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted2);
+        border: none;
+        border-radius: 5px;
+        background: none;
+        cursor: pointer;
+        transition:
+          color 0.12s,
+          background 0.12s;
+      }
+      .tab-btn:hover {
+        color: var(--text);
+        background: var(--surface2);
+      }
+      .tab-btn.active {
+        color: var(--accent);
+        background: rgba(79, 141, 255, 0.1);
+      }
+      #tab-hint {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--muted);
+        padding-right: 10px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* Tab panes */
+      #tab-graph {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #tab-analytics {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px;
+      }
+
+      /* Graph */
+      #graph-container {
+        flex: 1;
+        margin: 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #08090f;
+        overflow: hidden;
+      }
+
+      /* Detail panel */
+      #detail-panel {
+        display: none;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+        overflow-y: auto;
+        flex-shrink: 0;
+        max-height: 38vh;
+      }
+      #detail-inner {
+        padding: 16px 20px;
+      }
+      .detail-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .detail-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+        flex: 1;
+        line-height: 1.3;
+      }
+      .detail-meta {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+        font-size: 11px;
+        color: var(--muted);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .detail-body {
+        font-size: 12.5px;
+        color: var(--muted2);
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-bottom: 12px;
+      }
+      .detail-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .detail-chip {
+        font-size: 10px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        color: var(--muted2);
+      }
+      .detail-chip.file {
+        color: var(--accent-c);
+        border-color: rgba(34, 208, 200, 0.3);
+        background: rgba(34, 208, 200, 0.07);
+      }
+      .detail-close {
+        width: 24px;
+        height: 24px;
+        border-radius: 5px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        color: var(--muted2);
+        transition: color 0.12s;
+      }
+      .detail-close:hover {
+        color: var(--text);
+      }
+
+      /* Analytics */
+      .a-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      @media (max-width: 900px) {
+        .a-grid {
+          grid-template-columns: 1fr;
+        }
+      }
       .a-card {
-        background: #0d0f14;
-        border: 1px solid #1a1f2c;
-        border-radius: 8px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         padding: 16px;
       }
       .a-title {
-        font-size: 9px;
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        color: #333d52;
+        color: var(--muted);
         margin-bottom: 14px;
       }
-
-      /* ── Progress bars ─────────────────────────────────────────── */
+      .bar-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .bar-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        width: 100px;
+        flex-shrink: 0;
+      }
       .bar-track {
-        height: 3px;
-        background: #1a1f2c;
-        border-radius: 2px;
         flex: 1;
+        height: 4px;
+        background: var(--surface3);
+        border-radius: 2px;
         overflow: hidden;
       }
       .bar-fill {
         height: 100%;
         border-radius: 2px;
         width: 0;
-        transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: width 0.65s cubic-bezier(0.16, 1, 0.3, 1);
       }
-
-      /* ── Graph ─────────────────────────────────────────────────── */
-      #graph-wrap {
-        flex: 1;
-        min-height: 0;
-        margin: 10px;
-        border: 1px solid #1a1f2c;
-        border-radius: 8px;
-        background: #09090d;
-        overflow: hidden;
-      }
-
-      /* ── Detail drawer ─────────────────────────────────────────── */
-      #detail-drawer {
-        border-top: 1px solid #1a1f2c;
-        background: #0b0d11;
-        overflow-y: auto;
+      .bar-count {
+        font-size: 11px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--muted2);
+        width: 36px;
+        text-align: right;
         flex-shrink: 0;
-        max-height: 40vh;
+      }
+      .cache-stat {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .cache-stat:last-child {
+        border-bottom: none;
+      }
+      .cache-stat-lbl {
+        font-size: 12px;
+        color: var(--muted2);
+      }
+      .cache-stat-val {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .file-row:last-child {
+        border-bottom: none;
+      }
+      .file-name {
+        font-size: 11px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--text);
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      .file-count {
+        font-size: 11px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--muted2);
+        flex-shrink: 0;
       }
 
-      /* ── Animations ────────────────────────────────────────────── */
-      @keyframes fadeUp {
+      /* Empty state */
+      .empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 48px 24px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .empty-icon {
+        opacity: 0.25;
+        margin-bottom: 2px;
+      }
+      .empty-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted2);
+      }
+      .empty-sub {
+        font-size: 11.5px;
+        color: var(--muted);
+        max-width: 220px;
+        line-height: 1.5;
+      }
+
+      /* Skeleton */
+      .skel {
+        background: var(--surface2);
+        border-radius: 5px;
+        animation: shimmer 1.5s ease-in-out infinite;
+      }
+
+      /* Animations */
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes shimmer {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+      @keyframes fadeIn {
         from {
           opacity: 0;
-          transform: translateY(5px);
+          transform: translateY(4px);
         }
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
-      .fade-up {
-        animation: fadeUp 0.18s ease forwards;
+      .fade-in {
+        animation: fadeIn 0.16s ease forwards;
       }
 
-      @keyframes shimmer {
-        0%,
-        100% {
-          opacity: 0.35;
-        }
-        50% {
-          opacity: 0.65;
-        }
+      /* Kind colour map */
+      .kind-decision {
+        background: rgba(79, 141, 255, 0.12);
+        color: #4f8dff;
       }
-      .skel {
-        background: #131720;
-        border-radius: 5px;
-        animation: shimmer 1.4s ease-in-out infinite;
+      .kind-learning {
+        background: rgba(155, 114, 245, 0.12);
+        color: #9b72f5;
       }
-
-      /* ── Empty states ──────────────────────────────────────────── */
-      .empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 40px 20px;
-        color: #333d52;
-        font-family: 'Syne', sans-serif;
-        font-weight: 700;
-        font-size: 11px;
-        text-align: center;
-        gap: 8px;
+      .kind-bugfix {
+        background: rgba(239, 88, 88, 0.12);
+        color: #ef5858;
       }
-      .empty svg {
-        opacity: 0.25;
+      .kind-command {
+        background: rgba(240, 166, 56, 0.12);
+        color: #f0a638;
       }
-
-      /* ── File rows ─────────────────────────────────────────────── */
-      .file-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 5px 0;
-        border-bottom: 1px solid #13161e;
+      .kind-file_summary {
+        background: rgba(34, 208, 200, 0.1);
+        color: #22d0c8;
       }
-      .file-row:last-child {
-        border-bottom: none;
+      .kind-other {
+        background: rgba(107, 122, 150, 0.12);
+        color: #6b7a96;
+      }
+      .kf-decision {
+        border-color: rgba(79, 141, 255, 0.3);
+        background: rgba(79, 141, 255, 0.08);
+        color: #4f8dff;
+      }
+      .kf-learning {
+        border-color: rgba(155, 114, 245, 0.3);
+        background: rgba(155, 114, 245, 0.08);
+        color: #9b72f5;
+      }
+      .kf-bugfix {
+        border-color: rgba(239, 88, 88, 0.3);
+        background: rgba(239, 88, 88, 0.08);
+        color: #ef5858;
+      }
+      .kf-command {
+        border-color: rgba(240, 166, 56, 0.3);
+        background: rgba(240, 166, 56, 0.08);
+        color: #f0a638;
+      }
+      .kf-file_summary {
+        border-color: rgba(34, 208, 200, 0.3);
+        background: rgba(34, 208, 200, 0.07);
+        color: #22d0c8;
+      }
+      .kf-other {
+        border-color: rgba(107, 122, 150, 0.3);
+        background: rgba(107, 122, 150, 0.08);
+        color: #6b7a96;
+      }
+      .kf-all {
+        border-color: rgba(79, 141, 255, 0.3);
+        background: rgba(79, 141, 255, 0.08);
+        color: #4f8dff;
       }
     </style>
   </head>
   <body>
-    <!-- ═══════════════════════ HEADER ═══════════════════════════ -->
-    <header
-      style="
-        height: 49px;
-        border-bottom: 1px solid #1a1f2c;
-        padding: 0 18px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-shrink: 0;
-      "
-    >
-      <div style="display: flex; align-items: center; gap: 10px">
-        <span
-          style="
-            font-family: Syne;
-            font-size: 18px;
-            font-weight: 800;
-            color: #4ade80;
-            letter-spacing: -0.02em;
-          "
-          >somtum</span
-        >
-        <span style="width: 1px; height: 16px; background: #1a1f2c"></span>
-        <span
-          id="project-id"
-          style="
-            font-size: 10px;
-            color: #2e3547;
-            max-width: 280px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          "
-        ></span>
+    <!-- ═══ HEADER ══════════════════════════════════════════════════════ -->
+    <header id="header">
+      <div id="logo">
+        <div id="logo-mark">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46L7 19M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46l.04-.54"
+            />
+          </svg>
+        </div>
+        somtum
       </div>
-      <div id="stat-chips" style="display: flex; gap: 6px">
-        <div class="stat-chip">
-          <span class="lbl">memories</span
-          ><span id="s-mem" class="val" style="color: #4ade80">—</span>
+      <div id="header-sep"></div>
+      <span id="project-label">—</span>
+      <div id="stat-bar">
+        <div class="stat-pill">
+          <span class="s-lbl">Memories</span>
+          <span id="s-mem" class="s-val" style="color: var(--accent-g)">—</span>
         </div>
-        <div class="stat-chip">
-          <span class="lbl">saved</span
-          ><span id="s-saved" class="val" style="color: #fbbf24">—</span>
+        <div class="stat-pill">
+          <span class="s-lbl">Saved</span>
+          <span id="s-saved" class="s-val" style="color: var(--accent-a)">—</span>
         </div>
-        <div class="stat-chip">
-          <span class="lbl">spent</span
-          ><span id="s-spent" class="val" style="color: #c5c9d4">—</span>
+        <div class="stat-pill">
+          <span class="s-lbl">Spent</span>
+          <span id="s-spent" class="s-val" style="color: var(--muted2)">—</span>
         </div>
-        <div class="stat-chip">
-          <span class="lbl">roi</span><span id="s-roi" class="val" style="color: #22d3ee">—</span>
+        <div class="stat-pill">
+          <span class="s-lbl">ROI</span>
+          <span id="s-roi" class="s-val" style="color: var(--accent)">—</span>
         </div>
-        <div class="stat-chip">
-          <span class="lbl">cache hit</span
-          ><span id="s-cache" class="val" style="color: #a78bfa">—</span>
+        <div class="stat-pill">
+          <span class="s-lbl">Cache</span>
+          <span id="s-cache" class="s-val" style="color: var(--accent-v)">—</span>
         </div>
       </div>
     </header>
 
-    <!-- ═══════════════════════ BODY ════════════════════════════= -->
-    <div style="display: flex; height: calc(100vh - 49px); overflow: hidden">
-      <!-- ─── LEFT SIDEBAR: Memory browser ────────────────────── -->
-      <aside
-        style="
-          width: 296px;
-          flex-shrink: 0;
-          border-right: 1px solid #1a1f2c;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        "
-      >
-        <!-- Search + strategy -->
-        <div
-          style="
-            padding: 10px;
-            border-bottom: 1px solid #1a1f2c;
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-          "
-        >
-          <div style="position: relative">
-            <svg
-              style="
-                position: absolute;
-                left: 8px;
-                top: 6.5px;
-                width: 13px;
-                height: 13px;
-                color: #2e3547;
-                pointer-events: none;
-              "
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"
-              />
+    <!-- ═══ LAYOUT ══════════════════════════════════════════════════════ -->
+    <div id="layout">
+      <!-- ─── SIDEBAR ───────────────────────────────────────────────── -->
+      <aside id="sidebar">
+        <!-- Search -->
+        <div id="search-wrap">
+          <div class="search-box">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-5-5" stroke-linecap="round" />
             </svg>
             <input
               id="search-input"
               type="text"
-              placeholder="search memories…"
+              placeholder="Search memories…"
               autocomplete="off"
-              style="
-                width: 100%;
-                background: #0a0c10;
-                border: 1px solid #1a1f2c;
-                border-radius: 5px;
-                padding: 6px 8px 6px 26px;
-                font-size: 12px;
-                font-family: 'JetBrains Mono', monospace;
-                color: #c5c9d4;
-                outline: none;
-                transition: border-color 0.15s;
-              "
-              onfocus="this.style.borderColor = '#22d3ee'"
-              onblur="this.style.borderColor = '#1a1f2c'"
+              spellcheck="false"
             />
           </div>
-          <div style="display: flex; align-items: center; gap: 6px">
-            <span
-              style="
-                font-size: 8.5px;
-                color: #2e3547;
-                font-family: Syne;
-                font-weight: 800;
-                text-transform: uppercase;
-                letter-spacing: 0.1em;
-                white-space: nowrap;
-              "
-              >via</span
-            >
-            <div id="strategy-btns" style="display: flex; gap: 4px"></div>
-            <div id="search-spinner" style="display: none; margin-left: 4px">
+          <div id="search-meta">
+            <div class="strat-row" id="strategy-btns"></div>
+            <div id="search-spinner">
               <svg
-                width="11"
-                height="11"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#22d3ee"
+                stroke="var(--accent)"
                 stroke-width="2.5"
-                style="animation: spin 0.8s linear infinite"
               >
                 <path
                   d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
@@ -484,106 +890,44 @@
           </div>
         </div>
 
-        <!-- Kind filter -->
-        <div
-          id="kind-filter"
-          style="
-            padding: 8px 10px;
-            border-bottom: 1px solid #1a1f2c;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            flex-shrink: 0;
-          "
-        ></div>
+        <!-- Kind filters -->
+        <div id="kind-filters"></div>
 
         <!-- List header -->
-        <div
-          style="
-            padding: 6px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #13161e;
-          "
-        >
-          <span
-            style="
-              font-size: 9px;
-              font-family: Syne;
-              font-weight: 800;
-              text-transform: uppercase;
-              letter-spacing: 0.1em;
-              color: #2e3547;
-            "
-            >memories</span
-          >
-          <span
-            id="list-count"
-            style="font-size: 9px; font-family: 'JetBrains Mono'; color: #2e3547"
-          ></span>
+        <div id="list-header">
+          <span class="h-label">Memories</span>
+          <span id="list-count"></span>
         </div>
 
         <!-- Memory list -->
-        <div
-          id="memory-list"
-          style="
-            flex: 1;
-            overflow-y: auto;
-            padding: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-          "
-        ></div>
+        <div id="memory-list">
+          <div class="skel" style="height: 68px; border-radius: 6px"></div>
+          <div class="skel" style="height: 56px; border-radius: 6px; margin-top: 3px"></div>
+          <div class="skel" style="height: 72px; border-radius: 6px; margin-top: 3px"></div>
+        </div>
       </aside>
 
-      <!-- ─── RIGHT PANEL ───────────────────────────────────────── -->
-      <main style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0">
+      <!-- ─── MAIN ──────────────────────────────────────────────────── -->
+      <main id="main">
         <!-- Tab bar -->
-        <div
-          style="
-            border-bottom: 1px solid #1a1f2c;
-            padding: 0 6px;
-            display: flex;
-            align-items: center;
-            flex-shrink: 0;
-            background: #07080b;
-          "
-        >
+        <div id="tab-bar">
           <button class="tab-btn active" data-tab="graph">Graph</button>
           <button class="tab-btn" data-tab="analytics">Analytics</button>
-          <div style="flex: 1"></div>
-          <span
-            id="tab-info"
-            style="
-              font-size: 9px;
-              font-family: Syne;
-              font-weight: 700;
-              color: #2e3547;
-              padding-right: 14px;
-            "
-          ></span>
+          <span id="tab-hint"></span>
         </div>
 
-        <!-- Tab content -->
+        <!-- Panes wrapper -->
         <div
           style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0"
         >
           <!-- GRAPH TAB -->
-          <div
-            id="tab-graph"
-            style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0"
-          >
-            <div id="graph-wrap"></div>
+          <div id="tab-graph">
+            <div id="graph-container"></div>
           </div>
 
-          <!-- ANALYTICS TAB (hidden) -->
-          <div id="tab-analytics" style="display: none; flex: 1; overflow-y: auto; padding: 12px">
-            <div
-              id="analytics-grid"
-              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
-            >
+          <!-- ANALYTICS TAB -->
+          <div id="tab-analytics">
+            <div class="a-grid" id="analytics-grid">
               <div class="skel" style="height: 180px"></div>
               <div class="skel" style="height: 180px"></div>
               <div class="skel" style="height: 200px"></div>
@@ -592,122 +936,20 @@
           </div>
         </div>
 
-        <!-- Detail drawer (hidden by default) -->
-        <div id="detail-drawer" style="display: none">
-          <div style="padding: 14px 18px">
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 10px;
-              "
-            >
-              <div>
-                <span
-                  id="d-kind"
-                  style="
-                    font-family: Syne;
-                    font-size: 9px;
-                    font-weight: 800;
-                    text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    display: inline-block;
-                    margin-bottom: 5px;
-                  "
-                ></span>
-                <h3
-                  id="d-title"
-                  style="
-                    font-family: Syne;
-                    font-size: 15px;
-                    font-weight: 700;
-                    color: #dde2ee;
-                    line-height: 1.3;
-                    margin: 0;
-                  "
-                ></h3>
-                <div style="display: flex; gap: 14px; margin-top: 5px">
-                  <span id="d-date" style="font-size: 10px; color: #2e3547"></span>
-                  <span id="d-tokens" style="font-size: 10px; color: #333d52"></span>
-                </div>
-              </div>
-              <button
-                onclick="closeDetail()"
-                style="
-                  color: #2e3547;
-                  background: none;
-                  border: none;
-                  cursor: pointer;
-                  padding: 3px;
-                  border-radius: 4px;
-                  line-height: 1;
-                  flex-shrink: 0;
-                  transition: color 0.12s;
-                "
-                onmouseover="this.style.color = '#7a8299'"
-                onmouseout="this.style.color = '#2e3547'"
-              >
-                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2.5"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div
-              id="d-body"
-              style="
-                color: #8a91a8;
-                font-size: 12px;
-                line-height: 1.75;
-                white-space: pre-wrap;
-                margin-bottom: 12px;
-                max-height: 180px;
-                overflow-y: auto;
-              "
-            ></div>
-            <div
-              id="d-footer"
-              style="
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-                padding-top: 10px;
-                border-top: 1px solid #13161e;
-              "
-            ></div>
-          </div>
+        <!-- Detail panel -->
+        <div id="detail-panel">
+          <div id="detail-inner"></div>
         </div>
       </main>
     </div>
 
-    <!-- spin keyframes (for search spinner) -->
-    <style>
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
-
     <script>
-      // ──────────────────────────────────────────────────────────────────────────────
-      // State
-      // ──────────────────────────────────────────────────────────────────────────────
+      // ─── State ───────────────────────────────────────────────────────────────────
       const S = {
-        data: null, // /api/data response
-        fullStats: null, // /api/stats/full response
+        data: null,
+        fullStats: null,
         activeTab: 'graph',
-        activeKind: null, // kind filter
+        activeKind: 'all',
         selectedId: null,
         searchQuery: '',
         searchResults: null,
@@ -717,574 +959,644 @@
         analyticsRendered: false,
       };
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Kind → color
-      // ──────────────────────────────────────────────────────────────────────────────
-      const KC = {
-        decision: '#4ade80',
-        bugfix: '#f87171',
-        learning: '#fbbf24',
-        command: '#60a5fa',
-        file_summary: '#a78bfa',
-        other: '#52576a',
+      // ─── Kind colours (for vis-network nodes) ────────────────────────────────────
+      const KIND_COLOR = {
+        decision: { bg: '#4f8dff', border: '#2d6edd' },
+        learning: { bg: '#9b72f5', border: '#7a50d4' },
+        bugfix: { bg: '#ef5858', border: '#d43737' },
+        command: { bg: '#f0a638', border: '#d48820' },
+        file_summary: { bg: '#22d0c8', border: '#16a8a1' },
+        other: { bg: '#4d5870', border: '#3a4560' },
       };
-      function kc(kind) {
-        return KC[kind] ?? '#52576a';
-      }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Helpers
-      // ──────────────────────────────────────────────────────────────────────────────
-      function fmtN(n) {
-        if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-        return n.toLocaleString();
+      // ─── Utilities ────────────────────────────────────────────────────────────────
+      function fmtK(n) {
+        if (n === undefined || n === null) return '—';
+        if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+        if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+        return String(n);
       }
 
       function relTime(ts) {
-        const d = Date.now() - ts;
-        const s = d / 1000,
-          m = s / 60,
-          h = m / 60,
-          day = h / 24;
-        if (s < 60) return 'just now';
-        if (m < 60) return Math.floor(m) + 'm ago';
-        if (h < 24) return Math.floor(h) + 'h ago';
-        if (day < 30) return Math.floor(day) + 'd ago';
-        return new Date(ts).toLocaleDateString();
+        if (!ts) return '';
+        const d = Date.now() - new Date(ts).getTime();
+        const min = Math.floor(d / 60000);
+        if (min < 1) return 'just now';
+        if (min < 60) return `${min}m ago`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr}h ago`;
+        return `${Math.floor(hr / 24)}d ago`;
       }
 
-      function trunc(s, n) {
-        return s.length > n ? s.slice(0, n - 1) + '…' : s;
+      function kindClass(k) {
+        return 'kind-' + (k || 'other').replace(/[^a-z_]/g, '');
       }
 
-      function esc(s) {
-        return String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Boot
-      // ──────────────────────────────────────────────────────────────────────────────
-      async function init() {
-        buildStrategyButtons();
-        buildKindFilter([]);
-
-        try {
-          const r = await fetch('/api/data');
-          S.data = await r.json();
-          renderHeaderStats(S.data.stats);
-          buildKindFilter(Object.keys(KC));
-          renderList(visibleMemories());
-          renderGraph(S.data.graph);
-          updateListCount();
-        } catch (e) {
-          console.error('init failed', e);
+      function h(tag, attrs, ...children) {
+        const el = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs || {})) {
+          if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+          else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+          else el.setAttribute(k, v);
         }
-
-        // Load cache hit for header without blocking
-        loadFullStats().catch(() => {});
+        for (const c of children.flat()) {
+          if (c == null) continue;
+          el.append(typeof c === 'string' ? c : c);
+        }
+        return el;
       }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Header
-      // ──────────────────────────────────────────────────────────────────────────────
-      function renderHeaderStats(stats) {
-        document.getElementById('project-id').textContent = stats.projectId;
-        document.getElementById('s-mem').textContent = fmtN(stats.memories);
-        document.getElementById('s-saved').textContent = fmtN(stats.tokensSaved);
-        document.getElementById('s-spent').textContent = fmtN(stats.tokensSpent);
-        const roi =
-          stats.tokensSpent > 0 ? '×' + (stats.tokensSaved / stats.tokensSpent).toFixed(1) : '—';
+      // ─── Boot ─────────────────────────────────────────────────────────────────────
+      async function boot() {
+        buildStrategyBtns();
+        buildKindFilters([]);
+        bindTabs();
+        try {
+          const res = await fetch('/api/data');
+          S.data = await res.json();
+          applyData();
+        } catch (e) {
+          document.getElementById('memory-list').innerHTML =
+            '<div class="empty"><div class="empty-title">Could not load data</div>' +
+            '<div class="empty-sub">' +
+            e.message +
+            '</div></div>';
+        }
+      }
+
+      function applyData() {
+        const { stats, memories, graph } = S.data;
+        document.getElementById('project-label').textContent = stats.projectId;
+        const saved = stats.tokensSaved ?? 0;
+        const spent = stats.tokensSpent ?? 0;
+        const roi = spent > 0 ? (saved / spent).toFixed(1) + 'x' : '—';
+        document.getElementById('s-mem').textContent = fmtK(stats.memories);
+        document.getElementById('s-saved').textContent = fmtK(saved);
+        document.getElementById('s-spent').textContent = fmtK(spent);
         document.getElementById('s-roi').textContent = roi;
+        // cache from full stats, placeholder for now
+        document.getElementById('s-cache').textContent = '—';
+
+        buildKindFilters(memories);
+        renderList(memories);
+        buildGraph(graph);
+        // load full stats in background for cache pill
+        loadFullStats();
       }
 
-      async function loadFullStats() {
-        if (S.fullStats) return S.fullStats;
-        const r = await fetch('/api/stats/full');
-        S.fullStats = await r.json();
-        const hr = S.fullStats.cache.hit_rate;
-        document.getElementById('s-cache').textContent =
-          hr !== null ? Math.round(hr * 100) + '%' : '—';
-        return S.fullStats;
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Strategy buttons
-      // ──────────────────────────────────────────────────────────────────────────────
-      function buildStrategyButtons() {
-        const el = document.getElementById('strategy-btns');
-        el.innerHTML = '';
+      // ─── Strategy buttons ─────────────────────────────────────────────────────────
+      function buildStrategyBtns() {
+        const wrap = document.getElementById('strategy-btns');
         ['bm25', 'hybrid', 'embeddings'].forEach((s) => {
-          const b = document.createElement('button');
-          b.className = 'strat-btn' + (s === S.strategy ? ' active' : '');
-          b.textContent = s;
-          b.onclick = () => {
-            S.strategy = s;
-            buildStrategyButtons();
-            if (S.searchQuery) doSearch();
-          };
-          el.appendChild(b);
-        });
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Kind filter
-      // ──────────────────────────────────────────────────────────────────────────────
-      function buildKindFilter(kinds) {
-        const el = document.getElementById('kind-filter');
-        el.innerHTML = '';
-        const chips = [
-          { kind: null, label: 'all' },
-          ...kinds.map((k) => ({ kind: k, label: k.replace('_', ' ') })),
-        ];
-        chips.forEach(({ kind, label }) => {
-          const b = document.createElement('button');
-          b.className = 'kind-chip';
-          b.textContent = label;
-          const active = S.activeKind === kind;
-          if (active) {
-            const c = kind ? kc(kind) : '#4ade80';
-            b.style.cssText = `background:${c}14;border-color:${c}50;color:${c};`;
-          }
-          b.onclick = () => {
-            S.activeKind = kind;
-            buildKindFilter(kinds);
-            renderList(visibleMemories());
-            updateListCount();
-          };
-          el.appendChild(b);
-        });
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Visible memory list
-      // ──────────────────────────────────────────────────────────────────────────────
-      function visibleMemories() {
-        let mems =
-          S.searchResults !== null
-            ? S.searchResults.map((r) => r.observation ?? r)
-            : (S.data?.memories ?? []);
-        if (S.activeKind) mems = mems.filter((m) => m.kind === S.activeKind);
-        return mems;
-      }
-
-      function updateListCount() {
-        const vis = visibleMemories().length;
-        const total = S.data?.stats?.memories ?? 0;
-        const el = document.getElementById('list-count');
-        el.textContent = S.searchQuery || S.activeKind ? `${vis} / ${total}` : `${total}`;
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Memory list
-      // ──────────────────────────────────────────────────────────────────────────────
-      function renderList(mems) {
-        const el = document.getElementById('memory-list');
-        if (!mems.length) {
-          el.innerHTML = `<div class="empty">
-      <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <span>${S.searchQuery ? 'no results' : 'no memories'}</span>
-    </div>`;
-          return;
-        }
-
-        el.innerHTML = '';
-        mems.forEach((m) => {
-          const card = document.createElement('div');
-          card.className = 'mem-card fade-up' + (S.selectedId === m.id ? ' selected' : '');
-          card.dataset.id = m.id;
-
-          const c = kc(m.kind);
-          const tags = (m.tags ?? [])
-            .slice(0, 3)
-            .map(
-              (t) =>
-                `<span style="font-size:9px;background:#131720;border:1px solid #1a1f2c;color:#3d4757;padding:1px 5px;border-radius:3px;">${esc(t)}</span>`,
-            )
-            .join('');
-          const score =
-            m.score != null
-              ? `<span style="font-size:9px;color:#2e3547;font-family:JetBrains Mono;">↑${m.score.toFixed(2)}</span>`
-              : '';
-
-          card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;padding-right:20px;">
-        <span style="font-size:9px;font-family:Syne;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;padding:1px 5px;border-radius:3px;background:${c}12;color:${c};border:1px solid ${c}28;">${esc(m.kind.replace('_', ' '))}</span>
-        <div style="display:flex;align-items:center;gap:6px;">${score}<span style="font-size:9px;color:#2e3547;">${relTime(m.created_at)}</span></div>
-      </div>
-      <div style="font-size:12px;font-weight:600;color:#b8bfd4;line-height:1.35;margin-bottom:${tags ? '6px' : '0'};font-family:Syne;padding-right:4px;">${esc(trunc(m.title, 65))}</div>
-      ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:3px;">${tags}</div>` : ''}
-      <button class="forget-btn" onclick="event.stopPropagation();forgetMemory('${esc(m.id)}')">✕</button>
-    `;
-          card.onclick = () => selectMemory(m.id);
-          el.appendChild(card);
-        });
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Search
-      // ──────────────────────────────────────────────────────────────────────────────
-      document.getElementById('search-input').addEventListener('input', (e) => {
-        S.searchQuery = e.target.value.trim();
-        clearTimeout(S.debounce);
-        if (!S.searchQuery) {
-          S.searchResults = null;
-          renderList(visibleMemories());
-          updateListCount();
-          document.getElementById('tab-info').textContent = '';
-          return;
-        }
-        S.debounce = setTimeout(doSearch, 320);
-      });
-
-      async function doSearch() {
-        if (!S.searchQuery) return;
-        const spinner = document.getElementById('search-spinner');
-        spinner.style.display = 'block';
-        try {
-          const url = `/api/search?q=${encodeURIComponent(S.searchQuery)}&strategy=${S.strategy}&k=20`;
-          const r = await fetch(url);
-          const d = await r.json();
-          S.searchResults = d.results ?? [];
-          // Attach score to each result's observation for display
-          S.searchResults = S.searchResults.map((r) => ({
-            ...r.observation,
-            score: r.score,
-            id: r.id,
-          }));
-          renderList(visibleMemories());
-          updateListCount();
-          document.getElementById('tab-info').textContent =
-            `${S.searchResults.length} hits via ${d.strategy}`;
-        } catch (e) {
-          console.error('search error', e);
-        } finally {
-          spinner.style.display = 'none';
-        }
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Graph
-      // ──────────────────────────────────────────────────────────────────────────────
-      function renderGraph(graph) {
-        const wrap = document.getElementById('graph-wrap');
-        if (!graph?.nodes?.length) {
-          wrap.innerHTML = `<div class="empty" style="height:100%;">
-      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:0.2;">
-        <circle cx="5" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="12" r="2"/>
-        <line x1="7" y1="12" x2="10" y2="12"/><line x1="12" y1="7" x2="12" y2="10"/>
-        <line x1="12" y1="14" x2="12" y2="17"/><line x1="14" y1="12" x2="17" y2="12"/>
-      </svg>
-      <span>no connections yet</span>
-    </div>`;
-          return;
-        }
-
-        const nodes = new vis.DataSet(
-          graph.nodes.map((n) => ({
-            ...n,
-            font: { color: '#636b85', face: 'JetBrains Mono', size: 10.5 },
-            shape: 'dot',
-            size: 9,
-            borderWidth: 1.5,
-            borderWidthSelected: 3,
-            color: {
-              background: kc(n.kind),
-              border: '#1a1f2c',
-              highlight: { background: kc(n.kind), border: '#dde2ee' },
-              hover: { background: kc(n.kind), border: '#252d3e' },
-            },
-          })),
-        );
-
-        const edges = new vis.DataSet(
-          graph.edges.map((e) => ({
-            ...e,
-            color: { color: '#1a1f2c', opacity: 0.7, highlight: '#4ade80' },
-            width: 1,
-            smooth: { type: 'curvedCW', roundness: 0.08 },
-          })),
-        );
-
-        S.network = new vis.Network(
-          wrap,
-          { nodes, edges },
-          {
-            physics: {
-              forceAtlas2Based: {
-                gravitationalConstant: -42,
-                centralGravity: 0.012,
-                springLength: 130,
-                springConstant: 0.055,
+          const btn = h(
+            'button',
+            {
+              class: 'strat-btn' + (s === S.strategy ? ' active' : ''),
+              onclick: () => {
+                S.strategy = s;
+                wrap.querySelectorAll('.strat-btn').forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+                if (S.searchQuery) runSearch(S.searchQuery);
               },
-              maxVelocity: 50,
-              solver: 'forceAtlas2Based',
-              timestep: 0.35,
-              stabilization: { iterations: 130 },
             },
-            interaction: { hover: true, tooltipDelay: 120 },
-          },
-        );
-
-        S.network.on('click', (params) => {
-          if (params.nodes.length) selectMemory(params.nodes[0]);
+            s,
+          );
+          wrap.append(btn);
         });
       }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Select memory (syncs list ↔ graph ↔ detail)
-      // ──────────────────────────────────────────────────────────────────────────────
-      function selectMemory(id) {
-        S.selectedId = id;
-        document
-          .querySelectorAll('.mem-card')
-          .forEach((c) => c.classList.toggle('selected', c.dataset.id === id));
-        const card = document.querySelector(`.mem-card[data-id="${id}"]`);
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // ─── Kind filter chips ────────────────────────────────────────────────────────
+      const KIND_ORDER = [
+        'all',
+        'decision',
+        'learning',
+        'bugfix',
+        'command',
+        'file_summary',
+        'other',
+      ];
+
+      function buildKindFilters(memories) {
+        const wrap = document.getElementById('kind-filters');
+        wrap.innerHTML = '';
+        const counts = {};
+        memories.forEach((m) => {
+          counts[m.kind] = (counts[m.kind] || 0) + 1;
+        });
+
+        const kinds = [
+          'all',
+          ...Object.keys(counts).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b)),
+        ];
+
+        kinds.forEach((k) => {
+          const isAll = k === 'all';
+          const label = isAll ? 'All' : k.replace('_', ' ');
+          const count = isAll ? memories.length : counts[k] || 0;
+          const btn = h(
+            'div',
+            {
+              class: 'kind-tag' + (S.activeKind === k ? ' active kf-' + k : ''),
+              onclick: () => {
+                S.activeKind = k;
+                wrap.querySelectorAll('.kind-tag').forEach((b) => {
+                  b.className = 'kind-tag';
+                });
+                btn.className = 'kind-tag active kf-' + k;
+                renderList(S.searchResults ?? S.data?.memories ?? []);
+              },
+            },
+            label + (count > 0 ? ' ' + count : ''),
+          );
+          wrap.append(btn);
+        });
+      }
+
+      // ─── Memory list ──────────────────────────────────────────────────────────────
+      function renderList(memories) {
+        const list = document.getElementById('memory-list');
+        const filtered =
+          S.activeKind === 'all' ? memories : memories.filter((m) => m.kind === S.activeKind);
+
+        document.getElementById('list-count').textContent =
+          filtered.length !== memories.length
+            ? filtered.length + ' / ' + memories.length
+            : memories.length.toString();
+
+        if (filtered.length === 0) {
+          list.innerHTML = '';
+          list.append(
+            h(
+              'div',
+              { class: 'empty' },
+              h('div', { class: 'empty-icon' }, svgIcon('search')),
+              h('div', { class: 'empty-title' }, S.searchQuery ? 'No results' : 'No memories yet'),
+              h(
+                'div',
+                { class: 'empty-sub' },
+                S.searchQuery
+                  ? 'Try a different query or strategy.'
+                  : 'End a Claude session — the hook will extract observations automatically.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        list.innerHTML = '';
+        filtered.forEach((m) => list.append(memCard(m)));
+      }
+
+      function memCard(m) {
+        const card = h('div', {
+          class: 'mem-card fade-in' + (m.id === S.selectedId ? ' selected' : ''),
+          onclick: () => selectMemory(m),
+        });
+
+        // Left accent color
+        const kc = KIND_COLOR[m.kind] || KIND_COLOR.other;
+        card.style.setProperty('--card-accent', kc.bg);
+        if (m.id === S.selectedId) {
+          card.style.borderLeftColor = kc.bg;
+        }
+        card.style.cssText += `--before-bg: ${kc.bg};`;
+
+        const forget = h(
+          'div',
+          {
+            class: 'mc-forget',
+            title: 'Forget this memory',
+            onclick: async (e) => {
+              e.stopPropagation();
+              if (!confirm('Remove this memory?')) return;
+              await fetch('/api/memories/' + m.id, { method: 'DELETE' });
+              S.data.memories = S.data.memories.filter((x) => x.id !== m.id);
+              if (S.selectedId === m.id) {
+                S.selectedId = null;
+                hideDetail();
+              }
+              buildKindFilters(S.data.memories);
+              renderList(S.searchResults ?? S.data.memories);
+              if (S.network) {
+                try {
+                  S.network.getBody().data.nodes.remove(m.id);
+                } catch {}
+              }
+              document.getElementById('s-mem').textContent = fmtK(S.data.memories.length);
+            },
+          },
+          '×',
+        );
+
+        const head = h(
+          'div',
+          { class: 'mc-head' },
+          h('span', { class: 'mc-title' }, m.title),
+          h(
+            'span',
+            { class: 'mc-kind ' + kindClass(m.kind) },
+            (m.kind || 'other').replace('_', ' '),
+          ),
+        );
+
+        const preview = m.body ? h('div', { class: 'mc-body' }, m.body) : null;
+
+        const tags = (m.tags || []).slice(0, 3).map((t) => h('span', { class: 'mc-tag' }, t));
+        const footer = h(
+          'div',
+          { class: 'mc-footer' },
+          h('span', { class: 'mc-time' }, relTime(m.created_at)),
+          h('div', { class: 'mc-tags' }, ...tags),
+        );
+
+        card.append(forget, head);
+        if (preview) card.append(preview);
+        card.append(footer);
+        return card;
+      }
+
+      // ─── Detail panel ─────────────────────────────────────────────────────────────
+      function selectMemory(m) {
+        S.selectedId = m.id;
+        document.querySelectorAll('.mem-card').forEach((c) => c.classList.remove('selected'));
+        const cards = document.querySelectorAll('.mem-card');
+        // find by checking onclick would match but instead we just re-render is expensive
+        // so find by matching title as a quick approach
+        renderList(S.searchResults ?? S.data?.memories ?? []);
+        showDetail(m);
         if (S.network) {
           try {
-            S.network.selectNodes([id], true);
-            S.network.focus(id, {
-              animation: { duration: 350, easingFunction: 'easeInOutQuad' },
-              scale: 1.2,
+            S.network.selectNodes([m.id]);
+            S.network.focus(m.id, {
+              animation: { duration: 400, easingFunction: 'easeInOutQuad' },
             });
           } catch {}
         }
-        const obs = findMemory(id);
-        if (obs) showDetail(obs);
       }
 
-      function findMemory(id) {
-        return (
-          S.data?.memories?.find((m) => m.id === id) ??
-          S.searchResults?.find((m) => m.id === id) ??
-          null
+      function showDetail(m) {
+        const panel = document.getElementById('detail-panel');
+        const inner = document.getElementById('detail-inner');
+        panel.style.display = 'block';
+
+        const kc = KIND_COLOR[m.kind] || KIND_COLOR.other;
+        const saved = m.tokens_saved ? fmtK(m.tokens_saved) + ' tk saved' : '';
+        const spent = m.tokens_spent ? fmtK(m.tokens_spent) + ' tk spent' : '';
+
+        const fileChips = (m.files || []).map((f) => {
+          const short = f.split('/').slice(-2).join('/');
+          return h('span', { class: 'detail-chip file', title: f }, short);
+        });
+        const tagChips = (m.tags || []).map((t) => h('span', { class: 'detail-chip' }, t));
+
+        inner.innerHTML = '';
+        inner.append(
+          h(
+            'div',
+            { class: 'detail-head' },
+            h('span', { class: 'detail-title' }, m.title),
+            h(
+              'span',
+              { class: 'mc-kind ' + kindClass(m.kind) },
+              (m.kind || 'other').replace('_', ' '),
+            ),
+            h(
+              'div',
+              {
+                class: 'detail-close',
+                title: 'Close',
+                onclick: () => {
+                  S.selectedId = null;
+                  hideDetail();
+                  renderList(S.searchResults ?? S.data?.memories ?? []);
+                },
+              },
+              h(
+                'svg',
+                {
+                  width: '10',
+                  height: '10',
+                  viewBox: '0 0 10 10',
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  'stroke-width': '1.6',
+                  'stroke-linecap': 'round',
+                },
+                h('path', { d: 'M1 1l8 8M9 1L1 9' }),
+              ),
+            ),
+          ),
+          h(
+            'div',
+            { class: 'detail-meta' },
+            h('span', {}, relTime(m.created_at)),
+            saved ? h('span', { style: 'color:var(--accent-g)' }, saved) : null,
+            spent ? h('span', {}, spent) : null,
+          ),
+          h('div', { class: 'detail-body' }, m.body || ''),
+          fileChips.length || tagChips.length
+            ? h('div', { class: 'detail-chips' }, ...fileChips, ...tagChips)
+            : null,
         );
       }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Detail drawer
-      // ──────────────────────────────────────────────────────────────────────────────
-      function showDetail(obs) {
-        const drawer = document.getElementById('detail-drawer');
-        drawer.style.display = 'block';
-        const c = kc(obs.kind);
-        const kindEl = document.getElementById('d-kind');
-        kindEl.textContent = obs.kind.replace('_', ' ');
-        kindEl.style.cssText = `font-family:Syne;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;background:${c}12;color:${c};border:1px solid ${c}28;`;
-        document.getElementById('d-title').textContent = obs.title;
-        document.getElementById('d-date').textContent = new Date(obs.created_at).toLocaleString();
-        const ts = obs.tokens_saved ?? 0;
-        document.getElementById('d-tokens').textContent = ts ? fmtN(ts) + ' tokens saved' : '';
-        document.getElementById('d-body').textContent = obs.body;
-
-        const footer = document.getElementById('d-footer');
-        footer.innerHTML = '';
-        (obs.files ?? []).forEach((f) => {
-          const s = document.createElement('span');
-          s.style.cssText =
-            'font-size:10px;font-family:JetBrains Mono;background:#131720;border:1px solid #1a1f2c;color:#4a5168;padding:2px 7px;border-radius:3px;';
-          s.textContent = f;
-          footer.appendChild(s);
-        });
-        (obs.tags ?? []).forEach((t) => {
-          const s = document.createElement('span');
-          s.style.cssText =
-            'font-size:9.5px;font-family:Syne;font-weight:700;background:#0a0c10;border:1px solid #1a1f2c;color:#2e3547;padding:2px 7px;border-radius:3px;';
-          s.textContent = '#' + t;
-          footer.appendChild(s);
-        });
-        drawer.scrollTop = 0;
-      }
-
-      function closeDetail() {
-        document.getElementById('detail-drawer').style.display = 'none';
-        S.selectedId = null;
-        document.querySelectorAll('.mem-card').forEach((c) => c.classList.remove('selected'));
-        if (S.network)
+      function hideDetail() {
+        document.getElementById('detail-panel').style.display = 'none';
+        if (S.network) {
           try {
             S.network.unselectAll();
           } catch {}
-      }
-
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Forget
-      // ──────────────────────────────────────────────────────────────────────────────
-      async function forgetMemory(id) {
-        try {
-          const r = await fetch(`/api/memories/${id}`, { method: 'DELETE' });
-          const d = await r.json();
-          if (!d.ok) return;
-          if (S.data) {
-            S.data.memories = S.data.memories.filter((m) => m.id !== id);
-            S.data.stats.memories = S.data.memories.length;
-            document.getElementById('s-mem').textContent = fmtN(S.data.stats.memories);
-          }
-          if (S.searchResults) S.searchResults = S.searchResults.filter((m) => m.id !== id);
-          if (S.selectedId === id) closeDetail();
-          renderList(visibleMemories());
-          updateListCount();
-          if (S.network)
-            try {
-              S.network.body.data.nodes.remove(id);
-            } catch {}
-        } catch (e) {
-          console.error('forget failed', e);
         }
       }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Tabs
-      // ──────────────────────────────────────────────────────────────────────────────
-      document.querySelectorAll('.tab-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const tab = btn.dataset.tab;
-          S.activeTab = tab;
-          document
-            .querySelectorAll('.tab-btn')
-            .forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-          document.getElementById('tab-graph').style.display = tab === 'graph' ? 'flex' : 'none';
-          document.getElementById('tab-analytics').style.display =
-            tab === 'analytics' ? 'block' : 'none';
-          if (tab === 'analytics' && !S.analyticsRendered) openAnalytics();
-          if (tab !== 'graph') document.getElementById('tab-info').textContent = '';
-        });
+      // ─── Search ────────────────────────────────────────────────────────────────────
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        const q = e.target.value.trim();
+        S.searchQuery = q;
+        clearTimeout(S.debounce);
+        if (!q) {
+          S.searchResults = null;
+          renderList(S.data?.memories ?? []);
+          return;
+        }
+        S.debounce = setTimeout(() => runSearch(q), 320);
       });
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Analytics
-      // ──────────────────────────────────────────────────────────────────────────────
-      async function openAnalytics() {
+      async function runSearch(q) {
+        const spin = document.getElementById('search-spinner');
+        spin.style.display = 'block';
         try {
-          const stats = await loadFullStats();
-          renderAnalytics(stats);
-          S.analyticsRendered = true;
-        } catch (e) {
-          document.getElementById('analytics-grid').innerHTML =
-            '<div class="empty" style="grid-column:span 2;">failed to load analytics</div>';
+          const res = await fetch(
+            `/api/search?q=${encodeURIComponent(q)}&strategy=${S.strategy}&k=20`,
+          );
+          const json = await res.json();
+          S.searchResults = json.results;
+          document.getElementById('tab-hint').textContent =
+            `${json.strategy} · ${json.results.length} results`;
+          renderList(json.results);
+        } catch {
+          S.searchResults = null;
+          renderList(S.data?.memories ?? []);
+        } finally {
+          spin.style.display = 'none';
         }
       }
 
-      function renderAnalytics({ kindBreakdown, topFiles, retrieval, cache }) {
-        const grid = document.getElementById('analytics-grid');
-
-        // ── Kind breakdown ───────────────────────────────────────────
-        const total = Object.values(kindBreakdown).reduce((a, b) => a + b, 0);
-        const maxKind = Math.max(...Object.values(kindBreakdown), 1);
-        const kindRows = Object.entries(kindBreakdown)
-          .filter(([, n]) => n > 0)
-          .sort(([, a], [, b]) => b - a)
-          .map(([kind, n]) => {
-            const c = kc(kind);
-            return `
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-          <span style="font-size:9.5px;font-family:Syne;font-weight:800;width:76px;color:${c};flex-shrink:0;letter-spacing:0.02em;">${kind.replace('_', ' ')}</span>
-          <div class="bar-track"><div class="bar-fill" data-w="${Math.round((n / maxKind) * 100)}" style="background:${c};"></div></div>
-          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;width:24px;text-align:right;">${n}</span>
-        </div>`;
-          })
-          .join('');
-
-        // ── Cache stats ──────────────────────────────────────────────
-        const hr = cache.hit_rate;
-        const hrPct = hr !== null ? Math.round(hr * 100) : null;
-        const cColor =
-          hrPct !== null
-            ? hrPct >= 60
-              ? '#4ade80'
-              : hrPct >= 30
-                ? '#fbbf24'
-                : '#f87171'
-            : '#52576a';
-        const cacheBar =
-          hrPct !== null
-            ? `<div style="margin-top:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:9px;font-family:Syne;font-weight:800;color:#2e3547;text-transform:uppercase;letter-spacing:0.08em;">hit rate</span><span style="font-size:10px;font-family:JetBrains Mono;color:${cColor};">${hrPct}%</span></div><div class="bar-track" style="height:5px;"><div class="bar-fill" data-w="${hrPct}" style="background:${cColor};height:5px;"></div></div></div>`
-            : '';
-
-        // ── Retrieval usage ──────────────────────────────────────────
-        const maxRetr = Math.max(...retrieval.map((r) => r.call_count), 1);
-        const retriRows = retrieval.length
-          ? retrieval
-              .map(
-                (r) => `
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-          <span style="font-size:9.5px;font-family:Syne;font-weight:800;color:#22d3ee;width:70px;flex-shrink:0;">${r.strategy}</span>
-          <div class="bar-track"><div class="bar-fill" data-w="${Math.round((r.call_count / maxRetr) * 100)}" style="background:#22d3ee88;"></div></div>
-          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;width:24px;text-align:right;">${r.call_count}</span>
-        </div>`,
-              )
-              .join('')
-          : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no retrieval calls recorded</div>';
-
-        // ── Top files ────────────────────────────────────────────────
-        const fileRows = topFiles.length
-          ? topFiles
-              .slice(0, 14)
-              .map(
-                (f) => `
-        <div class="file-row">
-          <span style="font-size:10px;font-family:JetBrains Mono;color:#7a8299;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(f.file)}">${esc(f.file)}</span>
-          <span style="font-size:11px;font-family:JetBrains Mono;color:#3d4757;flex-shrink:0;padding-left:8px;">${f.count}</span>
-        </div>`,
-              )
-              .join('')
-          : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no file references</div>';
-
-        grid.innerHTML = `
-    <div class="a-card">
-      <div class="a-title">memories by kind ${total ? `<span style="color:#1e2330;font-weight:600;">· ${total}</span>` : ''}</div>
-      ${total ? kindRows : '<div style="font-size:10px;font-family:Syne;font-weight:700;color:#2e3547;">no memories yet</div>'}
-    </div>
-
-    <div class="a-card">
-      <div class="a-title">prompt cache</div>
-      <div style="display:flex;gap:16px;align-items:flex-start;">
-        <div>
-          <div style="font-family:Syne;font-size:32px;font-weight:800;color:${cColor};line-height:1;">${hrPct !== null ? hrPct + '%' : '—'}</div>
-          <div style="font-size:8.5px;font-family:Syne;font-weight:800;color:#2e3547;text-transform:uppercase;letter-spacing:0.1em;margin-top:3px;">hit rate</div>
-        </div>
-        <div style="border-left:1px solid #1a1f2c;padding-left:16px;display:flex;flex-direction:column;gap:5px;margin-top:3px;">
-          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.hit_count.toLocaleString()} <span style="color:#4ade80;font-size:9.5px;">hits</span></div>
-          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.miss_count.toLocaleString()} <span style="color:#f87171;font-size:9.5px;">misses</span></div>
-          <div style="font-family:JetBrains Mono;font-size:12px;color:#b8bfd4;">${cache.entry_count.toLocaleString()} <span style="color:#52576a;font-size:9.5px;">entries</span></div>
-        </div>
-      </div>
-      ${cacheBar}
-    </div>
-
-    <div class="a-card">
-      <div class="a-title">retrieval usage</div>
-      ${retriRows}
-    </div>
-
-    <div class="a-card">
-      <div class="a-title">top files <span style="color:#1e2330;font-weight:600;">· by reference count</span></div>
-      ${fileRows}
-    </div>
-  `;
-
-        // Animate bars on next frame
-        requestAnimationFrame(() => {
-          document.querySelectorAll('.bar-fill[data-w]').forEach((el) => {
-            const w = el.dataset.w;
-            el.style.width = '0';
-            requestAnimationFrame(() => {
-              el.style.width = w + '%';
-            });
+      // ─── Tabs ─────────────────────────────────────────────────────────────────────
+      function bindTabs() {
+        document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const t = btn.dataset.tab;
+            S.activeTab = t;
+            document
+              .querySelectorAll('.tab-btn[data-tab]')
+              .forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-graph').style.display = t === 'graph' ? 'flex' : 'none';
+            document.getElementById('tab-analytics').style.display =
+              t === 'analytics' ? 'flex' : 'none';
+            if (t === 'analytics' && !S.analyticsRendered && S.fullStats) {
+              renderAnalytics(S.fullStats);
+            }
           });
         });
       }
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      // Go
-      // ──────────────────────────────────────────────────────────────────────────────
-      init();
+      // ─── Knowledge graph ──────────────────────────────────────────────────────────
+      function buildGraph({ nodes, edges }) {
+        const container = document.getElementById('graph-container');
+        if (!nodes?.length) {
+          container.innerHTML =
+            '<div class="empty" style="height:100%">' +
+            svgIcon('graph') +
+            '<div class="empty-title">No graph yet</div>' +
+            '<div class="empty-sub">Memories with shared files or tags will appear here.</div></div>';
+          return;
+        }
+
+        const vNodes = new vis.DataSet(
+          nodes.map((n) => {
+            const kc = KIND_COLOR[n.kind] || KIND_COLOR.other;
+            return {
+              id: n.id,
+              label: n.label,
+              title: n.title,
+              color: {
+                background: kc.bg,
+                border: kc.border,
+                highlight: { background: kc.bg, border: '#fff' },
+              },
+              font: { color: '#dde1ea', size: 11, face: 'Bricolage Grotesque' },
+              shape: 'dot',
+              size: 10,
+              borderWidth: 1.5,
+            };
+          }),
+        );
+
+        const vEdges = new vis.DataSet(
+          edges.map((e, i) => ({
+            id: i,
+            from: e.from,
+            to: e.to,
+            color: { color: '#1f2535', highlight: '#4f8dff', opacity: 0.8 },
+            width: 1,
+            smooth: { type: 'dynamic' },
+          })),
+        );
+
+        S.network = new vis.Network(
+          container,
+          { nodes: vNodes, edges: vEdges },
+          {
+            physics: {
+              stabilization: { iterations: 100 },
+              barnesHut: { gravitationalConstant: -2000, springLength: 120 },
+            },
+            interaction: { hover: true, tooltipDelay: 200 },
+            nodes: { borderWidthSelected: 2 },
+          },
+        );
+
+        S.network.on('click', ({ nodes: selected }) => {
+          if (!selected.length) return;
+          const id = selected[0];
+          const mem = S.data?.memories?.find((m) => m.id === id);
+          if (mem) {
+            S.selectedId = id;
+            renderList(S.searchResults ?? S.data?.memories ?? []);
+            showDetail(mem);
+          }
+        });
+
+        document.getElementById('tab-hint').textContent =
+          `${nodes.length} nodes · ${edges.length} edges`;
+      }
+
+      // ─── Full stats ────────────────────────────────────────────────────────────────
+      async function loadFullStats() {
+        try {
+          const res = await fetch('/api/stats/full');
+          S.fullStats = await res.json();
+          // Update cache pill
+          const hit = S.fullStats.cache?.hit_rate;
+          document.getElementById('s-cache').textContent =
+            hit != null ? (hit * 100).toFixed(0) + '%' : '—';
+          if (S.activeTab === 'analytics') renderAnalytics(S.fullStats);
+        } catch {}
+      }
+
+      function renderAnalytics(fs) {
+        S.analyticsRendered = true;
+        const grid = document.getElementById('analytics-grid');
+        grid.innerHTML = '';
+
+        // 1. Kind breakdown
+        const kb = fs.kindBreakdown || {};
+        const kbMax = Math.max(...Object.values(kb).map(Number), 1);
+        const kbCard = card('Memory kinds');
+        Object.entries(kb)
+          .sort((a, b) => b[1] - a[1])
+          .forEach(([kind, count]) => {
+            const kc = KIND_COLOR[kind] || KIND_COLOR.other;
+            const row = h(
+              'div',
+              { class: 'bar-row' },
+              h(
+                'span',
+                { class: 'bar-label', style: 'font-size:11.5px;font-weight:600' },
+                kind.replace('_', ' '),
+              ),
+              h(
+                'div',
+                { class: 'bar-track' },
+                h('div', { class: 'bar-fill', style: `background:${kc.bg}` }),
+              ),
+              h('span', { class: 'bar-count' }, String(count)),
+            );
+            kbCard.append(row);
+            requestAnimationFrame(() => {
+              row.querySelector('.bar-fill').style.width = (count / kbMax) * 100 + '%';
+            });
+          });
+        if (!Object.keys(kb).length)
+          kbCard.append(
+            h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No data yet')),
+          );
+        grid.append(wrap(kbCard));
+
+        // 2. Cache performance
+        const cc = fs.cache || {};
+        const cacheCard = card('Cache performance');
+        [
+          [
+            'Hit rate',
+            cc.hit_rate != null ? (cc.hit_rate * 100).toFixed(1) + '%' : '—',
+            'var(--accent-g)',
+          ],
+          ['Hits', cc.hit_count ?? 0, 'var(--accent-g)'],
+          ['Misses', cc.miss_count ?? 0, 'var(--muted2)'],
+          ['Entries', cc.entry_count ?? 0, 'var(--accent)'],
+        ].forEach(([lbl, val, color]) => {
+          cacheCard.append(
+            h(
+              'div',
+              { class: 'cache-stat' },
+              h('span', { class: 'cache-stat-lbl' }, lbl),
+              h('span', { class: 'cache-stat-val', style: `color:${color}` }, String(val)),
+            ),
+          );
+        });
+        grid.append(wrap(cacheCard));
+
+        // 3. Retrieval usage
+        const ru = fs.retrieval || [];
+        const ruMax = Math.max(...ru.map((r) => r.call_count), 1);
+        const ruCard = card('Retrieval strategy');
+        ru.sort((a, b) => b.call_count - a.call_count).forEach((r) => {
+          const row = h(
+            'div',
+            { class: 'bar-row' },
+            h('span', { class: 'bar-label' }, r.strategy),
+            h(
+              'div',
+              { class: 'bar-track' },
+              h('div', { class: 'bar-fill', style: 'background:var(--accent-v)' }),
+            ),
+            h('span', { class: 'bar-count' }, String(r.call_count)),
+          );
+          ruCard.append(row);
+          requestAnimationFrame(() => {
+            row.querySelector('.bar-fill').style.width = (r.call_count / ruMax) * 100 + '%';
+          });
+        });
+        if (!ru.length)
+          ruCard.append(
+            h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No retrieval data yet')),
+          );
+        grid.append(wrap(ruCard));
+
+        // 4. Top files
+        const tf = fs.topFiles || [];
+        const tfCard = card('Top files referenced');
+        tf.slice(0, 12).forEach((f) => {
+          tfCard.append(
+            h(
+              'div',
+              { class: 'file-row' },
+              h(
+                'span',
+                { class: 'file-name', title: f.file_path },
+                f.file_path.split('/').slice(-2).join('/'),
+              ),
+              h('span', { class: 'file-count' }, String(f.reference_count) + 'x'),
+            ),
+          );
+        });
+        if (!tf.length)
+          tfCard.append(
+            h(
+              'div',
+              { class: 'empty' },
+              h('div', { class: 'empty-sub' }, 'No file references yet'),
+            ),
+          );
+        grid.append(wrap(tfCard));
+      }
+
+      function card(title) {
+        const el = h('div', { class: 'a-card' });
+        el.append(h('div', { class: 'a-title' }, title));
+        return el;
+      }
+      function wrap(el) {
+        const w = h('div', {});
+        w.append(el);
+        return w;
+      }
+
+      // ─── SVG icons ────────────────────────────────────────────────────────────────
+      function svgIcon(name) {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        el.setAttribute('width', '32');
+        el.setAttribute('height', '32');
+        el.setAttribute('viewBox', '0 0 24 24');
+        el.setAttribute('fill', 'none');
+        el.setAttribute('stroke', 'currentColor');
+        el.setAttribute('stroke-width', '1.5');
+        el.setAttribute('stroke-linecap', 'round');
+        el.classList.add('empty-icon');
+        const paths = {
+          search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
+          graph:
+            '<circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.5L17 6M7 12.5L17 18"/>',
+        };
+        el.innerHTML = paths[name] || '';
+        return el;
+      }
+
+      // ─── Init ─────────────────────────────────────────────────────────────────────
+      boot();
     </script>
   </body>
 </html>

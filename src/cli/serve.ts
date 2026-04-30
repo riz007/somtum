@@ -18,12 +18,19 @@ import { resolveProjectId } from '../core/project_id.js';
 import { projectDir, loadConfig } from '../config.js';
 import { makeRetriever } from '../core/retriever/factory.js';
 import { RetrievalStrategy } from '../core/schema.js';
-import type { Observation } from '../core/schema.js';
 
 const GRAPH_NODE_CAP = 200;
 const GRAPH_EDGE_CAP = 500;
 
-function buildGraph(memories: Observation[]) {
+interface Memory {
+  id: string;
+  title: string;
+  kind: string;
+  files: string[];
+  tags: string[];
+}
+
+function buildGraph(memories: Memory[]) {
   const capped = memories.slice(0, GRAPH_NODE_CAP);
   const nodes = capped.map((m) => ({
     id: m.id,
@@ -31,7 +38,6 @@ function buildGraph(memories: Observation[]) {
     kind: m.kind,
     title: m.title,
   }));
-
   const edges: { from: string; to: string }[] = [];
   outer: for (let i = 0; i < capped.length; i++) {
     for (let j = i + 1; j < capped.length; j++) {
@@ -46,7 +52,13 @@ function buildGraph(memories: Observation[]) {
   return { nodes, edges };
 }
 
-export async function runServe(options: { port?: number; open?: boolean; cwd?: string } = {}) {
+export interface ServeOptions {
+  port?: number;
+  open?: boolean;
+  cwd?: string;
+}
+
+export async function runServe(options: ServeOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
   const projectId = resolveProjectId(cwd);
   const dbPath = join(projectDir(projectId), 'db.sqlite');
@@ -58,7 +70,6 @@ export async function runServe(options: { port?: number; open?: boolean; cwd?: s
 
   const app = new H3();
 
-  // Lightweight summary + pre-computed graph for initial load
   app.get(
     '/api/data',
     defineEventHandler(() => {
@@ -71,12 +82,11 @@ export async function runServe(options: { port?: number; open?: boolean; cwd?: s
           tokensSpent: store.totalTokensSpent(projectId),
         },
         memories,
-        graph: buildGraph(memories),
+        graph: buildGraph(memories as Memory[]),
       };
     }),
   );
 
-  // Full analytics: kind breakdown, top files, retrieval usage, cache summary
   app.get(
     '/api/stats/full',
     defineEventHandler(() => ({
@@ -90,7 +100,6 @@ export async function runServe(options: { port?: number; open?: boolean; cwd?: s
     })),
   );
 
-  // Server-side search — routes to the configured retriever strategy
   app.get(
     '/api/search',
     defineEventHandler(async (event) => {
@@ -106,7 +115,6 @@ export async function runServe(options: { port?: number; open?: boolean; cwd?: s
     }),
   );
 
-  // Soft-delete a memory from the UI
   app.delete(
     '/api/memories/:id',
     defineEventHandler((event) => {
@@ -115,24 +123,30 @@ export async function runServe(options: { port?: number; open?: boolean; cwd?: s
     }),
   );
 
-  // Static dashboard — sirv wraps as a Node handler; only called for unmatched routes
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const dashboardDir = join(__dirname, '..', 'dashboard');
   const sirvMiddleware = sirv(dashboardDir, { single: true, dev: true });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   app.use(fromNodeHandler((req: any, res: any) => sirvMiddleware(req, res, () => {})));
 
-  await listen(toNodeHandler(app), {
+  const listener = await listen(toNodeHandler(app), {
     port: options.port ?? 3000,
     open: options.open ?? true,
     name: 'Somtum Dashboard',
     showURL: true,
   });
+
+  // Keep the process alive until Ctrl-C / SIGTERM.
+  await new Promise<void>((resolve) => {
+    process.once('SIGINT', resolve);
+    process.once('SIGTERM', resolve);
+  });
+
+  await listener.close();
+  db.close();
 }
 
-export async function serveCommand(
-  options: { port?: number; open?: boolean; cwd?: string } = {},
-): Promise<number> {
+export async function serveCommand(options: ServeOptions = {}): Promise<number> {
   try {
     await runServe(options);
     return 0;
