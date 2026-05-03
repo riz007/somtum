@@ -7,160 +7,153 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Fira+Code:wght@300;400;500&display=swap"
       rel="stylesheet"
     />
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
       :root {
-        --bg: #0b0d12;
-        --surface: #111318;
-        --surface2: #181c24;
-        --surface3: #1d2230;
-        --border: #1f2535;
-        --border2: #2a3245;
-        --text: #dde1ea;
-        --muted: #4d5870;
-        --muted2: #6b7a96;
-        --accent: #4f8dff;
-        --accent-g: #27c27d;
-        --accent-a: #f0a638;
-        --accent-r: #ef5858;
-        --accent-v: #9b72f5;
-        --accent-c: #22d0c8;
-        --radius: 8px;
-        --sidebar: 300px;
-        --header: 52px;
+        --bg:        #0c0a07;
+        --surface:   #111009;
+        --surface2:  #19160e;
+        --surface3:  #201d13;
+        --border:    #2d2918;
+        --border2:   #3e3920;
+        --text:      #ede8da;
+        --muted:     #6b6350;
+        --muted2:    #9e9278;
+        --accent:    #f0a030;
+        --accent-g:  #34d399;
+        --accent-a:  #f0a030;
+        --accent-r:  #e8685a;
+        --accent-v:  #a78bfa;
+        --accent-c:  #38bdf8;
+        --radius:    7px;
+        --sidebar:   304px;
+        --header:    52px;
       }
 
-      html,
-      body {
-        height: 100%;
-        overflow: hidden;
+      html, body {
+        height: 100%; overflow: hidden;
         background: var(--bg);
         color: var(--text);
-        font-family: 'Bricolage Grotesque', sans-serif;
+        font-family: 'Syne', sans-serif;
         font-size: 13px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
       }
 
-      /* ── Scrollbars ─────────────────────────────────────────────── */
-      ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: var(--border2);
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: var(--muted);
+      /* Grain overlay */
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 9999;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        opacity: 0.022;
+        background-size: 180px 180px;
       }
 
-      /* ── Mono text ──────────────────────────────────────────────── */
-      .mono {
-        font-family: 'JetBrains Mono', monospace;
-      }
+      /* ── Scrollbars ── */
+      ::-webkit-scrollbar { width: 3px; height: 3px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-      /* ── Header ─────────────────────────────────────────────────── */
+      .mono { font-family: 'Fira Code', monospace; }
+
+      /* ══ HEADER ══════════════════════════════════════════════════════ */
       #header {
         height: var(--header);
-        border-bottom: 1px solid var(--border);
-        padding: 0 20px;
+        padding: 0 18px;
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
         flex-shrink: 0;
         background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        position: relative;
       }
+      /* accent line under header */
+      #header::after {
+        content: '';
+        position: absolute;
+        bottom: -1px; left: 0;
+        width: 100%; height: 1px;
+        background: linear-gradient(90deg, var(--accent) 0%, transparent 40%);
+        opacity: 0.35;
+      }
+
       #logo {
-        font-size: 19px;
+        font-size: 17px;
         font-weight: 800;
         color: var(--accent);
-        letter-spacing: -0.04em;
+        letter-spacing: -0.02em;
         line-height: 1;
         display: flex;
         align-items: center;
-        gap: 7px;
-      }
-      #logo-mark {
-        width: 26px;
-        height: 26px;
-        border-radius: 7px;
-        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-v) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        gap: 8px;
         flex-shrink: 0;
       }
-      #logo-mark svg {
-        width: 14px;
-        height: 14px;
-        color: #fff;
+      #logo-mark {
+        width: 28px; height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent) 0%, #e07820 100%);
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 0 16px rgba(240,160,48,0.3);
       }
-      #header-sep {
-        width: 1px;
-        height: 20px;
-        background: var(--border);
-      }
+      #logo-mark svg { width: 14px; height: 14px; color: #0c0a07; }
+
+      #header-sep { width: 1px; height: 18px; background: var(--border2); }
+
       #project-label {
         font-size: 11px;
         color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'Fira Code', monospace;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 240px;
+        max-width: 200px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 3px 8px;
+        border-radius: 4px;
       }
-      #stat-bar {
-        display: flex;
-        gap: 6px;
-        margin-left: auto;
-      }
+
+      #stat-bar { display: flex; gap: 4px; margin-left: auto; }
       .stat-pill {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 5px 11px;
-        border-radius: 6px;
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 10px;
+        border-radius: 5px;
         background: var(--surface2);
         border: 1px solid var(--border);
         cursor: default;
+        transition: border-color 0.15s;
       }
+      .stat-pill:hover { border-color: var(--border2); }
       .stat-pill .s-lbl {
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        font-size: 9px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.1em;
         color: var(--muted);
       }
       .stat-pill .s-val {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        font-weight: 600;
+        font-family: 'Fira Code', monospace;
+        font-size: 12.5px; font-weight: 500;
       }
 
-      /* ── Layout ─────────────────────────────────────────────────── */
+      /* ══ LAYOUT ══════════════════════════════════════════════════════ */
       #layout {
         display: flex;
         height: calc(100vh - var(--header));
         overflow: hidden;
       }
 
-      /* ── Sidebar ─────────────────────────────────────────────────── */
+      /* ══ SIDEBAR ══════════════════════════════════════════════════════ */
       #sidebar {
         width: var(--sidebar);
         flex-shrink: 0;
@@ -175,319 +168,231 @@
       #search-wrap {
         padding: 10px;
         border-bottom: 1px solid var(--border);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        display: flex; flex-direction: column; gap: 8px;
+        background: var(--bg);
       }
-      .search-box {
-        position: relative;
-      }
+      .search-box { position: relative; }
       .search-box svg {
-        position: absolute;
-        left: 9px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 14px;
-        height: 14px;
-        color: var(--muted);
-        pointer-events: none;
+        position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+        width: 13px; height: 13px; color: var(--muted); pointer-events: none;
       }
       #search-input {
         width: 100%;
-        background: var(--bg);
-        border: 1px solid var(--border);
+        background: var(--surface);
+        border: 1px solid var(--border2);
         border-radius: var(--radius);
-        padding: 7px 9px 7px 30px;
+        padding: 7px 9px 7px 28px;
         font-size: 12.5px;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'Fira Code', monospace;
         color: var(--text);
         outline: none;
-        transition:
-          border-color 0.15s,
-          box-shadow 0.15s;
+        transition: border-color 0.15s, box-shadow 0.15s;
       }
-      #search-input::placeholder {
-        color: var(--muted);
-      }
+      #search-input::placeholder { color: var(--muted); }
       #search-input:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 2px rgba(79, 141, 255, 0.12);
+        box-shadow: 0 0 0 2px rgba(240,160,48,0.1);
       }
       #search-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        display: flex; align-items: center; justify-content: space-between;
       }
-      .strat-row {
-        display: flex;
-        gap: 4px;
-      }
+      .strat-row { display: flex; gap: 3px; }
       .strat-btn {
         padding: 3px 8px;
-        font-size: 10px;
-        font-weight: 600;
-        border: 1px solid var(--border);
-        border-radius: 4px;
+        font-size: 10px; font-weight: 600;
+        border: 1px solid var(--border2); border-radius: 4px;
         cursor: pointer;
-        background: var(--surface2);
-        color: var(--muted2);
+        background: var(--surface2); color: var(--muted2);
         transition: all 0.12s;
-        font-family: 'Bricolage Grotesque', sans-serif;
+        font-family: 'Syne', sans-serif;
+        letter-spacing: 0.03em;
       }
-      .strat-btn:hover {
-        color: var(--text);
-        border-color: var(--border2);
-      }
+      .strat-btn:hover { color: var(--text); border-color: var(--muted); }
       .strat-btn.active {
-        background: rgba(79, 141, 255, 0.1);
-        border-color: rgba(79, 141, 255, 0.4);
+        background: rgba(240,160,48,0.1);
+        border-color: rgba(240,160,48,0.4);
         color: var(--accent);
       }
-      #search-spinner {
-        display: none;
-      }
-      #search-spinner svg {
-        animation: spin 0.7s linear infinite;
-        display: block;
-      }
+      #search-spinner { display: none; }
+      #search-spinner svg { animation: spin 0.7s linear infinite; display: block; }
 
       /* Kind filters */
       #kind-filters {
         padding: 7px 10px;
         border-bottom: 1px solid var(--border);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
+        display: flex; flex-wrap: wrap; gap: 3px;
         flex-shrink: 0;
       }
       .kind-tag {
-        padding: 2px 8px;
-        font-size: 10px;
-        font-weight: 600;
-        border-radius: 4px;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition: all 0.12s;
-        color: var(--muted2);
-        background: var(--surface2);
+        padding: 2px 8px; font-size: 10px; font-weight: 700;
+        border-radius: 4px; border: 1px solid transparent;
+        cursor: pointer; transition: all 0.12s;
+        color: var(--muted2); background: var(--surface2);
+        letter-spacing: 0.04em;
       }
-      .kind-tag:hover {
-        color: var(--text);
-        border-color: var(--border2);
-      }
-      .kind-tag.active {
-        color: #fff;
-      }
+      .kind-tag:hover { color: var(--text); border-color: var(--border2); }
+      .kind-tag.active { color: #fff; }
 
       /* List header */
       #list-header {
-        padding: 6px 10px 5px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        padding: 5px 10px 5px;
+        display: flex; align-items: center; justify-content: space-between;
         border-bottom: 1px solid var(--border);
       }
       #list-header .h-label {
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        font-size: 9px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.12em;
         color: var(--muted);
       }
       #list-count {
-        font-size: 10px;
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--muted);
+        font-size: 10px; font-family: 'Fira Code', monospace; color: var(--muted);
       }
 
       /* Memory list */
       #memory-list {
-        flex: 1;
-        overflow-y: auto;
+        flex: 1; overflow-y: auto;
         padding: 6px;
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
+        display: flex; flex-direction: column; gap: 2px;
       }
 
       /* Memory card */
       .mem-card {
-        padding: 9px 10px;
+        padding: 10px 10px 8px;
         border-radius: 6px;
         background: var(--surface2);
         border: 1px solid var(--border);
         cursor: pointer;
-        transition:
-          border-color 0.12s,
-          background 0.12s;
+        transition: border-color 0.12s, background 0.12s, transform 0.1s;
         position: relative;
         overflow: hidden;
       }
+      /* kind color bar on left */
       .mem-card::before {
         content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        border-radius: 3px 0 0 3px;
+        position: absolute; left: 0; top: 0; bottom: 0;
+        width: 2.5px;
+        border-radius: 6px 0 0 6px;
+        background: var(--card-accent, var(--muted));
+        opacity: 0.6;
+        transition: opacity 0.12s;
       }
       .mem-card:hover {
         border-color: var(--border2);
         background: var(--surface3);
       }
+      .mem-card:hover::before { opacity: 1; }
       .mem-card.selected {
         border-color: var(--accent);
+        background: rgba(240,160,48,0.04);
       }
-      .mem-card.selected::before {
-        background: var(--accent);
-      }
+      .mem-card.selected::before { background: var(--accent); opacity: 1; }
 
       .mc-head {
-        display: flex;
-        align-items: flex-start;
-        gap: 7px;
-        margin-bottom: 3px;
+        display: flex; align-items: flex-start; gap: 6px;
+        margin-bottom: 4px;
       }
       .mc-title {
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--text);
-        line-height: 1.35;
-        flex: 1;
-        min-width: 0;
+        font-size: 12.5px; font-weight: 600; color: var(--text);
+        line-height: 1.35; flex: 1; min-width: 0;
       }
       .mc-kind {
         flex-shrink: 0;
-        font-size: 9px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        padding: 2px 6px;
-        border-radius: 3px;
+        font-size: 8.5px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        padding: 2px 6px; border-radius: 3px;
       }
       .mc-body {
-        font-size: 11px;
-        color: var(--muted2);
-        line-height: 1.4;
+        font-size: 11px; color: var(--muted2);
+        line-height: 1.45;
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
       }
       .mc-footer {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        margin-top: 5px;
+        display: flex; align-items: center; gap: 5px; margin-top: 6px;
       }
       .mc-time {
-        font-size: 10px;
-        color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
+        font-size: 9.5px; color: var(--muted);
+        font-family: 'Fira Code', monospace;
       }
-      .mc-tags {
-        display: flex;
-        gap: 3px;
-        flex-wrap: wrap;
-        flex: 1;
-      }
+      .mc-tags { display: flex; gap: 3px; flex-wrap: wrap; flex: 1; }
       .mc-tag {
-        font-size: 9px;
-        font-weight: 600;
+        font-size: 9px; font-weight: 600;
         padding: 1px 5px;
         background: var(--surface3);
         border: 1px solid var(--border2);
-        border-radius: 3px;
-        color: var(--muted2);
+        border-radius: 3px; color: var(--muted);
+        font-family: 'Fira Code', monospace;
       }
       .mc-forget {
         display: none;
-        width: 20px;
-        height: 20px;
-        align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-        cursor: pointer;
-        background: rgba(239, 88, 88, 0.08);
-        border: 1px solid rgba(239, 88, 88, 0.2);
+        width: 20px; height: 20px;
+        align-items: center; justify-content: center;
+        border-radius: 4px; cursor: pointer;
+        background: rgba(232,104,90,0.08);
+        border: 1px solid rgba(232,104,90,0.2);
         color: var(--accent-r);
-        font-size: 10px;
+        font-size: 13px; font-weight: 300;
         transition: background 0.12s;
         flex-shrink: 0;
-        position: absolute;
-        top: 7px;
-        right: 7px;
+        position: absolute; top: 7px; right: 7px;
+        line-height: 1;
       }
-      .mem-card:hover .mc-forget {
-        display: flex;
-      }
-      .mc-forget:hover {
-        background: rgba(239, 88, 88, 0.18);
-      }
+      .mem-card:hover .mc-forget { display: flex; }
+      .mc-forget:hover { background: rgba(232,104,90,0.2); }
 
-      /* ── Main panel ──────────────────────────────────────────────── */
+      /* ══ MAIN ══════════════════════════════════════════════════════════ */
       #main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        min-width: 0;
+        flex: 1; display: flex; flex-direction: column;
+        overflow: hidden; min-width: 0;
       }
 
       /* Tab bar */
       #tab-bar {
-        height: 42px;
-        border-bottom: 1px solid var(--border);
-        padding: 0 8px;
-        display: flex;
-        align-items: center;
-        flex-shrink: 0;
+        height: 40px;
+        padding: 0 14px;
+        display: flex; align-items: center; flex-shrink: 0;
         background: var(--surface);
-        gap: 2px;
+        border-bottom: 1px solid var(--border);
+        gap: 0;
       }
       .tab-btn {
-        padding: 6px 14px;
-        font-size: 11.5px;
-        font-weight: 600;
+        padding: 0 14px;
+        height: 100%;
+        font-size: 11.5px; font-weight: 600;
         color: var(--muted2);
         border: none;
-        border-radius: 5px;
         background: none;
         cursor: pointer;
-        transition:
-          color 0.12s,
-          background 0.12s;
+        transition: color 0.12s;
+        position: relative;
+        font-family: 'Syne', sans-serif;
+        letter-spacing: 0.04em;
       }
-      .tab-btn:hover {
-        color: var(--text);
-        background: var(--surface2);
+      .tab-btn::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 14px; right: 14px;
+        height: 2px;
+        background: var(--accent);
+        border-radius: 2px 2px 0 0;
+        opacity: 0;
+        transition: opacity 0.15s;
       }
-      .tab-btn.active {
-        color: var(--accent);
-        background: rgba(79, 141, 255, 0.1);
-      }
+      .tab-btn:hover { color: var(--text); }
+      .tab-btn.active { color: var(--accent); }
+      .tab-btn.active::after { opacity: 1; }
       #tab-hint {
         margin-left: auto;
-        font-size: 10px;
-        color: var(--muted);
-        padding-right: 10px;
-        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; color: var(--muted);
+        font-family: 'Fira Code', monospace;
+        padding-right: 4px;
       }
 
       /* Tab panes */
-      #tab-graph {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-      #tab-analytics {
-        display: none;
-        flex: 1;
-        overflow-y: auto;
-        padding: 14px;
-      }
+      #tab-graph { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+      #tab-analytics { display: none; flex: 1; overflow-y: auto; padding: 14px; }
 
       /* Graph */
       #graph-container {
@@ -495,8 +400,20 @@
         margin: 10px;
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        background: #08090f;
+        background: #09080500;
         overflow: hidden;
+        position: relative;
+      }
+      /* ambient glow behind graph */
+      #graph-container::before {
+        content: '';
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 400px; height: 300px;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(ellipse, rgba(240,160,48,0.04) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
       }
 
       /* Detail panel */
@@ -504,90 +421,59 @@
         display: none;
         border-top: 1px solid var(--border);
         background: var(--surface);
-        overflow-y: auto;
-        flex-shrink: 0;
-        max-height: 38vh;
+        overflow-y: auto; flex-shrink: 0;
+        max-height: 36vh;
+        animation: slideUp 0.18s ease forwards;
       }
-      #detail-inner {
-        padding: 16px 20px;
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
+      #detail-inner { padding: 16px 20px; }
       .detail-head {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        margin-bottom: 12px;
+        display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px;
       }
       .detail-title {
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text);
-        flex: 1;
-        line-height: 1.3;
+        font-size: 15px; font-weight: 700; color: var(--text);
+        flex: 1; line-height: 1.3;
       }
       .detail-meta {
-        display: flex;
-        gap: 16px;
-        margin-bottom: 12px;
-        font-size: 11px;
-        color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
+        display: flex; gap: 16px; margin-bottom: 12px;
+        font-size: 10.5px; color: var(--muted);
+        font-family: 'Fira Code', monospace;
       }
       .detail-body {
-        font-size: 12.5px;
-        color: var(--muted2);
-        line-height: 1.65;
-        white-space: pre-wrap;
-        word-break: break-word;
+        font-size: 12.5px; color: var(--muted2);
+        line-height: 1.7; white-space: pre-wrap; word-break: break-word;
         margin-bottom: 12px;
       }
-      .detail-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-      }
+      .detail-chips { display: flex; flex-wrap: wrap; gap: 5px; }
       .detail-chip {
-        font-size: 10px;
-        font-weight: 500;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: var(--surface2);
-        border: 1px solid var(--border2);
+        font-size: 10px; font-weight: 500;
+        padding: 2px 8px; border-radius: 4px;
+        background: var(--surface2); border: 1px solid var(--border2);
         color: var(--muted2);
+        font-family: 'Fira Code', monospace;
       }
       .detail-chip.file {
-        color: var(--accent-c);
-        border-color: rgba(34, 208, 200, 0.3);
-        background: rgba(34, 208, 200, 0.07);
+        color: var(--accent-c); border-color: rgba(56,189,248,0.3);
+        background: rgba(56,189,248,0.06);
       }
       .detail-close {
-        width: 24px;
-        height: 24px;
-        border-radius: 5px;
+        width: 24px; height: 24px; border-radius: 5px;
         flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--surface2);
-        border: 1px solid var(--border);
-        cursor: pointer;
-        color: var(--muted2);
-        transition: color 0.12s;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--surface2); border: 1px solid var(--border);
+        cursor: pointer; color: var(--muted2);
+        transition: color 0.12s, border-color 0.12s;
       }
-      .detail-close:hover {
-        color: var(--text);
-      }
+      .detail-close:hover { color: var(--text); border-color: var(--border2); }
 
       /* Analytics */
       .a-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
       }
-      @media (max-width: 900px) {
-        .a-grid {
-          grid-template-columns: 1fr;
-        }
-      }
+      @media (max-width: 900px) { .a-grid { grid-template-columns: 1fr; } }
       .a-card {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -595,215 +481,97 @@
         padding: 16px;
       }
       .a-title {
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--muted);
-        margin-bottom: 14px;
+        font-size: 9px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.14em;
+        color: var(--muted); margin-bottom: 14px;
       }
       .bar-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
+        display: flex; align-items: center; gap: 8px; margin-bottom: 9px;
       }
       .bar-label {
-        font-size: 11.5px;
-        font-weight: 600;
-        width: 100px;
-        flex-shrink: 0;
+        font-size: 11.5px; font-weight: 600;
+        width: 100px; flex-shrink: 0;
       }
       .bar-track {
-        flex: 1;
-        height: 4px;
-        background: var(--surface3);
-        border-radius: 2px;
-        overflow: hidden;
+        flex: 1; height: 3px;
+        background: var(--surface3); border-radius: 2px; overflow: hidden;
       }
       .bar-fill {
-        height: 100%;
-        border-radius: 2px;
-        width: 0;
-        transition: width 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+        height: 100%; border-radius: 2px;
+        width: 0; transition: width 0.7s cubic-bezier(0.16,1,0.3,1);
       }
       .bar-count {
-        font-size: 11px;
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--muted2);
-        width: 36px;
-        text-align: right;
-        flex-shrink: 0;
+        font-size: 11px; font-family: 'Fira Code', monospace;
+        color: var(--muted2); width: 36px; text-align: right; flex-shrink: 0;
       }
       .cache-stat {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 7px 0;
-        border-bottom: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 8px 0; border-bottom: 1px solid var(--border);
       }
-      .cache-stat:last-child {
-        border-bottom: none;
-      }
-      .cache-stat-lbl {
-        font-size: 12px;
-        color: var(--muted2);
-      }
-      .cache-stat-val {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
-        font-weight: 600;
-      }
+      .cache-stat:last-child { border-bottom: none; }
+      .cache-stat-lbl { font-size: 12px; color: var(--muted2); }
+      .cache-stat-val { font-family: 'Fira Code', monospace; font-size: 13px; font-weight: 500; }
       .file-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 0;
-        border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 0; border-bottom: 1px solid var(--border);
       }
-      .file-row:last-child {
-        border-bottom: none;
-      }
+      .file-row:last-child { border-bottom: none; }
       .file-name {
-        font-size: 11px;
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--text);
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
+        font-size: 11px; font-family: 'Fira Code', monospace;
+        color: var(--text); flex: 1;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
       }
       .file-count {
-        font-size: 11px;
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--muted2);
-        flex-shrink: 0;
+        font-size: 11px; font-family: 'Fira Code', monospace;
+        color: var(--muted2); flex-shrink: 0;
       }
 
       /* Empty state */
       .empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 48px 24px;
-        color: var(--muted);
-        text-align: center;
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 8px;
+        padding: 48px 24px; color: var(--muted); text-align: center;
       }
-      .empty-icon {
-        opacity: 0.25;
-        margin-bottom: 2px;
-      }
-      .empty-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--muted2);
-      }
+      .empty-icon { opacity: 0.2; margin-bottom: 4px; }
+      .empty-title { font-size: 13px; font-weight: 600; color: var(--muted2); }
       .empty-sub {
-        font-size: 11.5px;
-        color: var(--muted);
-        max-width: 220px;
-        line-height: 1.5;
+        font-size: 11.5px; color: var(--muted);
+        max-width: 220px; line-height: 1.55;
       }
 
       /* Skeleton */
       .skel {
-        background: var(--surface2);
-        border-radius: 5px;
-        animation: shimmer 1.5s ease-in-out infinite;
+        background: var(--surface2); border-radius: 5px;
+        animation: shimmer 1.8s ease-in-out infinite;
       }
 
-      /* Animations */
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
+      /* ── Animations ── */
+      @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes shimmer {
-        0%,
-        100% {
-          opacity: 0.4;
-        }
-        50% {
-          opacity: 0.7;
-        }
+        0%, 100% { opacity: 0.35; }
+        50%       { opacity: 0.6; }
       }
       @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(4px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(3px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
-      .fade-in {
-        animation: fadeIn 0.16s ease forwards;
-      }
+      .fade-in { animation: fadeIn 0.14s ease forwards; }
 
-      /* Kind colour map */
-      .kind-decision {
-        background: rgba(79, 141, 255, 0.12);
-        color: #4f8dff;
-      }
-      .kind-learning {
-        background: rgba(155, 114, 245, 0.12);
-        color: #9b72f5;
-      }
-      .kind-bugfix {
-        background: rgba(239, 88, 88, 0.12);
-        color: #ef5858;
-      }
-      .kind-command {
-        background: rgba(240, 166, 56, 0.12);
-        color: #f0a638;
-      }
-      .kind-file_summary {
-        background: rgba(34, 208, 200, 0.1);
-        color: #22d0c8;
-      }
-      .kind-other {
-        background: rgba(107, 122, 150, 0.12);
-        color: #6b7a96;
-      }
-      .kf-decision {
-        border-color: rgba(79, 141, 255, 0.3);
-        background: rgba(79, 141, 255, 0.08);
-        color: #4f8dff;
-      }
-      .kf-learning {
-        border-color: rgba(155, 114, 245, 0.3);
-        background: rgba(155, 114, 245, 0.08);
-        color: #9b72f5;
-      }
-      .kf-bugfix {
-        border-color: rgba(239, 88, 88, 0.3);
-        background: rgba(239, 88, 88, 0.08);
-        color: #ef5858;
-      }
-      .kf-command {
-        border-color: rgba(240, 166, 56, 0.3);
-        background: rgba(240, 166, 56, 0.08);
-        color: #f0a638;
-      }
-      .kf-file_summary {
-        border-color: rgba(34, 208, 200, 0.3);
-        background: rgba(34, 208, 200, 0.07);
-        color: #22d0c8;
-      }
-      .kf-other {
-        border-color: rgba(107, 122, 150, 0.3);
-        background: rgba(107, 122, 150, 0.08);
-        color: #6b7a96;
-      }
-      .kf-all {
-        border-color: rgba(79, 141, 255, 0.3);
-        background: rgba(79, 141, 255, 0.08);
-        color: #4f8dff;
-      }
+      /* ── Kind colour map ── */
+      .kind-decision   { background: rgba(79,141,255,0.12);  color: #6ba3ff; }
+      .kind-learning   { background: rgba(167,139,250,0.12); color: #a78bfa; }
+      .kind-bugfix     { background: rgba(232,104,90,0.12);  color: #e8685a; }
+      .kind-command    { background: rgba(240,160,48,0.12);  color: #f0a030; }
+      .kind-file_summary { background: rgba(56,189,248,0.1); color: #38bdf8; }
+      .kind-other      { background: rgba(107,99,80,0.15);   color: #9e9278; }
+
+      .kf-decision   { border-color: rgba(79,141,255,0.3);  background: rgba(79,141,255,0.07);  color: #6ba3ff; }
+      .kf-learning   { border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.07); color: #a78bfa; }
+      .kf-bugfix     { border-color: rgba(232,104,90,0.3);  background: rgba(232,104,90,0.07);  color: #e8685a; }
+      .kf-command    { border-color: rgba(240,160,48,0.3);  background: rgba(240,160,48,0.07);  color: #f0a030; }
+      .kf-file_summary { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.06); color: #38bdf8; }
+      .kf-other      { border-color: rgba(107,99,80,0.3);   background: rgba(107,99,80,0.07);   color: #9e9278; }
+      .kf-all        { border-color: rgba(240,160,48,0.35); background: rgba(240,160,48,0.08);  color: #f0a030; }
     </style>
   </head>
   <body>
@@ -811,17 +579,8 @@
     <header id="header">
       <div id="logo">
         <div id="logo-mark">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46L7 19M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46l.04-.54"
-            />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46L7 19M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46l.04-.54" />
           </svg>
         </div>
         somtum
@@ -831,112 +590,84 @@
       <div id="stat-bar">
         <div class="stat-pill">
           <span class="s-lbl">Memories</span>
-          <span id="s-mem" class="s-val" style="color: var(--accent-g)">—</span>
+          <span id="s-mem" class="s-val" style="color:var(--accent-g)">—</span>
         </div>
         <div class="stat-pill">
           <span class="s-lbl">Saved</span>
-          <span id="s-saved" class="s-val" style="color: var(--accent-a)">—</span>
+          <span id="s-saved" class="s-val" style="color:var(--accent)">—</span>
         </div>
         <div class="stat-pill">
           <span class="s-lbl">Spent</span>
-          <span id="s-spent" class="s-val" style="color: var(--muted2)">—</span>
+          <span id="s-spent" class="s-val" style="color:var(--muted2)">—</span>
         </div>
         <div class="stat-pill">
           <span class="s-lbl">ROI</span>
-          <span id="s-roi" class="s-val" style="color: var(--accent)">—</span>
+          <span id="s-roi" class="s-val" style="color:var(--accent-v)">—</span>
         </div>
         <div class="stat-pill">
           <span class="s-lbl">Cache</span>
-          <span id="s-cache" class="s-val" style="color: var(--accent-v)">—</span>
+          <span id="s-cache" class="s-val" style="color:var(--accent-c)">—</span>
         </div>
       </div>
     </header>
 
     <!-- ═══ LAYOUT ══════════════════════════════════════════════════════ -->
     <div id="layout">
-      <!-- ─── SIDEBAR ───────────────────────────────────────────────── -->
+      <!-- ─── SIDEBAR ─────────────────────────────────────────────────── -->
       <aside id="sidebar">
-        <!-- Search -->
         <div id="search-wrap">
           <div class="search-box">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-5-5" stroke-linecap="round" />
+              <circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5" stroke-linecap="round"/>
             </svg>
-            <input
-              id="search-input"
-              type="text"
-              placeholder="Search memories…"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <input id="search-input" type="text" placeholder="Search memories…" autocomplete="off" spellcheck="false" />
           </div>
           <div id="search-meta">
             <div class="strat-row" id="strategy-btns"></div>
             <div id="search-spinner">
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--accent)"
-                stroke-width="2.5"
-              >
-                <path
-                  d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
-                />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
               </svg>
             </div>
           </div>
         </div>
 
-        <!-- Kind filters -->
         <div id="kind-filters"></div>
 
-        <!-- List header -->
         <div id="list-header">
           <span class="h-label">Memories</span>
           <span id="list-count"></span>
         </div>
 
-        <!-- Memory list -->
         <div id="memory-list">
-          <div class="skel" style="height: 68px; border-radius: 6px"></div>
-          <div class="skel" style="height: 56px; border-radius: 6px; margin-top: 3px"></div>
-          <div class="skel" style="height: 72px; border-radius: 6px; margin-top: 3px"></div>
+          <div class="skel" style="height:66px;border-radius:6px"></div>
+          <div class="skel" style="height:54px;border-radius:6px;margin-top:2px"></div>
+          <div class="skel" style="height:70px;border-radius:6px;margin-top:2px"></div>
         </div>
       </aside>
 
-      <!-- ─── MAIN ──────────────────────────────────────────────────── -->
+      <!-- ─── MAIN ─────────────────────────────────────────────────────── -->
       <main id="main">
-        <!-- Tab bar -->
         <div id="tab-bar">
           <button class="tab-btn active" data-tab="graph">Graph</button>
           <button class="tab-btn" data-tab="analytics">Analytics</button>
           <span id="tab-hint"></span>
         </div>
 
-        <!-- Panes wrapper -->
-        <div
-          style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0"
-        >
-          <!-- GRAPH TAB -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
           <div id="tab-graph">
             <div id="graph-container"></div>
           </div>
-
-          <!-- ANALYTICS TAB -->
           <div id="tab-analytics">
             <div class="a-grid" id="analytics-grid">
-              <div class="skel" style="height: 180px"></div>
-              <div class="skel" style="height: 180px"></div>
-              <div class="skel" style="height: 200px"></div>
-              <div class="skel" style="height: 200px"></div>
+              <div class="skel" style="height:180px"></div>
+              <div class="skel" style="height:180px"></div>
+              <div class="skel" style="height:200px"></div>
+              <div class="skel" style="height:200px"></div>
             </div>
           </div>
         </div>
 
-        <!-- Detail panel -->
         <div id="detail-panel">
           <div id="detail-inner"></div>
         </div>
@@ -946,27 +677,20 @@
     <script>
       // ─── State ───────────────────────────────────────────────────────────────────
       const S = {
-        data: null,
-        fullStats: null,
-        activeTab: 'graph',
-        activeKind: 'all',
-        selectedId: null,
-        searchQuery: '',
-        searchResults: null,
-        strategy: 'bm25',
-        debounce: null,
-        network: null,
-        analyticsRendered: false,
+        data: null, fullStats: null, activeTab: 'graph',
+        activeKind: 'all', selectedId: null, searchQuery: '',
+        searchResults: null, strategy: 'bm25', debounce: null,
+        network: null, analyticsRendered: false,
       };
 
-      // ─── Kind colours (for vis-network nodes) ────────────────────────────────────
+      // ─── Kind colours (vis-network nodes) ────────────────────────────────────────
       const KIND_COLOR = {
-        decision: { bg: '#4f8dff', border: '#2d6edd' },
-        learning: { bg: '#9b72f5', border: '#7a50d4' },
-        bugfix: { bg: '#ef5858', border: '#d43737' },
-        command: { bg: '#f0a638', border: '#d48820' },
-        file_summary: { bg: '#22d0c8', border: '#16a8a1' },
-        other: { bg: '#4d5870', border: '#3a4560' },
+        decision:     { bg: '#6ba3ff', border: '#4f8dff' },
+        learning:     { bg: '#a78bfa', border: '#8b6fe8' },
+        bugfix:       { bg: '#e8685a', border: '#d04838' },
+        command:      { bg: '#f0a030', border: '#d48020' },
+        file_summary: { bg: '#38bdf8', border: '#1aa8e8' },
+        other:        { bg: '#6b6350', border: '#504c3c' },
       };
 
       // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -988,9 +712,7 @@
         return `${Math.floor(hr / 24)}d ago`;
       }
 
-      function kindClass(k) {
-        return 'kind-' + (k || 'other').replace(/[^a-z_]/g, '');
-      }
+      function kindClass(k) { return 'kind-' + (k || 'other').replace(/[^a-z_]/g, ''); }
 
       function h(tag, attrs, ...children) {
         const el = document.createElement(tag);
@@ -1018,9 +740,7 @@
         } catch (e) {
           document.getElementById('memory-list').innerHTML =
             '<div class="empty"><div class="empty-title">Could not load data</div>' +
-            '<div class="empty-sub">' +
-            e.message +
-            '</div></div>';
+            '<div class="empty-sub">' + e.message + '</div></div>';
         }
       }
 
@@ -1034,13 +754,10 @@
         document.getElementById('s-saved').textContent = fmtK(saved);
         document.getElementById('s-spent').textContent = fmtK(spent);
         document.getElementById('s-roi').textContent = roi;
-        // cache from full stats, placeholder for now
         document.getElementById('s-cache').textContent = '—';
-
         buildKindFilters(memories);
         renderList(memories);
         buildGraph(graph);
-        // load full stats in background for cache pill
         loadFullStats();
       }
 
@@ -1048,66 +765,41 @@
       function buildStrategyBtns() {
         const wrap = document.getElementById('strategy-btns');
         ['bm25', 'hybrid', 'embeddings'].forEach((s) => {
-          const btn = h(
-            'button',
-            {
-              class: 'strat-btn' + (s === S.strategy ? ' active' : ''),
-              onclick: () => {
-                S.strategy = s;
-                wrap.querySelectorAll('.strat-btn').forEach((b) => b.classList.remove('active'));
-                btn.classList.add('active');
-                if (S.searchQuery) runSearch(S.searchQuery);
-              },
+          const btn = h('button', {
+            class: 'strat-btn' + (s === S.strategy ? ' active' : ''),
+            onclick: () => {
+              S.strategy = s;
+              wrap.querySelectorAll('.strat-btn').forEach((b) => b.classList.remove('active'));
+              btn.classList.add('active');
+              if (S.searchQuery) runSearch(S.searchQuery);
             },
-            s,
-          );
+          }, s);
           wrap.append(btn);
         });
       }
 
       // ─── Kind filter chips ────────────────────────────────────────────────────────
-      const KIND_ORDER = [
-        'all',
-        'decision',
-        'learning',
-        'bugfix',
-        'command',
-        'file_summary',
-        'other',
-      ];
+      const KIND_ORDER = ['all','decision','learning','bugfix','command','file_summary','other'];
 
       function buildKindFilters(memories) {
         const wrap = document.getElementById('kind-filters');
         wrap.innerHTML = '';
         const counts = {};
-        memories.forEach((m) => {
-          counts[m.kind] = (counts[m.kind] || 0) + 1;
-        });
-
-        const kinds = [
-          'all',
-          ...Object.keys(counts).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b)),
-        ];
-
+        memories.forEach((m) => { counts[m.kind] = (counts[m.kind] || 0) + 1; });
+        const kinds = ['all', ...Object.keys(counts).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b))];
         kinds.forEach((k) => {
           const isAll = k === 'all';
           const label = isAll ? 'All' : k.replace('_', ' ');
           const count = isAll ? memories.length : counts[k] || 0;
-          const btn = h(
-            'div',
-            {
-              class: 'kind-tag' + (S.activeKind === k ? ' active kf-' + k : ''),
-              onclick: () => {
-                S.activeKind = k;
-                wrap.querySelectorAll('.kind-tag').forEach((b) => {
-                  b.className = 'kind-tag';
-                });
-                btn.className = 'kind-tag active kf-' + k;
-                renderList(S.searchResults ?? S.data?.memories ?? []);
-              },
+          const btn = h('div', {
+            class: 'kind-tag' + (S.activeKind === k ? ' active kf-' + k : ''),
+            onclick: () => {
+              S.activeKind = k;
+              wrap.querySelectorAll('.kind-tag').forEach((b) => { b.className = 'kind-tag'; });
+              btn.className = 'kind-tag active kf-' + k;
+              renderList(S.searchResults ?? S.data?.memories ?? []);
             },
-            label + (count > 0 ? ' ' + count : ''),
-          );
+          }, label + (count > 0 ? ' ' + count : ''));
           wrap.append(btn);
         });
       }
@@ -1115,9 +807,7 @@
       // ─── Memory list ──────────────────────────────────────────────────────────────
       function renderList(memories) {
         const list = document.getElementById('memory-list');
-        const filtered =
-          S.activeKind === 'all' ? memories : memories.filter((m) => m.kind === S.activeKind);
-
+        const filtered = S.activeKind === 'all' ? memories : memories.filter((m) => m.kind === S.activeKind);
         document.getElementById('list-count').textContent =
           filtered.length !== memories.length
             ? filtered.length + ' / ' + memories.length
@@ -1125,24 +815,16 @@
 
         if (filtered.length === 0) {
           list.innerHTML = '';
-          list.append(
-            h(
-              'div',
-              { class: 'empty' },
-              h('div', { class: 'empty-icon' }, svgIcon('search')),
-              h('div', { class: 'empty-title' }, S.searchQuery ? 'No results' : 'No memories yet'),
-              h(
-                'div',
-                { class: 'empty-sub' },
-                S.searchQuery
-                  ? 'Try a different query or strategy.'
-                  : 'End a Claude session — the hook will extract observations automatically.',
-              ),
-            ),
-          );
+          list.append(h('div', { class: 'empty' },
+            h('div', { class: 'empty-icon' }, svgIcon('search')),
+            h('div', { class: 'empty-title' }, S.searchQuery ? 'No results' : 'No memories yet'),
+            h('div', { class: 'empty-sub' },
+              S.searchQuery
+                ? 'Try a different query or strategy.'
+                : 'End a Claude session — observations are extracted automatically.'),
+          ));
           return;
         }
-
         list.innerHTML = '';
         filtered.forEach((m) => list.append(memCard(m)));
       }
@@ -1153,62 +835,35 @@
           onclick: () => selectMemory(m),
         });
 
-        // Left accent color
         const kc = KIND_COLOR[m.kind] || KIND_COLOR.other;
         card.style.setProperty('--card-accent', kc.bg);
-        if (m.id === S.selectedId) {
-          card.style.borderLeftColor = kc.bg;
-        }
-        card.style.cssText += `--before-bg: ${kc.bg};`;
+        if (m.id === S.selectedId) card.style.borderLeftColor = kc.bg;
 
-        const forget = h(
-          'div',
-          {
-            class: 'mc-forget',
-            title: 'Forget this memory',
-            onclick: async (e) => {
-              e.stopPropagation();
-              if (!confirm('Remove this memory?')) return;
-              await fetch('/api/memories/' + m.id, { method: 'DELETE' });
-              S.data.memories = S.data.memories.filter((x) => x.id !== m.id);
-              if (S.selectedId === m.id) {
-                S.selectedId = null;
-                hideDetail();
-              }
-              buildKindFilters(S.data.memories);
-              renderList(S.searchResults ?? S.data.memories);
-              if (S.network) {
-                try {
-                  S.network.getBody().data.nodes.remove(m.id);
-                } catch {}
-              }
-              document.getElementById('s-mem').textContent = fmtK(S.data.memories.length);
-            },
+        const forget = h('div', {
+          class: 'mc-forget', title: 'Forget this memory',
+          onclick: async (e) => {
+            e.stopPropagation();
+            if (!confirm('Remove this memory?')) return;
+            await fetch('/api/memories/' + m.id, { method: 'DELETE' });
+            S.data.memories = S.data.memories.filter((x) => x.id !== m.id);
+            if (S.selectedId === m.id) { S.selectedId = null; hideDetail(); }
+            buildKindFilters(S.data.memories);
+            renderList(S.searchResults ?? S.data.memories);
+            if (S.network) { try { S.network.getBody().data.nodes.remove(m.id); } catch {} }
+            document.getElementById('s-mem').textContent = fmtK(S.data.memories.length);
           },
-          '×',
-        );
+        }, '×');
 
-        const head = h(
-          'div',
-          { class: 'mc-head' },
+        const head = h('div', { class: 'mc-head' },
           h('span', { class: 'mc-title' }, m.title),
-          h(
-            'span',
-            { class: 'mc-kind ' + kindClass(m.kind) },
-            (m.kind || 'other').replace('_', ' '),
-          ),
+          h('span', { class: 'mc-kind ' + kindClass(m.kind) }, (m.kind || 'other').replace('_', ' ')),
         );
-
         const preview = m.body ? h('div', { class: 'mc-body' }, m.body) : null;
-
         const tags = (m.tags || []).slice(0, 3).map((t) => h('span', { class: 'mc-tag' }, t));
-        const footer = h(
-          'div',
-          { class: 'mc-footer' },
+        const footer = h('div', { class: 'mc-footer' },
           h('span', { class: 'mc-time' }, relTime(m.created_at)),
           h('div', { class: 'mc-tags' }, ...tags),
         );
-
         card.append(forget, head);
         if (preview) card.append(preview);
         card.append(footer);
@@ -1218,18 +873,12 @@
       // ─── Detail panel ─────────────────────────────────────────────────────────────
       function selectMemory(m) {
         S.selectedId = m.id;
-        document.querySelectorAll('.mem-card').forEach((c) => c.classList.remove('selected'));
-        const cards = document.querySelectorAll('.mem-card');
-        // find by checking onclick would match but instead we just re-render is expensive
-        // so find by matching title as a quick approach
         renderList(S.searchResults ?? S.data?.memories ?? []);
         showDetail(m);
         if (S.network) {
           try {
             S.network.selectNodes([m.id]);
-            S.network.focus(m.id, {
-              animation: { duration: 400, easingFunction: 'easeInOutQuad' },
-            });
+            S.network.focus(m.id, { animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
           } catch {}
         }
       }
@@ -1238,57 +887,29 @@
         const panel = document.getElementById('detail-panel');
         const inner = document.getElementById('detail-inner');
         panel.style.display = 'block';
+        panel.style.animation = 'none';
+        requestAnimationFrame(() => { panel.style.animation = ''; });
 
-        const kc = KIND_COLOR[m.kind] || KIND_COLOR.other;
         const saved = m.tokens_saved ? fmtK(m.tokens_saved) + ' tk saved' : '';
         const spent = m.tokens_spent ? fmtK(m.tokens_spent) + ' tk spent' : '';
-
         const fileChips = (m.files || []).map((f) => {
           const short = f.split('/').slice(-2).join('/');
           return h('span', { class: 'detail-chip file', title: f }, short);
         });
         const tagChips = (m.tags || []).map((t) => h('span', { class: 'detail-chip' }, t));
-
         inner.innerHTML = '';
         inner.append(
-          h(
-            'div',
-            { class: 'detail-head' },
+          h('div', { class: 'detail-head' },
             h('span', { class: 'detail-title' }, m.title),
-            h(
-              'span',
-              { class: 'mc-kind ' + kindClass(m.kind) },
-              (m.kind || 'other').replace('_', ' '),
-            ),
-            h(
-              'div',
-              {
-                class: 'detail-close',
-                title: 'Close',
-                onclick: () => {
-                  S.selectedId = null;
-                  hideDetail();
-                  renderList(S.searchResults ?? S.data?.memories ?? []);
-                },
-              },
-              h(
-                'svg',
-                {
-                  width: '10',
-                  height: '10',
-                  viewBox: '0 0 10 10',
-                  fill: 'none',
-                  stroke: 'currentColor',
-                  'stroke-width': '1.6',
-                  'stroke-linecap': 'round',
-                },
-                h('path', { d: 'M1 1l8 8M9 1L1 9' }),
-              ),
+            h('span', { class: 'mc-kind ' + kindClass(m.kind) }, (m.kind || 'other').replace('_', ' ')),
+            h('div', { class: 'detail-close', title: 'Close', onclick: () => {
+              S.selectedId = null; hideDetail(); renderList(S.searchResults ?? S.data?.memories ?? []);
+            }},
+              h('svg', { width: '10', height: '10', viewBox: '0 0 10 10', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round' },
+                h('path', { d: 'M1 1l8 8M9 1L1 9' }))
             ),
           ),
-          h(
-            'div',
-            { class: 'detail-meta' },
+          h('div', { class: 'detail-meta' },
             h('span', {}, relTime(m.created_at)),
             saved ? h('span', { style: 'color:var(--accent-g)' }, saved) : null,
             spent ? h('span', {}, spent) : null,
@@ -1302,11 +923,7 @@
 
       function hideDetail() {
         document.getElementById('detail-panel').style.display = 'none';
-        if (S.network) {
-          try {
-            S.network.unselectAll();
-          } catch {}
-        }
+        if (S.network) { try { S.network.unselectAll(); } catch {} }
       }
 
       // ─── Search ────────────────────────────────────────────────────────────────────
@@ -1314,11 +931,7 @@
         const q = e.target.value.trim();
         S.searchQuery = q;
         clearTimeout(S.debounce);
-        if (!q) {
-          S.searchResults = null;
-          renderList(S.data?.memories ?? []);
-          return;
-        }
+        if (!q) { S.searchResults = null; renderList(S.data?.memories ?? []); return; }
         S.debounce = setTimeout(() => runSearch(q), 320);
       });
 
@@ -1326,13 +939,10 @@
         const spin = document.getElementById('search-spinner');
         spin.style.display = 'block';
         try {
-          const res = await fetch(
-            `/api/search?q=${encodeURIComponent(q)}&strategy=${S.strategy}&k=20`,
-          );
+          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&strategy=${S.strategy}&k=20`);
           const json = await res.json();
           S.searchResults = json.results;
-          document.getElementById('tab-hint').textContent =
-            `${json.strategy} · ${json.results.length} results`;
+          document.getElementById('tab-hint').textContent = `${json.strategy} · ${json.results.length} results`;
           renderList(json.results);
         } catch {
           S.searchResults = null;
@@ -1348,16 +958,11 @@
           btn.addEventListener('click', () => {
             const t = btn.dataset.tab;
             S.activeTab = t;
-            document
-              .querySelectorAll('.tab-btn[data-tab]')
-              .forEach((b) => b.classList.remove('active'));
+            document.querySelectorAll('.tab-btn[data-tab]').forEach((b) => b.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-graph').style.display = t === 'graph' ? 'flex' : 'none';
-            document.getElementById('tab-analytics').style.display =
-              t === 'analytics' ? 'flex' : 'none';
-            if (t === 'analytics' && !S.analyticsRendered && S.fullStats) {
-              renderAnalytics(S.fullStats);
-            }
+            document.getElementById('tab-analytics').style.display = t === 'analytics' ? 'flex' : 'none';
+            if (t === 'analytics' && !S.analyticsRendered && S.fullStats) renderAnalytics(S.fullStats);
           });
         });
       }
@@ -1367,70 +972,41 @@
         const container = document.getElementById('graph-container');
         if (!nodes?.length) {
           container.innerHTML =
-            '<div class="empty" style="height:100%">' +
-            svgIcon('graph') +
+            '<div class="empty" style="height:100%">' + svgIcon('graph').outerHTML +
             '<div class="empty-title">No graph yet</div>' +
-            '<div class="empty-sub">Memories with shared files or tags will appear here.</div></div>';
+            '<div class="empty-sub">Memories with shared files or tags appear here.</div></div>';
           return;
         }
-
-        const vNodes = new vis.DataSet(
-          nodes.map((n) => {
-            const kc = KIND_COLOR[n.kind] || KIND_COLOR.other;
-            return {
-              id: n.id,
-              label: n.label,
-              title: n.title,
-              color: {
-                background: kc.bg,
-                border: kc.border,
-                highlight: { background: kc.bg, border: '#fff' },
-              },
-              font: { color: '#dde1ea', size: 11, face: 'Bricolage Grotesque' },
-              shape: 'dot',
-              size: 10,
-              borderWidth: 1.5,
-            };
-          }),
-        );
-
-        const vEdges = new vis.DataSet(
-          edges.map((e, i) => ({
-            id: i,
-            from: e.from,
-            to: e.to,
-            color: { color: '#1f2535', highlight: '#4f8dff', opacity: 0.8 },
-            width: 1,
-            smooth: { type: 'dynamic' },
-          })),
-        );
-
+        const vNodes = new vis.DataSet(nodes.map((n) => {
+          const kc = KIND_COLOR[n.kind] || KIND_COLOR.other;
+          return {
+            id: n.id, label: n.label, title: n.title,
+            color: { background: kc.bg, border: kc.border, highlight: { background: kc.bg, border: '#fff' } },
+            font: { color: '#ede8da', size: 11, face: 'Syne' },
+            shape: 'dot', size: 10, borderWidth: 1.5,
+          };
+        }));
+        const vEdges = new vis.DataSet(edges.map((e, i) => ({
+          id: i, from: e.from, to: e.to,
+          color: { color: '#2d2918', highlight: '#f0a030', opacity: 0.9 },
+          width: 1, smooth: { type: 'dynamic' },
+        })));
         S.network = new vis.Network(
           container,
           { nodes: vNodes, edges: vEdges },
           {
-            physics: {
-              stabilization: { iterations: 100 },
-              barnesHut: { gravitationalConstant: -2000, springLength: 120 },
-            },
+            physics: { stabilization: { iterations: 100 }, barnesHut: { gravitationalConstant: -2000, springLength: 120 } },
             interaction: { hover: true, tooltipDelay: 200 },
             nodes: { borderWidthSelected: 2 },
           },
         );
-
         S.network.on('click', ({ nodes: selected }) => {
           if (!selected.length) return;
           const id = selected[0];
           const mem = S.data?.memories?.find((m) => m.id === id);
-          if (mem) {
-            S.selectedId = id;
-            renderList(S.searchResults ?? S.data?.memories ?? []);
-            showDetail(mem);
-          }
+          if (mem) { S.selectedId = id; renderList(S.searchResults ?? S.data?.memories ?? []); showDetail(mem); }
         });
-
-        document.getElementById('tab-hint').textContent =
-          `${nodes.length} nodes · ${edges.length} edges`;
+        document.getElementById('tab-hint').textContent = `${nodes.length} nodes · ${edges.length} edges`;
       }
 
       // ─── Full stats ────────────────────────────────────────────────────────────────
@@ -1438,10 +1014,8 @@
         try {
           const res = await fetch('/api/stats/full');
           S.fullStats = await res.json();
-          // Update cache pill
           const hit = S.fullStats.cache?.hit_rate;
-          document.getElementById('s-cache').textContent =
-            hit != null ? (hit * 100).toFixed(0) + '%' : '—';
+          document.getElementById('s-cache').textContent = hit != null ? (hit * 100).toFixed(0) + '%' : '—';
           if (S.activeTab === 'analytics') renderAnalytics(S.fullStats);
         } catch {}
       }
@@ -1455,57 +1029,32 @@
         const kb = fs.kindBreakdown || {};
         const kbMax = Math.max(...Object.values(kb).map(Number), 1);
         const kbCard = card('Memory kinds');
-        Object.entries(kb)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([kind, count]) => {
-            const kc = KIND_COLOR[kind] || KIND_COLOR.other;
-            const row = h(
-              'div',
-              { class: 'bar-row' },
-              h(
-                'span',
-                { class: 'bar-label', style: 'font-size:11.5px;font-weight:600' },
-                kind.replace('_', ' '),
-              ),
-              h(
-                'div',
-                { class: 'bar-track' },
-                h('div', { class: 'bar-fill', style: `background:${kc.bg}` }),
-              ),
-              h('span', { class: 'bar-count' }, String(count)),
-            );
-            kbCard.append(row);
-            requestAnimationFrame(() => {
-              row.querySelector('.bar-fill').style.width = (count / kbMax) * 100 + '%';
-            });
-          });
-        if (!Object.keys(kb).length)
-          kbCard.append(
-            h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No data yet')),
+        Object.entries(kb).sort((a, b) => b[1] - a[1]).forEach(([kind, count]) => {
+          const kc = KIND_COLOR[kind] || KIND_COLOR.other;
+          const row = h('div', { class: 'bar-row' },
+            h('span', { class: 'bar-label' }, kind.replace('_', ' ')),
+            h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: `background:${kc.bg}` })),
+            h('span', { class: 'bar-count' }, String(count)),
           );
+          kbCard.append(row);
+          requestAnimationFrame(() => { row.querySelector('.bar-fill').style.width = (count / kbMax) * 100 + '%'; });
+        });
+        if (!Object.keys(kb).length) kbCard.append(h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No data yet')));
         grid.append(wrap(kbCard));
 
         // 2. Cache performance
         const cc = fs.cache || {};
         const cacheCard = card('Cache performance');
         [
-          [
-            'Hit rate',
-            cc.hit_rate != null ? (cc.hit_rate * 100).toFixed(1) + '%' : '—',
-            'var(--accent-g)',
-          ],
-          ['Hits', cc.hit_count ?? 0, 'var(--accent-g)'],
-          ['Misses', cc.miss_count ?? 0, 'var(--muted2)'],
-          ['Entries', cc.entry_count ?? 0, 'var(--accent)'],
+          ['Hit rate', cc.hit_rate != null ? (cc.hit_rate * 100).toFixed(1) + '%' : '—', 'var(--accent-g)'],
+          ['Hits',    cc.hit_count ?? 0,  'var(--accent-g)'],
+          ['Misses',  cc.miss_count ?? 0, 'var(--muted2)'],
+          ['Entries', cc.entry_count ?? 0, 'var(--accent-c)'],
         ].forEach(([lbl, val, color]) => {
-          cacheCard.append(
-            h(
-              'div',
-              { class: 'cache-stat' },
-              h('span', { class: 'cache-stat-lbl' }, lbl),
-              h('span', { class: 'cache-stat-val', style: `color:${color}` }, String(val)),
-            ),
-          );
+          cacheCard.append(h('div', { class: 'cache-stat' },
+            h('span', { class: 'cache-stat-lbl' }, lbl),
+            h('span', { class: 'cache-stat-val', style: `color:${color}` }, String(val)),
+          ));
         });
         grid.append(wrap(cacheCard));
 
@@ -1514,53 +1063,27 @@
         const ruMax = Math.max(...ru.map((r) => r.call_count), 1);
         const ruCard = card('Retrieval strategy');
         ru.sort((a, b) => b.call_count - a.call_count).forEach((r) => {
-          const row = h(
-            'div',
-            { class: 'bar-row' },
+          const row = h('div', { class: 'bar-row' },
             h('span', { class: 'bar-label' }, r.strategy),
-            h(
-              'div',
-              { class: 'bar-track' },
-              h('div', { class: 'bar-fill', style: 'background:var(--accent-v)' }),
-            ),
+            h('div', { class: 'bar-track' }, h('div', { class: 'bar-fill', style: 'background:var(--accent-v)' })),
             h('span', { class: 'bar-count' }, String(r.call_count)),
           );
           ruCard.append(row);
-          requestAnimationFrame(() => {
-            row.querySelector('.bar-fill').style.width = (r.call_count / ruMax) * 100 + '%';
-          });
+          requestAnimationFrame(() => { row.querySelector('.bar-fill').style.width = (r.call_count / ruMax) * 100 + '%'; });
         });
-        if (!ru.length)
-          ruCard.append(
-            h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No retrieval data yet')),
-          );
+        if (!ru.length) ruCard.append(h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No retrieval data yet')));
         grid.append(wrap(ruCard));
 
         // 4. Top files
         const tf = fs.topFiles || [];
         const tfCard = card('Top files referenced');
         tf.slice(0, 12).forEach((f) => {
-          tfCard.append(
-            h(
-              'div',
-              { class: 'file-row' },
-              h(
-                'span',
-                { class: 'file-name', title: f.file_path },
-                f.file_path.split('/').slice(-2).join('/'),
-              ),
-              h('span', { class: 'file-count' }, String(f.reference_count) + 'x'),
-            ),
-          );
+          tfCard.append(h('div', { class: 'file-row' },
+            h('span', { class: 'file-name', title: f.file_path }, f.file_path.split('/').slice(-2).join('/')),
+            h('span', { class: 'file-count' }, String(f.reference_count) + 'x'),
+          ));
         });
-        if (!tf.length)
-          tfCard.append(
-            h(
-              'div',
-              { class: 'empty' },
-              h('div', { class: 'empty-sub' }, 'No file references yet'),
-            ),
-          );
+        if (!tf.length) tfCard.append(h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No file references yet')));
         grid.append(wrap(tfCard));
       }
 
@@ -1569,27 +1092,18 @@
         el.append(h('div', { class: 'a-title' }, title));
         return el;
       }
-      function wrap(el) {
-        const w = h('div', {});
-        w.append(el);
-        return w;
-      }
+      function wrap(el) { const w = h('div', {}); w.append(el); return w; }
 
       // ─── SVG icons ────────────────────────────────────────────────────────────────
       function svgIcon(name) {
         const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        el.setAttribute('width', '32');
-        el.setAttribute('height', '32');
-        el.setAttribute('viewBox', '0 0 24 24');
-        el.setAttribute('fill', 'none');
-        el.setAttribute('stroke', 'currentColor');
-        el.setAttribute('stroke-width', '1.5');
-        el.setAttribute('stroke-linecap', 'round');
-        el.classList.add('empty-icon');
+        el.setAttribute('width', '32'); el.setAttribute('height', '32');
+        el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('fill', 'none');
+        el.setAttribute('stroke', 'currentColor'); el.setAttribute('stroke-width', '1.5');
+        el.setAttribute('stroke-linecap', 'round'); el.classList.add('empty-icon');
         const paths = {
           search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
-          graph:
-            '<circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.5L17 6M7 12.5L17 18"/>',
+          graph: '<circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 11.5L17 6M7 12.5L17 18"/>',
         };
         el.innerHTML = paths[name] || '';
         return el;
