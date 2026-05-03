@@ -1,11 +1,11 @@
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   H3,
   defineEventHandler,
   getQuery,
   getRouterParam,
-  fromNodeHandler,
   toNodeHandler,
 } from 'h3';
 import { listen } from 'listhen';
@@ -126,10 +126,18 @@ export async function runServe(options: ServeOptions = {}): Promise<void> {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const dashboardDir = join(__dirname, '..', 'dashboard');
   const sirvMiddleware = sirv(dashboardDir, { single: true, dev: true });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  app.use(fromNodeHandler((req: any, res: any) => sirvMiddleware(req, res, () => {})));
+  const h3NodeHandler = toNodeHandler(app);
 
-  const listener = await listen(toNodeHandler(app), {
+  // Compose sirv and H3 at the Node.js level to avoid H3 v2 middleware deprecations.
+  // API paths go straight to H3; everything else is served as static files by sirv.
+  const requestHandler = (req: IncomingMessage, res: ServerResponse) => {
+    if (req.url?.startsWith('/api/')) {
+      return h3NodeHandler(req, res);
+    }
+    sirvMiddleware(req, res, () => { void h3NodeHandler(req, res); });
+  };
+
+  const listener = await listen(requestHandler, {
     port: options.port ?? 3000,
     open: options.open ?? true,
     name: 'Somtum Dashboard',

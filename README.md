@@ -7,9 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
 
-Somtum (Thai: ส้มตำ) is named after the vibrant, shredded green papaya salad. Just like its namesake, Somtum captures and blends durable observations from your Claude Code sessions — decisions, bugfixes, learnings, file summaries — stores them in a local SQLite database, and injects the relevant ones back into context. It also caches repeated prompt→response pairs so identical (or near-identical) prompts never hit the model twice.
+Somtum (Thai: ส้มตำ) is named after the vibrant, shredded green papaya salad. Just like its namesake, Somtum blends durable observations from your Claude Code sessions — decisions, bugfixes, learnings, file summaries — stores them in a local SQLite database, and injects the relevant ones back into context the next time you work on the same project.
 
-Zero-config: one `somtum init` in an existing Claude Code project and every session end is captured automatically. No server, no cloud account, no mandatory tuning.
+Zero-config: one `somtum init` and every session end is captured automatically. No server, no cloud account, no mandatory tuning.
 
 ---
 
@@ -37,17 +37,80 @@ Zero-config: one `somtum init` in an existing Claude Code project and every sess
 
 ## Why Somtum?
 
-LLM agents like Claude Code typically start every session with a "blank slate." This leads to:
+LLM agents like Claude Code start every session with a blank slate. That leads to:
 
-- **Repetitive Explanations:** Having to re-explain architectural choices or local conventions.
-- **Regressions:** Claude might suggest a fix you've already tried and discarded.
-- **Context Waste:** Large codebases eat up tokens just to "set the scene."
+- **Repetitive context** — re-explaining the same architectural choices every session
+- **Regressions** — Claude suggests a fix you already tried and discarded
+- **Token waste** — reading large files just to "set the scene"
 
-**Somtum gives Claude a long-term memory.** It ensures that once a decision is made or a bug is fixed, it stays "remembered" across all future sessions without bloating your context window.
+**Somtum gives Claude a long-term memory.** Once a decision is made or a bug is fixed, it's remembered across all future sessions — without bloating your context window.
+
+### What a session looks like with Somtum
+
+```
+Without Somtum                    With Somtum
+────────────────────              ──────────────────────────────────────
+Session 1: "We use pnpm           Session 1: same work
+           because of workspace
+           hoisting"
+
+Session 2: Claude suggests        Session 2: Claude already knows about
+           npm, you correct it       pnpm, the auth decisions, and the
+           again                     bugfixes from last week
+```
 
 ---
 
 ## How it works
+
+At the end of each Claude Code session, Somtum reads the session transcript and asks Claude Haiku to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally and injected back into context the next time you ask something related.
+
+### Memory lifecycle
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Claude Code
+    participant Somtum Hook
+    participant SQLite DB
+
+    You->>Claude Code: Work on project (coding, debugging, decisions)
+    Claude Code->>Somtum Hook: SessionEnd fires automatically
+    Somtum Hook->>Claude Code: Extract observations via Haiku
+    Somtum Hook->>SQLite DB: Store memories locally
+
+    Note over You,SQLite DB: Next session
+
+    You->>Claude Code: Ask about the project
+    Claude Code->>SQLite DB: recall() via MCP tool
+    SQLite DB-->>Claude Code: Relevant past decisions & fixes
+    Claude Code-->>You: Answer informed by prior sessions
+```
+
+### What gets captured — a concrete example
+
+You work a session debugging an auth bug and refactoring a module. At session end, Somtum extracts something like:
+
+```json
+[
+  {
+    "kind": "bugfix",
+    "title": "JWT refresh loop caused by missing expiry check",
+    "body": "The refresh token loop was triggered because we checked token.exp < Date.now() instead of token.exp < Date.now() / 1000. Unix timestamps are in seconds, not milliseconds.",
+    "files": ["src/auth/refresh.ts"]
+  },
+  {
+    "kind": "decision",
+    "title": "Use pnpm workspaces — npm hoisting breaks shared types",
+    "body": "Switched from npm to pnpm because npm's hoisting puts shared type packages in the wrong node_modules scope, breaking type inference across packages.",
+    "files": ["package.json", "pnpm-workspace.yaml"]
+  }
+]
+```
+
+Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.ts`, Claude finds these memories and already has the context.
+
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -60,8 +123,7 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
 │                     │         │                      │
 │  UserPromptSubmit ──┼─────────┼▶ cache_lookup        │
 │  SessionEnd ────────┼─────────┼▶ recall / get        │
-│  PreCompact ────────┼─────────┼▶ remember / forget   │
-│  PreToolUse (Read) ─┼─────────┼▶ stats               │
+│  PreToolUse (Read) ─┼─────────┼▶ remember / forget   │
 └──────────┬──────────┘         └──────────┬───────────┘
            │                               │
            ▼                               ▼
@@ -71,10 +133,10 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
 │  │ PromptCache  │  │ MemoryStore  │  │    Retriever     │  │
 │  │              │  │              │  │                  │  │
-│  │ exact hash   │  │ observations │  │  bm25 (FTS5)     │  │
+│  │ exact hash   │  │ observations │  │  bm25 (default)  │  │
 │  │ fuzzy embed  │  │ + embeddings │  │  embeddings      │  │
-│  │ fingerprint  │  │ + redaction  │  │  index (Haiku)   │  │
-│  │ invalidation │  │              │  │  hybrid (default)│  │
+│  │ fingerprint  │  │ + redaction  │  │  index           │  │
+│  │ invalidation │  │              │  │  hybrid          │  │
 │  └──────────────┘  └──────────────┘  └──────────────────┘  │
 └─────────────────────────────────┬───────────────────────────┘
                                   │
@@ -89,14 +151,16 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
                     └─────────────────────────┘
 ```
 
-### Three retrieval strategies — all first-class
+### Retrieval strategies
 
-| Strategy                 | How it works                                                     | Best for                                 | Cost                                |
-| ------------------------ | ---------------------------------------------------------------- | ---------------------------------------- | ----------------------------------- |
-| **`bm25`**               | SQLite FTS5 lexical search over title + body + tags              | Keyword queries, offline-forever setups  | Near-zero                           |
-| **`embeddings`**         | Cosine similarity over 384-dim vectors (bge-small-en-v1.5, ONNX) | Semantic queries, large corpora          | ~30 MB model, ~5 ms at 10k memories |
-| **`index`**              | Compact catalog sent to Haiku; model picks relevant IDs          | Paraphrased queries, zero-embedding mode | 1 Haiku call per query              |
-| **`hybrid`** _(default)_ | BM25 top-50 ∪ embeddings top-50 → RRF blend → Haiku rerank       | General case                             | BM25 + embeddings + 1 Haiku call    |
+| Strategy | How it works | Best for | Cost |
+|---|---|---|---|
+| **`bm25`** | Keyword search over title + body + tags (SQLite FTS5 — no external dependencies) | Exact terms, offline setups | Near-zero |
+| **`embeddings`** | Semantic similarity using a 30 MB local model (bge-small-en-v1.5, runs fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories |
+| **`index`** | Sends a compact memory catalog to Haiku; the model picks relevant IDs | Paraphrased or fuzzy queries | 1 Haiku API call |
+| **`hybrid`** | BM25 + embeddings results merged and re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+
+**Default is `bm25`** — works offline, no setup. Enable `hybrid` once you have embeddings downloaded.
 
 ---
 
@@ -104,16 +168,14 @@ LLM agents like Claude Code typically start every session with a "blank slate." 
 
 - **Node 20+**
 - **Claude Code** — Somtum hooks into Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` events
-- **`ANTHROPIC_API_KEY`** _(optional)_ — if set, Somtum uses the Anthropic API directly for extraction (lets you choose the model explicitly). If not set, Somtum falls back to the `claude` CLI that ships with Claude Code, so **no separate API key is required for Claude Code subscribers**.
-
-> `pnpm` is only required if building from source. Global npm/yarn installs have no pnpm dependency.
+- **`ANTHROPIC_API_KEY`** _(optional)_ — if set, Somtum uses the Anthropic API directly for extraction. If not set, Somtum falls back to the `claude` CLI that ships with Claude Code, so **no separate API key is required for Claude Code subscribers**.
 
 ---
 
 ## Install
 
 ```bash
-# npm (recommended for global install)
+# npm (recommended)
 npm install -g somtum
 
 # yarn
@@ -141,7 +203,7 @@ pnpm link --global
 
 ### Native module note
 
-Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically. On Alpine Linux / musl or unusual architectures the addon compiles from source — `python`, `make`, and `gcc` must be available. If the install fails with a node-gyp error, install those build tools and retry.
+Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which contains a native C++ addon. On most platforms (macOS, Linux x64/arm64, Windows x64) a prebuilt binary is downloaded automatically. On Alpine Linux / musl or unusual architectures, the addon compiles from source — `python`, `make`, and `gcc` must be available. If the install fails with a node-gyp error, install those build tools and retry.
 
 ---
 
@@ -149,15 +211,15 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ### Step 1 — Choose your extraction backend
 
-Somtum needs to call a Claude model at session end to extract observations. There are two options — pick one:
+Somtum needs to call a Claude model at session end to extract observations. Pick one:
 
 **Option A: Claude Code subscription (no extra setup)**
 
 If you already have Claude Code installed, you're done. Somtum calls `claude --print` automatically when no API key is present. Skip to Step 2.
 
-**Option B: Direct Anthropic API key (optional — faster, explicit model choice)**
+**Option B: Direct Anthropic API key (optional — faster, lets you pick the model)**
 
-If you want Somtum to call the API directly (useful if you use Somtum outside of a Claude Code environment, or want to pin a specific model), add to `~/.zshrc` (or `~/.bashrc`):
+Add to `~/.zshrc` (or `~/.bashrc`):
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
@@ -169,32 +231,30 @@ Then reload:
 source ~/.zshrc
 ```
 
-> When a `SessionEnd` hook fires, it inherits the environment of the shell that _started_ Claude Code — not the current terminal. So the key must be in your shell profile, not just `export`-ed in an open terminal tab.
+> The key must be in your shell profile, not just exported in an open terminal tab. The `SessionEnd` hook inherits the environment of the shell that _started_ Claude Code — not the current terminal.
 
 ### Step 2 — Install inside a Claude Code project
 
-Run this from the **root of the project you work in with Claude Code**:
+Run this from the **root of the project you work on with Claude Code**:
 
 ```bash
 somtum init
 ```
 
-This writes a `SessionEnd` hook into `.claude/settings.json` in the current directory. Claude Code reads that file automatically when you open a session from the same directory.
-
-To enable all features at once:
+To enable all features at once (recommended):
 
 ```bash
 somtum init --all
 # Installs:
 #   - SessionEnd capture hook     (memory extraction)
 #   - UserPromptSubmit cache hook (prompt cache lookup)
-#   - PreToolUse file-gating hook (file read summaries)
+#   - PreToolUse file-gating hook (large file summarization)
 #   - MCP server in .mcp.json     (Claude can call recall/remember tools)
 ```
 
 ### Step 3 — Use Claude Code normally
 
-Open a Claude Code session **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds so it never blocks you).
+Open a Claude Code session **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
 
 ### Step 4 — Check your memory
 
@@ -218,7 +278,7 @@ If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](#tro
 somtum doctor
 ```
 
-This checks your API key, DB health, hook installation, migrations, cache, and breakeven ratio. It will tell you exactly what is misconfigured and how to fix it.
+This checks your API key, DB health, hook installation, migrations, cache, and breakeven ratio — with specific fix instructions for each failing check.
 
 ---
 
@@ -228,20 +288,18 @@ After your **first** Claude Code session ends:
 
 **1. Check the hook log**
 
-Every hook run appends a timestamped line to `~/.somtum/hook.log`:
-
 ```bash
 cat ~/.somtum/hook.log
 ```
 
-A successful run looks like:
+A successful run:
 
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
 ```
 
-A run using the claude CLI fallback (no API key) looks like:
+Using the `claude` CLI fallback (no API key):
 
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
@@ -249,12 +307,10 @@ A run using the claude CLI fallback (no API key) looks like:
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
 ```
 
-A failed run (neither key nor CLI available) looks like:
+Neither backend available:
 
 ```
-2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
-2026-04-30T10:15:42.131Z [post_session] ERROR: Neither ANTHROPIC_API_KEY nor the claude CLI is available.
+2026-04-30T10:15:42.123Z [post_session] ERROR: Neither ANTHROPIC_API_KEY nor the claude CLI is available.
 ```
 
 **2. Check stats**
@@ -263,7 +319,7 @@ A failed run (neither key nor CLI available) looks like:
 somtum stats
 ```
 
-You should see `memories` > 0 after a substantive session. Short test sessions may yield 0 observations if there is nothing worth extracting (Claude Code did not make decisions, fix bugs, or learn anything the extractor considers durable).
+You should see `memories > 0` after a substantive session. Short or trivial sessions (no decisions, no bug fixes) correctly return 0 — the extractor only keeps durable observations.
 
 **3. Run doctor**
 
@@ -277,28 +333,24 @@ All checks should show `✓`. The `api_key` and `hooks_installed` checks are the
 
 ## Dashboard
 
-Somtum includes a visual memory browser you can open at any time:
-
 ```bash
 somtum serve
-# Opens http://localhost:3000 in your browser
+# Opens http://localhost:3000
 ```
 
-The dashboard provides:
+The dashboard has four views:
 
-- **Memory browser** — searchable, filterable list of all captured observations. Supports BM25, hybrid, and embeddings strategies live. Click any memory to see its full body, files touched, and tags.
-- **Knowledge graph** — vis-network graph where nodes are memories and edges connect memories that share files or tags. Clicking a node opens the detail panel.
-- **Analytics** — kind breakdown, cache hit rate, retrieval strategy usage, and top-referenced files.
+- **Memory browser** — searchable, filterable list of all captured observations. Switch between BM25, hybrid, and embeddings strategies live. Click any memory to see its full body, files, and tags.
+- **Knowledge graph** — nodes are memories, edges connect memories that share files or tags. Click a node to open it in the detail panel.
+- **Analytics** — kind breakdown, cache hit rate, retrieval strategy usage, top-referenced files.
 - **Forget button** — soft-delete any memory directly from the browser.
 
-Options:
+| Flag | Default | Description |
+|---|---|---|
+| `--port <n>` | 3000 | Listen on a custom port |
+| `--no-open` | — | Start server without opening the browser |
 
-| Flag         | Description                            |
-| ------------ | -------------------------------------- |
-| `--port <n>` | Listen on a custom port (default 3000) |
-| `--no-open`  | Don't auto-open the browser            |
-
-Press `Ctrl-C` to stop the server.
+Press `Ctrl-C` to stop.
 
 ---
 
@@ -306,169 +358,171 @@ Press `Ctrl-C` to stop the server.
 
 ### Setup
 
-| Command                     | Description                                                  |
-| --------------------------- | ------------------------------------------------------------ |
-| `somtum init`               | Install the SessionEnd capture hook                          |
-| `somtum init --cache`       | Also install the UserPromptSubmit cache hook                 |
-| `somtum init --file-gating` | Also install the PreToolUse file-gating hook                 |
-| `somtum init --all`         | Install all hooks + MCP server                               |
-| `somtum init --force`       | Reinstall even if hooks already present                      |
-| `somtum doctor`             | Check DB health, migrations, hooks, API key, breakeven ratio |
+| Command | Description |
+|---|---|
+| `somtum init` | Install the SessionEnd capture hook |
+| `somtum init --cache` | Also install the UserPromptSubmit cache hook |
+| `somtum init --file-gating` | Also install the PreToolUse file-gating hook |
+| `somtum init --all` | Install all hooks + MCP server |
+| `somtum init --force` | Reinstall even if hooks already present |
+| `somtum doctor` | Check DB health, migrations, hooks, API key, breakeven ratio |
 
 ### Memory
 
-| Command                                 | Description                                      |
-| --------------------------------------- | ------------------------------------------------ |
-| `somtum search <query>`                 | Search observations (default: `hybrid` strategy) |
-| `somtum search <query> --strategy bm25` | Force a specific retrieval strategy              |
-| `somtum search <query> -k 16`           | Return more results                              |
-| `somtum show <id>`                      | Print the full body of an observation            |
-| `somtum forget <id>`                    | Soft-delete an observation                       |
-| `somtum edit <id>`                      | Open an observation body in `$EDITOR`            |
-| `somtum rebuild`                        | Regenerate `index.md` from all observations      |
-| `somtum reindex`                        | Recompute embeddings (after a model change)      |
+| Command | Description |
+|---|---|
+| `somtum search <query>` | Search observations (default: `bm25` strategy) |
+| `somtum search <query> --strategy hybrid` | Force a specific retrieval strategy |
+| `somtum search <query> -k 16` | Return more results |
+| `somtum show <id>` | Print the full body of an observation |
+| `somtum remember` | Manually store an observation |
+| `somtum forget <id>` | Soft-delete an observation |
+| `somtum edit <id>` | Open an observation body in `$EDITOR` |
+| `somtum rebuild` | Regenerate `index.md` from all observations |
+| `somtum reindex` | Recompute embeddings (after enabling embeddings or changing model) |
 
 ### Stats & Visibility
 
-| Command                   | Description                                       |
-| ------------------------- | ------------------------------------------------- |
-| `somtum stats`            | Tokens saved, cache hit rate, retrieval breakdown |
-| `somtum stats --json`     | Machine-readable JSON output                      |
-| `somtum serve`            | Open the visual dashboard in the browser          |
-| `somtum serve --port <n>` | Use a custom port (default 3000)                  |
-| `somtum serve --no-open`  | Start server without opening the browser          |
+| Command | Description |
+|---|---|
+| `somtum stats` | Tokens saved, cache hit rate, retrieval breakdown |
+| `somtum stats --json` | Machine-readable JSON output |
+| `somtum serve` | Open the visual dashboard in the browser |
+| `somtum serve --port <n>` | Use a custom port (default 3000) |
+| `somtum serve --no-open` | Start server without opening the browser |
 
-### Data management
+### Data Management
 
-| Command                                           | Description                                         |
-| ------------------------------------------------- | --------------------------------------------------- |
-| `somtum export`                                   | Export observations to stdout as JSON               |
-| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file                                |
-| `somtum export --format markdown`                 | Export as readable Markdown                         |
-| `somtum export --include-deleted`                 | Include soft-deleted entries                        |
-| `somtum import <file>`                            | Import observations from JSON or JSONL              |
-| `somtum purge --older-than 30d`                   | Hard-delete soft-deleted entries older than 30 days |
-| `somtum purge --older-than 30d --dry-run`         | Preview without deleting                            |
-
-### Stats & visibility
-
-| Command          | Description                                 |
-| ---------------- | ------------------------------------------- |
-| `somtum reindex` | Embed observations that are missing vectors |
+| Command | Description |
+|---|---|
+| `somtum export` | Export observations to stdout as JSON |
+| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file |
+| `somtum export --format markdown` | Export as readable Markdown |
+| `somtum export --include-deleted` | Include soft-deleted entries |
+| `somtum import <file>` | Import observations from JSON or JSONL |
+| `somtum purge --older-than 30d` | Hard-delete soft-deleted entries older than 30 days |
+| `somtum purge --older-than 30d --dry-run` | Preview without deleting |
 
 ### Configuration
 
-| Command                                                        | Description                       |
-| -------------------------------------------------------------- | --------------------------------- |
-| `somtum config get`                                            | Print the full resolved config    |
-| `somtum config get retrieval.strategy`                         | Read a single key (dot-separated) |
-| `somtum config set retrieval.strategy hybrid`                  | Write to `.somtum/config.json`    |
-| `somtum config set retrieval.embeddings.enabled true --global` | Write to `~/.somtum/config.json`  |
+| Command | Description |
+|---|---|
+| `somtum config get` | Print the full resolved config |
+| `somtum config get retrieval.strategy` | Read a single key (dot-separated) |
+| `somtum config set retrieval.strategy hybrid` | Write to `.somtum/config.json` |
+| `somtum config set retrieval.embeddings.enabled true --global` | Write to `~/.somtum/config.json` |
 
 ### Sync
 
-| Command              | Description                               |
-| -------------------- | ----------------------------------------- |
+| Command | Description |
+|---|---|
 | `somtum sync status` | Compare local vs remote observation count |
-| `somtum sync push`   | Export and scp observations to remote     |
-| `somtum sync pull`   | scp from remote and merge into local DB   |
+| `somtum sync push` | Export and scp observations to remote |
+| `somtum sync pull` | scp from remote and merge into local DB |
 
-Remote configured in config: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`  
-Somtum uses hostname-aware syncing to prevent data loss when using multiple devices.
+Set your remote: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`
+
+Somtum uses hostname-aware syncing — merging observations from multiple machines without data loss.
 
 ---
 
 ## MCP Server
 
-Somtum includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server. When you run `somtum init --all`, it registers tools that Claude can use autonomously:
+When you run `somtum init --all`, Somtum registers an MCP server that Claude can call autonomously during a session:
 
-| Tool           | What Claude can do with it                                             |
-| -------------- | ---------------------------------------------------------------------- |
-| `recall`       | Search memories by natural language when unsure about a project detail |
-| `get`          | Retrieve the full body of specific observations by ID                  |
-| `remember`     | Manually store an observation from within a session                    |
-| `cache_lookup` | Check the prompt cache directly                                        |
-| `forget`       | Soft-delete an observation                                             |
-| `stats`        | Report on tokens saved, cache hit rate, and corpus size                |
+| Tool | What Claude does with it |
+|---|---|
+| `recall` | Searches memories when unsure about a project detail |
+| `get` | Retrieves the full body of specific observations by ID |
+| `remember` | Stores an observation manually from within a session |
+| `cache_lookup` | Checks the prompt cache directly |
+| `forget` | Soft-deletes an observation |
+| `stats` | Reports tokens saved, cache hit rate, and corpus size |
 
 Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
 
 ---
 
-## Dashboard
-
-`somtum serve` opens a local web dashboard at `http://localhost:3000`:
-
-- **Memory browser** — search across all observations using BM25, hybrid, or embedding-based retrieval; filter by kind (decision, bugfix, learning, command, file_summary); forget memories directly from the UI.
-- **Knowledge graph** — vis-network graph where nodes are observations, edges represent shared files or tags. Clicking a node selects the memory in the list and vice versa.
-- **Analytics tab** — kind breakdown, token ROI (saved vs. spent), cache hit rate + entry count, retrieval strategy usage, and top files by reference count.
-- **Stat bar** — live counts for total memories, tokens saved, tokens spent, ROI ratio, and cache hit %.
-
-```bash
-somtum serve              # opens on port 3000
-somtum serve --port 4000  # custom port
-somtum serve --no-open    # don't auto-open the browser
-```
-
----
-
-## Storage layout
+## Storage Layout
 
 ```
 ~/.somtum/
-├── config.json                    ← global config (overridden by project config)
+├── config.json                    ← global config (merged with project config)
 ├── hook.log                       ← timestamped log of every hook execution
 └── projects/
     └── <project_id>/
         ├── db.sqlite              ← source of truth (SQLite WAL)
-        ├── index.md               ← regenerated human-readable mirror
+        ├── index.md               ← human-readable mirror (regenerated)
         └── memories/
             └── YYYY-MM/
                 └── <ulid>.md      ← per-observation markdown files
 ```
 
-The project ID is derived from the git remote URL (if present) or the directory path — the same project always maps to the same ID regardless of which machine you're on, as long as the remote URL matches.
+The project ID is derived from the git remote URL (or directory path if no remote). The same project maps to the same ID across machines as long as the remote URL matches.
 
-SQLite is the source of truth. `index.md` and `memories/*.md` are derived mirrors regenerated on each capture. Edit observations with `somtum edit <id>`, not by hand.
+SQLite is the source of truth. Edit observations with `somtum edit <id>`, not by hand.
 
 ---
 
 ## Configuration
 
-Global config lives at `~/.somtum/config.json`. Per-project config at `.somtum/config.json` — project values override global ones (deep merge).
+Global config lives at `~/.somtum/config.json`. Per-project config at `.somtum/config.json` overrides it (deep merge).
+
+### Most common settings
+
+```bash
+# Enable semantic (embedding-based) search — downloads a 30 MB model once
+somtum config set retrieval.embeddings.enabled true
+somtum reindex
+
+# Switch to hybrid retrieval (BM25 + embeddings + rerank) for best recall
+somtum config set retrieval.strategy hybrid
+
+# Use LLM-based retrieval (no embeddings required, costs one Haiku call per query)
+somtum config set retrieval.index.enabled true
+somtum config set retrieval.strategy index
+
+# Intercept large file reads and summarize them (reduces context bloat)
+somtum config set file_gating.enabled true
+
+# Limit observations extracted per session (default: 10)
+somtum config set extraction.max_observations_per_session 5
+```
+
+### Full config reference
 
 ```jsonc
 {
   "extraction": {
     "model": "claude-haiku-4-5-20251001",
     "trigger": ["SessionEnd", "PreCompact"],
-    "max_observations_per_session": 10,
+    "max_observations_per_session": 10
   },
   "cache": {
     "enabled": true,
     "fuzzy_match": true,
     "fuzzy_threshold": 0.92, // raise to 0.95 once you have signal
     "max_entries": 10000,
-    "ttl_days": 90,
+    "ttl_days": 90
   },
   "retrieval": {
-    "strategy": "hybrid", // bm25 | embeddings | index | hybrid
+    "strategy": "bm25", // bm25 | embeddings | index | hybrid
     "k": 8,
     "rerank_model": "claude-haiku-4-5-20251001",
     "bm25": { "enabled": true },
     "embeddings": {
       "enabled": false, // set true to download the 30 MB ONNX model
-      "model": "Xenova/bge-small-en-v1.5",
+      "model": "Xenova/bge-small-en-v1.5"
     },
     "index": {
       "enabled": false, // set true to use Haiku as the retriever
-      "model": "claude-haiku-4-5-20251001",
-    },
+      "model": "claude-haiku-4-5-20251001"
+    }
   },
   "file_gating": {
     "enabled": false, // set true to intercept large file reads
     "min_file_size_tokens": 500,
-    "exclude_globs": ["**/*.env", "**/secrets/**"],
+    "exclude_globs": ["**/*.env", "**/secrets/**"]
   },
   "privacy": {
     "telemetry": false,
@@ -477,22 +531,15 @@ Global config lives at `~/.somtum/config.json`. Per-project config at `.somtum/c
       "bearer\\s+[A-Za-z0-9_\\-.]+",
       "sk-[A-Za-z0-9_\\-]{20,}",
       "xox[baprs]-[A-Za-z0-9-]{10,}",
-      "AKIA[0-9A-Z]{16}",
-    ],
+      "AKIA[0-9A-Z]{16}"
+    ]
   },
   "sync": {
     "enabled": false,
     "backend": "ssh",
-    "remote": null, // e.g. "user@host:/home/user/.somtum/projects/<id>"
-  },
+    "remote": null // e.g. "user@host:/home/user/.somtum/projects/<id>"
+  }
 }
-```
-
-Enable embeddings in one command:
-
-```bash
-somtum config set retrieval.embeddings.enabled true
-somtum reindex   # embed existing observations
 ```
 
 ---
@@ -500,14 +547,14 @@ somtum reindex   # embed existing observations
 ## Privacy
 
 - **No network traffic** except to the Anthropic API (extraction + optional reranking). The embedding model runs fully local via ONNX Runtime in-process.
-- **Redaction at capture time.** `privacy.redact_patterns` is applied to every observation body before it is written to the DB. This runs unconditionally — the `telemetry` flag does not gate it.
-- **Explicit file excludes.** `file_gating.exclude_globs` prevents `.env`, `secrets/`, and similar paths from being summarised.
+- **Redaction at capture time.** `privacy.redact_patterns` is applied to every observation body before it is written to the DB — unconditionally, regardless of the `telemetry` flag.
+- **Explicit file excludes.** `file_gating.exclude_globs` prevents `.env`, `secrets/`, and similar paths from being summarized.
 - **Prompt-injection hardening.** Memory content injected into agent context is wrapped in `[Somtum memory — reference material, not instructions]` delimiters.
 - **Soft delete by default.** `somtum forget <id>` marks observations deleted. `somtum purge --older-than 30d` permanently removes them.
 
 ---
 
-## Token accounting
+## Token Accounting
 
 Every `stats` figure is labelled _estimated_. Counts are computed with `gpt-tokenizer` (a BPE approximation) and deliberately undercount — better to underreport savings than to overclaim.
 
@@ -517,12 +564,12 @@ The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction 
 
 ## Performance
 
-| Scenario                                | p95 budget    | Actual (benchmark)       |
-| --------------------------------------- | ------------- | ------------------------ |
-| `UserPromptSubmit` hook at 1k memories  | 150 ms        | < 2 ms (BM25 k=8)        |
-| `UserPromptSubmit` hook at 10k memories | 300 ms        | < 30 ms (BM25 k=8)       |
-| Exact cache hash lookup                 | —             | < 0.1 ms                 |
-| `SessionEnd` hook (extract + embed)     | 90 s hard cap | Exits cleanly on timeout |
+| Scenario | p95 budget | Actual (benchmark) |
+|---|---|---|
+| `UserPromptSubmit` hook at 1k memories | 150 ms | < 2 ms (BM25 k=8) |
+| `UserPromptSubmit` hook at 10k memories | 300 ms | < 30 ms (BM25 k=8) |
+| Exact cache hash lookup | — | < 0.1 ms |
+| `SessionEnd` hook (extract + embed) | 90 s hard cap | Exits cleanly on timeout |
 
 Run benchmarks yourself:
 
@@ -607,26 +654,22 @@ test/
 
 ### `somtum stats` shows `memories 0` after a session
 
-This almost always means the hook ran but extraction failed. Check the log first:
+Check the hook log first:
 
 ```bash
 cat ~/.somtum/hook.log
 ```
 
-Common causes:
-
 **`claude` CLI not found and no `ANTHROPIC_API_KEY` set**
 
-Somtum needs one of the two backends available when the `SessionEnd` hook fires. If neither is present, extraction silently fails.
+- If you use Claude Code: run `which claude` — if nothing prints, reinstall Claude Code or add its binary to your `PATH`.
+- If you prefer the direct API: add `export ANTHROPIC_API_KEY="sk-ant-..."` to `~/.zshrc` and `source ~/.zshrc`. Must be in your profile, not just exported in the current terminal tab.
 
-- If you use Claude Code: make sure the `claude` binary is on your `PATH`. Run `which claude` — if it prints nothing, reinstall Claude Code or add it to `PATH`.
-- If you prefer the direct API: add `export ANTHROPIC_API_KEY="sk-ant-..."` to `~/.zshrc` (or `~/.bashrc`) and `source ~/.zshrc`. The key must be in your shell profile because the hook subprocess inherits from the shell that _started_ Claude Code, not the current terminal tab.
-
-Run `somtum doctor` — the `api_key` check will tell you exactly which path is available.
+Run `somtum doctor` — the `api_key` check tells you exactly which backend is available.
 
 **Hook not installed in the right directory**
 
-`somtum init` writes the hook to `.claude/settings.json` in the directory where you ran it. If you run Claude Code from a _different_ directory, it reads a different (or absent) settings file.
+`somtum init` writes the hook to `.claude/settings.json` in the directory where you ran it. If you launch Claude Code from a different directory, it reads a different settings file.
 
 Fix: run `somtum init` from the same directory you use to launch Claude Code.
 
@@ -638,17 +681,7 @@ claude   # must be launched from ~/my-project
 
 **Short or trivial session**
 
-If the session didn't contain any decisions, bug fixes, or learnings (e.g. you just asked Claude to say hello), the extractor correctly returns 0 observations.
-
-Try a real working session, then re-check.
-
-**Run `somtum doctor`** for a full diagnostic:
-
-```bash
-somtum doctor
-```
-
-It checks extraction auth (API key or claude CLI), hook installation, DB health, embeddings, breakeven ratio, and more, with specific fix instructions for each failing check.
+If the session had no decisions, bug fixes, or learnings (e.g. you just asked Claude to say hello), the extractor correctly returns 0 observations.
 
 ---
 
@@ -670,8 +703,6 @@ pnpm build
 
 ### `somtum serve` — port already in use
 
-If port 3000 is busy, use `--port`:
-
 ```bash
 somtum serve --port 3001
 ```
@@ -680,24 +711,18 @@ somtum serve --port 3001
 
 ### Agent appears to keep running after session ends
 
-The `SessionEnd` hook has a hard 90-second timeout — it cannot block Claude Code indefinitely. If sessions appear stuck immediately after installing Somtum, verify you are on v1.1.0+:
+The `SessionEnd` hook has a hard 90-second timeout. If sessions appear stuck, verify you are on v1.1.0+:
 
 ```bash
 somtum --version
-```
-
-And check the log for any long-running operations:
-
-```bash
 tail -20 ~/.somtum/hook.log
 ```
 
 ---
 
-
 ### Installation fails (node-gyp / better-sqlite3)
 
-If you see errors related to building `better-sqlite3`, ensure build tools are installed:
+Ensure build tools are installed:
 
 - **macOS:** `xcode-select --install`
 - **Ubuntu/Debian:** `sudo apt-get install build-essential python3`
@@ -707,28 +732,28 @@ If you see errors related to building `better-sqlite3`, ensure build tools are i
 
 ### Embeddings are slow or the model won't download
 
-The first `somtum reindex` downloads a ~30 MB ONNX model (`bge-small-en-v1.5`) from Hugging Face. This requires internet access and may be slow on first run. Subsequent runs use the cached model.
+The first `somtum reindex` downloads a ~30 MB ONNX model from Hugging Face. This requires internet access and may be slow. Subsequent runs use the cached model.
 
-If you are on an air-gapped machine or prefer not to use embeddings, disable them:
+On an air-gapped machine or if you prefer not to use embeddings:
 
 ```bash
 somtum config set retrieval.embeddings.enabled false
 somtum config set retrieval.strategy bm25
 ```
 
-BM25 retrieval works fully offline and is fast at any reasonable corpus size.
+BM25 works fully offline and is fast at any corpus size.
 
 ---
 
 ### Claude isn't using the memories
 
-If you are using the MCP server (`somtum init --all`), Claude will automatically call `recall` when it's uncertain about project details. If it's not happening:
+If you are using the MCP server (`somtum init --all`), Claude calls `recall` automatically when uncertain about project details. If it's not happening:
 
-1. Confirm `.mcp.json` exists in your project root: `cat .mcp.json`
-2. Restart Claude Code so it picks up the new MCP config
-3. Try prompting Claude explicitly: _"Check your Somtum memory for anything related to our auth setup"_
+1. Confirm `.mcp.json` exists: `cat .mcp.json`
+2. Restart Claude Code to pick up the MCP config
+3. Prompt explicitly: _"Check your Somtum memory for anything related to our auth setup"_
 
-If you are not using the MCP server, memories are injected via the `index.md` file — add it to your CLAUDE.md or Claude Code context with:
+If you are not using the MCP server, memories are injected via `index.md`. Reference it in your CLAUDE.md:
 
 ```
 See ~/.somtum/projects/<project_id>/index.md for prior session learnings.
@@ -738,7 +763,7 @@ See ~/.somtum/projects/<project_id>/index.md for prior session learnings.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for the guide.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the guide.
 
 **Important:** This project uses `changesets` for versioning. Every PR must include a changeset file generated by running `pnpm changeset`.
 
