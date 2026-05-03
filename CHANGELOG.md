@@ -1,5 +1,11 @@
 # somtum
 
+## 1.3.1
+
+### Patch Changes
+
+- fb3cf70: improve the somtum serve webpage UI and update README.md for developers
+
 ## 1.3.0
 
 ### Minor Changes
