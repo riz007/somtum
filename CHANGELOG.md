@@ -1,5 +1,23 @@
 # somtum
 
+## 1.3.0
+
+### Minor Changes
+
+- **Auto-inject memories on every prompt** — The `UserPromptSubmit` hook now runs a BM25 recall (top-k, < 2 ms) and injects relevant memories as `additionalContext` on every prompt, not just on cache hits. Memories surface automatically without requiring the agent to call `recall`. Configurable via `injection.enabled`, `injection.k`, `injection.max_chars`.
+
+- **`update` MCP tool** — New tool to update an existing observation's `title`, `body`, `tags`, or `files` via MCP. Redaction is applied before storage. Agents can now correct bad captures without leaving the session.
+
+- **Warm-start after `PreCompact`** — When Claude Code compacts a conversation, the `PostCompact` hook now writes a warm-start file (`~/.somtum/warmstart/ws_<id>.json`) containing the top-8 BM25 memories. The next `UserPromptSubmit` reads and consumes it (30-minute TTL), restoring context into the fresh conversation automatically.
+
+- **False-hit detection** — Two mechanisms for populating `false_hit_count` on cache entries: (a) automatic — if the next prompt after a cache hit is a near-re-ask (≤ 5 min, > 60% word overlap) but a cache miss, the prior hit is flagged; (b) explicit — new `report_false_hit(cache_entry_id)` MCP tool for agent-driven feedback. Data feeds future fuzzy-threshold tuning.
+
+- **Workspace / cross-project observation scope** — New `scope: 'project' | 'workspace' | 'global'` field on all observations (migration 004). The `remember` MCP tool accepts `scope`; `recall` and `get` return it. Workspace-scoped observations represent cross-project knowledge (team conventions, tool preferences).
+
+- **`somtum suggest-claude-md`** — New CLI command: groups observations by kind, previews proposed CLAUDE.md additions, and asks for interactive confirmation before writing. Supports `--dry-run`, `--yes`, `--limit`. Off by default — must be explicitly invoked.
+
+- **Stale memory detection in `somtum doctor`** — Adds a `stale_memories` check: warns when observations are older than 90 days with no confirmed retrievals (`last_confirmed_at IS NULL`). New `last_confirmed_at` column (migration 004) is bumped by `recall` and `get` on every hit. New `countStale()` and `listStale()` methods on `MemoryStore`.
+
 ## 1.2.0
 
 ### Minor Changes

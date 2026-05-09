@@ -26,3 +26,4 @@ export {
   GLOBAL_CONFIG_PATH,
 } from './config.js';
 export * from './core/schema.js';
+export { suggestClaudeMdCommand } from './cli/suggest_claude_md.js';

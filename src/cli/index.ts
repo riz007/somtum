@@ -15,6 +15,7 @@ import { importCommand } from './import.js';
 import { purgeCommand } from './purge.js';
 import { syncCommand } from './sync.js';
 import { doctorCommand } from './doctor.js';
+import { suggestClaudeMdCommand } from './suggest_claude_md.js';
 import { configGetCommand, configSetCommand } from './config_cmd.js';
 import { serveCommand } from './serve.js';
 import { runMcpServer } from '../mcp/server.js';
@@ -250,6 +251,24 @@ program
     if (opts.port !== undefined) serveOpts.port = opts.port;
     if (opts.open !== undefined) serveOpts.open = opts.open;
     const code = await serveCommand(serveOpts);
+    process.exit(code);
+  });
+
+program
+  .command('suggest-claude-md')
+  .description(
+    'Suggest CLAUDE.md additions from accumulated observations (interactive, off by default)',
+  )
+  .option('--limit <n>', 'Max observations to consider', (v) => Number.parseInt(v, 10))
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .option('--dry-run', 'Preview suggestions without writing', false)
+  .action(async (opts: { limit?: number; yes?: boolean; dryRun?: boolean }) => {
+    const cmdOpts: Parameters<typeof suggestClaudeMdCommand>[0] = {
+      yes: opts.yes ?? false,
+      dry: opts.dryRun ?? false,
+    };
+    if (opts.limit !== undefined) cmdOpts.limit = opts.limit;
+    const code = await suggestClaudeMdCommand(cmdOpts);
     process.exit(code);
   });
 

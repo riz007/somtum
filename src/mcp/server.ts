@@ -10,14 +10,18 @@ import {
   RecallInput,
   GetInput,
   RememberInput,
+  UpdateInput,
   CacheLookupInput,
   ForgetInput,
+  ReportFalseHitInput,
   StatsInput,
   recall,
   get,
   remember,
+  update,
   cacheLookup,
   forget,
+  reportFalseHit,
   stats,
   type ToolContext,
 } from './tools.js';
@@ -114,6 +118,38 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
     async (args) => {
       try {
         return jsonResult(remember(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'update',
+    {
+      description:
+        'Update an existing observation. Pass only the fields to change (title, body, tags, files). Redaction is applied before storage.',
+      inputSchema: UpdateInput.shape,
+    },
+    async (args) => {
+      try {
+        return jsonResult(update(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'report_false_hit',
+    {
+      description:
+        'Report that a cache hit did not answer the question (the user had to rephrase or re-ask). Increments false_hit_count on the cache entry to inform threshold tuning.',
+      inputSchema: ReportFalseHitInput.shape,
+    },
+    async (args) => {
+      try {
+        return jsonResult(reportFalseHit(context, args));
       } catch (err) {
         return errorResult(err);
       }
