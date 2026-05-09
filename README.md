@@ -191,21 +191,12 @@ Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.t
 ## Install
 
 ```bash
-# npm (recommended)
 npm install -g somtum
-
-# yarn
-yarn global add somtum
-
-# pnpm
-pnpm add -g somtum
 ```
 
-Or as a project dependency:
-
-```bash
-npm install somtum
-```
+> **pnpm users:** `pnpm add -g somtum` works if you have run `pnpm setup` first (sets `PNPM_HOME`). If you haven't, use npm above.
+>
+> **yarn users:** `yarn global add` is not supported in Yarn v2+ (Berry). Use npm above.
 
 ### From source
 
