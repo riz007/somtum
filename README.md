@@ -67,24 +67,40 @@ At the end of each Claude Code session, Somtum reads the session transcript and 
 
 ### Memory lifecycle
 
-```mermaid
-sequenceDiagram
-    participant You
-    participant Claude Code
-    participant Somtum Hook
-    participant SQLite DB
-
-    You->>Claude Code: Work on project (coding, debugging, decisions)
-    Claude Code->>Somtum Hook: SessionEnd fires automatically
-    Somtum Hook->>Claude Code: Extract observations via Haiku
-    Somtum Hook->>SQLite DB: Store memories locally
-
-    Note over You,SQLite DB: Next session
-
-    You->>Claude Code: Ask about the project
-    Claude Code->>SQLite DB: recall() via MCP tool
-    SQLite DB-->>Claude Code: Relevant past decisions & fixes
-    Claude Code-->>You: Answer informed by prior sessions
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Claude Code Session                      │
+│                                                             │
+│       you code · debug · review · make decisions            │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ SessionEnd fires automatically
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Capture Pipeline                        │
+│                                                             │
+│  session transcript ──► Haiku extracts observations         │
+│                                                             │
+│      decisions · bug fixes · learnings · commands           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ persisted locally
+                               ▼
+                 ┌─────────────────────────┐
+                 │  ~/.somtum/projects/    │
+                 │     <project-hash>/     │
+                 │                         │
+                 │  db.sqlite              │
+                 │  index.md               │
+                 │  memories/YYYY-MM/      │
+                 └────────────┬────────────┘
+                              │ next session
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Query Pipeline                         │
+│                                                             │
+│  user prompt ──► BM25 / embeddings / hybrid ──► top-k hits  │
+│                                                             │
+│      injected into Claude Code context automatically        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### What gets captured — a concrete example
