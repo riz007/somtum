@@ -1,44 +1,22 @@
 # somtum
 
-## 1.3.4
-
-### Patch Changes
-
-- 2f3d528: update README.md with install
-
-## 1.3.3
-
-### Patch Changes
-
-- d74787d: update the README.md file sequence diagram
-
-## 1.3.2
-
-### Patch Changes
-
-- fb3cf70: fix: version no longer hardcoded to 1.0.0; fix hook deadlock when ANTHROPIC_API_KEY is unset
-
-## 1.3.1
-
-### Patch Changes
-
-- fb3cf70: improve the somtum serve webpage UI and update README.md for developers
-
 ## 1.3.0
 
 ### Minor Changes
 
-- 867c695: `ANTHROPIC_API_KEY` is now optional. When not set, the `SessionEnd` hook falls back to `claude --print` (the Claude Code CLI) so Claude Code subscribers need no separate API key. The `api_key` doctor check now passes when either the key or the CLI is available, and `claudeCodeCaller()` is exported from the public API.
+- **Auto-inject memories on every prompt** — The `UserPromptSubmit` hook now runs a BM25 recall (top-k, < 2 ms) and injects relevant memories as `additionalContext` on every prompt, not just on cache hits. Memories surface automatically without requiring the agent to call `recall`. Configurable via `injection.enabled`, `injection.k`, `injection.max_chars`.
 
-## 1.2.1
+- **`update` MCP tool** — New tool to update an existing observation's `title`, `body`, `tags`, or `files` via MCP. Redaction is applied before storage. Agents can now correct bad captures without leaving the session.
 
-### Patch Changes
+- **Warm-start after `PreCompact`** — When Claude Code compacts a conversation, the `PostCompact` hook now writes a warm-start file (`~/.somtum/warmstart/ws_<id>.json`) containing the top-8 BM25 memories. The next `UserPromptSubmit` reads and consumes it (30-minute TTL), restoring context into the fresh conversation automatically.
 
-- afd256b: - Redesigned `somtum serve` dashboard UI (light/dark theme support, improved layout)
-  - `somtum stats` now shows a setup hint when no memories have been captured yet, distinguishing between a missing `ANTHROPIC_API_KEY` and a hook that has not fired yet
-  - `somtum doctor` gains a new `api_key` check that reports whether `ANTHROPIC_API_KEY` is set
-  - Hook runner logs activity to `~/.somtum/hook.log` and emits a warning when `ANTHROPIC_API_KEY` is missing before the `post_session` extraction runs
-  - `somtum serve` port option now accepts `-p` shorthand and defaults gracefully when omitted
+- **False-hit detection** — Two mechanisms for populating `false_hit_count` on cache entries: (a) automatic — if the next prompt after a cache hit is a near-re-ask (≤ 5 min, > 60% word overlap) but a cache miss, the prior hit is flagged; (b) explicit — new `report_false_hit(cache_entry_id)` MCP tool for agent-driven feedback. Data feeds future fuzzy-threshold tuning.
+
+- **Workspace / cross-project observation scope** — New `scope: 'project' | 'workspace' | 'global'` field on all observations (migration 004). The `remember` MCP tool accepts `scope`; `recall` and `get` return it. Workspace-scoped observations represent cross-project knowledge (team conventions, tool preferences).
+
+- **`somtum suggest-claude-md`** — New CLI command: groups observations by kind, previews proposed CLAUDE.md additions, and asks for interactive confirmation before writing. Supports `--dry-run`, `--yes`, `--limit`. Off by default — must be explicitly invoked.
+
+- **Stale memory detection in `somtum doctor`** — Adds a `stale_memories` check: warns when observations are older than 90 days with no confirmed retrievals (`last_confirmed_at IS NULL`). New `last_confirmed_at` column (migration 004) is bumped by `recall` and `get` on every hit. New `countStale()` and `listStale()` methods on `MemoryStore`.
 
 ## 1.2.0
 

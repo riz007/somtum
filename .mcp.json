@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "somtum": {
+      "command": "somtum",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

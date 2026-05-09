@@ -10,6 +10,9 @@ export const ObservationKind = z.enum([
 ]);
 export type ObservationKind = z.infer<typeof ObservationKind>;
 
+export const ObservationScope = z.enum(['project', 'workspace', 'global']);
+export type ObservationScope = z.infer<typeof ObservationScope>;
+
 export const ObservationSchema = z.object({
   id: z.string().min(1),
   project_id: z.string().min(1),
@@ -25,6 +28,8 @@ export const ObservationSchema = z.object({
   superseded_by: z.string().nullable(),
   embedding: z.instanceof(Buffer).nullable(),
   deleted_at: z.number().int().nullable(),
+  scope: ObservationScope.default('project'),
+  last_confirmed_at: z.number().int().nullable(),
 });
 export type Observation = z.infer<typeof ObservationSchema>;
 
@@ -40,8 +45,17 @@ export const ObservationInputSchema = z.object({
   created_at: z.number().int().nonnegative().optional(),
   tokens_saved: z.number().int().nonnegative().default(0),
   tokens_spent: z.number().int().nonnegative().default(0),
+  scope: ObservationScope.default('project'),
 });
 export type ObservationInput = z.input<typeof ObservationInputSchema>;
+
+export const ObservationUpdateSchema = z.object({
+  title: z.string().min(1).max(80).optional(),
+  body: z.string().min(1).optional(),
+  tags: z.array(z.string()).optional(),
+  files: z.array(z.string()).optional(),
+});
+export type ObservationUpdate = z.infer<typeof ObservationUpdateSchema>;
 
 export const CacheEntrySchema = z.object({
   id: z.string(),
@@ -166,6 +180,14 @@ export const ConfigSchema = z.object({
       enabled: z.boolean().default(false),
       backend: z.string().default('ssh'),
       remote: z.string().nullable().default(null),
+    })
+    .default({}),
+  injection: z
+    .object({
+      // Auto-inject top-k relevant memories into every UserPromptSubmit context.
+      enabled: z.boolean().default(true),
+      k: z.number().int().positive().default(5),
+      max_chars: z.number().int().positive().default(3000),
     })
     .default({}),
 });
