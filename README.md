@@ -67,24 +67,40 @@ At the end of each Claude Code session, Somtum reads the session transcript and 
 
 ### Memory lifecycle
 
-```mermaid
-sequenceDiagram
-    participant You
-    participant Claude Code
-    participant Somtum Hook
-    participant SQLite DB
-
-    You->>Claude Code: Work on project (coding, debugging, decisions)
-    Claude Code->>Somtum Hook: SessionEnd fires automatically
-    Somtum Hook->>Claude Code: Extract observations via Haiku
-    Somtum Hook->>SQLite DB: Store memories locally
-
-    Note over You,SQLite DB: Next session
-
-    You->>Claude Code: Ask about the project
-    Claude Code->>SQLite DB: recall() via MCP tool
-    SQLite DB-->>Claude Code: Relevant past decisions & fixes
-    Claude Code-->>You: Answer informed by prior sessions
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Claude Code Session                      │
+│                                                             │
+│       you code · debug · review · make decisions            │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ SessionEnd fires automatically
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Capture Pipeline                        │
+│                                                             │
+│  session transcript ──► Haiku extracts observations         │
+│                                                             │
+│      decisions · bug fixes · learnings · commands           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ persisted locally
+                               ▼
+                 ┌─────────────────────────┐
+                 │  ~/.somtum/projects/    │
+                 │     <project-hash>/     │
+                 │                         │
+                 │  db.sqlite              │
+                 │  index.md               │
+                 │  memories/YYYY-MM/      │
+                 └────────────┬────────────┘
+                              │ next session
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Query Pipeline                         │
+│                                                             │
+│  user prompt ──► BM25 / embeddings / hybrid ──► top-k hits  │
+│                                                             │
+│      injected into Claude Code context automatically        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### What gets captured — a concrete example
@@ -153,12 +169,12 @@ Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.t
 
 ### Retrieval strategies
 
-| Strategy | How it works | Best for | Cost |
-|---|---|---|---|
-| **`bm25`** | Keyword search over title + body + tags (SQLite FTS5 — no external dependencies) | Exact terms, offline setups | Near-zero |
-| **`embeddings`** | Semantic similarity using a 30 MB local model (bge-small-en-v1.5, runs fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories |
-| **`index`** | Sends a compact memory catalog to Haiku; the model picks relevant IDs | Paraphrased or fuzzy queries | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings results merged and re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+| Strategy         | How it works                                                                             | Best for                                       | Cost                             |
+| ---------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------- |
+| **`bm25`**       | Keyword search over title + body + tags (SQLite FTS5 — no external dependencies)         | Exact terms, offline setups                    | Near-zero                        |
+| **`embeddings`** | Semantic similarity using a 30 MB local model (bge-small-en-v1.5, runs fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories            |
+| **`index`**      | Sends a compact memory catalog to Haiku; the model picks relevant IDs                    | Paraphrased or fuzzy queries                   | 1 Haiku API call                 |
+| **`hybrid`**     | BM25 + embeddings results merged and re-ranked by Haiku                                  | General case (best recall)                     | BM25 + embeddings + 1 Haiku call |
 
 **Default is `bm25`** — works offline, no setup. Enable `hybrid` once you have embeddings downloaded.
 
@@ -345,10 +361,10 @@ The dashboard has four views:
 - **Analytics** — kind breakdown, cache hit rate, retrieval strategy usage, top-referenced files.
 - **Forget button** — soft-delete any memory directly from the browser.
 
-| Flag | Default | Description |
-|---|---|---|
-| `--port <n>` | 3000 | Listen on a custom port |
-| `--no-open` | — | Start server without opening the browser |
+| Flag         | Default | Description                              |
+| ------------ | ------- | ---------------------------------------- |
+| `--port <n>` | 3000    | Listen on a custom port                  |
+| `--no-open`  | —       | Start server without opening the browser |
 
 Press `Ctrl-C` to stop.
 
@@ -358,67 +374,67 @@ Press `Ctrl-C` to stop.
 
 ### Setup
 
-| Command | Description |
-|---|---|
-| `somtum init` | Install the SessionEnd capture hook |
-| `somtum init --cache` | Also install the UserPromptSubmit cache hook |
-| `somtum init --file-gating` | Also install the PreToolUse file-gating hook |
-| `somtum init --all` | Install all hooks + MCP server |
-| `somtum init --force` | Reinstall even if hooks already present |
-| `somtum doctor` | Check DB health, migrations, hooks, API key, breakeven ratio |
+| Command                     | Description                                                  |
+| --------------------------- | ------------------------------------------------------------ |
+| `somtum init`               | Install the SessionEnd capture hook                          |
+| `somtum init --cache`       | Also install the UserPromptSubmit cache hook                 |
+| `somtum init --file-gating` | Also install the PreToolUse file-gating hook                 |
+| `somtum init --all`         | Install all hooks + MCP server                               |
+| `somtum init --force`       | Reinstall even if hooks already present                      |
+| `somtum doctor`             | Check DB health, migrations, hooks, API key, breakeven ratio |
 
 ### Memory
 
-| Command | Description |
-|---|---|
-| `somtum search <query>` | Search observations (default: `bm25` strategy) |
-| `somtum search <query> --strategy hybrid` | Force a specific retrieval strategy |
-| `somtum search <query> -k 16` | Return more results |
-| `somtum show <id>` | Print the full body of an observation |
-| `somtum remember` | Manually store an observation |
-| `somtum forget <id>` | Soft-delete an observation |
-| `somtum edit <id>` | Open an observation body in `$EDITOR` |
-| `somtum rebuild` | Regenerate `index.md` from all observations |
-| `somtum reindex` | Recompute embeddings (after enabling embeddings or changing model) |
+| Command                                   | Description                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `somtum search <query>`                   | Search observations (default: `bm25` strategy)                     |
+| `somtum search <query> --strategy hybrid` | Force a specific retrieval strategy                                |
+| `somtum search <query> -k 16`             | Return more results                                                |
+| `somtum show <id>`                        | Print the full body of an observation                              |
+| `somtum remember`                         | Manually store an observation                                      |
+| `somtum forget <id>`                      | Soft-delete an observation                                         |
+| `somtum edit <id>`                        | Open an observation body in `$EDITOR`                              |
+| `somtum rebuild`                          | Regenerate `index.md` from all observations                        |
+| `somtum reindex`                          | Recompute embeddings (after enabling embeddings or changing model) |
 
 ### Stats & Visibility
 
-| Command | Description |
-|---|---|
-| `somtum stats` | Tokens saved, cache hit rate, retrieval breakdown |
-| `somtum stats --json` | Machine-readable JSON output |
-| `somtum serve` | Open the visual dashboard in the browser |
-| `somtum serve --port <n>` | Use a custom port (default 3000) |
-| `somtum serve --no-open` | Start server without opening the browser |
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `somtum stats`            | Tokens saved, cache hit rate, retrieval breakdown |
+| `somtum stats --json`     | Machine-readable JSON output                      |
+| `somtum serve`            | Open the visual dashboard in the browser          |
+| `somtum serve --port <n>` | Use a custom port (default 3000)                  |
+| `somtum serve --no-open`  | Start server without opening the browser          |
 
 ### Data Management
 
-| Command | Description |
-|---|---|
-| `somtum export` | Export observations to stdout as JSON |
-| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file |
-| `somtum export --format markdown` | Export as readable Markdown |
-| `somtum export --include-deleted` | Include soft-deleted entries |
-| `somtum import <file>` | Import observations from JSON or JSONL |
-| `somtum purge --older-than 30d` | Hard-delete soft-deleted entries older than 30 days |
-| `somtum purge --older-than 30d --dry-run` | Preview without deleting |
+| Command                                           | Description                                         |
+| ------------------------------------------------- | --------------------------------------------------- |
+| `somtum export`                                   | Export observations to stdout as JSON               |
+| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file                                |
+| `somtum export --format markdown`                 | Export as readable Markdown                         |
+| `somtum export --include-deleted`                 | Include soft-deleted entries                        |
+| `somtum import <file>`                            | Import observations from JSON or JSONL              |
+| `somtum purge --older-than 30d`                   | Hard-delete soft-deleted entries older than 30 days |
+| `somtum purge --older-than 30d --dry-run`         | Preview without deleting                            |
 
 ### Configuration
 
-| Command | Description |
-|---|---|
-| `somtum config get` | Print the full resolved config |
-| `somtum config get retrieval.strategy` | Read a single key (dot-separated) |
-| `somtum config set retrieval.strategy hybrid` | Write to `.somtum/config.json` |
-| `somtum config set retrieval.embeddings.enabled true --global` | Write to `~/.somtum/config.json` |
+| Command                                                        | Description                       |
+| -------------------------------------------------------------- | --------------------------------- |
+| `somtum config get`                                            | Print the full resolved config    |
+| `somtum config get retrieval.strategy`                         | Read a single key (dot-separated) |
+| `somtum config set retrieval.strategy hybrid`                  | Write to `.somtum/config.json`    |
+| `somtum config set retrieval.embeddings.enabled true --global` | Write to `~/.somtum/config.json`  |
 
 ### Sync
 
-| Command | Description |
-|---|---|
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
 | `somtum sync status` | Compare local vs remote observation count |
-| `somtum sync push` | Export and scp observations to remote |
-| `somtum sync pull` | scp from remote and merge into local DB |
+| `somtum sync push`   | Export and scp observations to remote     |
+| `somtum sync pull`   | scp from remote and merge into local DB   |
 
 Set your remote: `somtum config set sync.remote "user@host:/path/.somtum/projects/<id>"`
 
@@ -430,14 +446,14 @@ Somtum uses hostname-aware syncing — merging observations from multiple machin
 
 When you run `somtum init --all`, Somtum registers an MCP server that Claude can call autonomously during a session:
 
-| Tool | What Claude does with it |
-|---|---|
-| `recall` | Searches memories when unsure about a project detail |
-| `get` | Retrieves the full body of specific observations by ID |
-| `remember` | Stores an observation manually from within a session |
-| `cache_lookup` | Checks the prompt cache directly |
-| `forget` | Soft-deletes an observation |
-| `stats` | Reports tokens saved, cache hit rate, and corpus size |
+| Tool           | What Claude does with it                               |
+| -------------- | ------------------------------------------------------ |
+| `recall`       | Searches memories when unsure about a project detail   |
+| `get`          | Retrieves the full body of specific observations by ID |
+| `remember`     | Stores an observation manually from within a session   |
+| `cache_lookup` | Checks the prompt cache directly                       |
+| `forget`       | Soft-deletes an observation                            |
+| `stats`        | Reports tokens saved, cache hit rate, and corpus size  |
 
 Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
 
@@ -496,14 +512,14 @@ somtum config set extraction.max_observations_per_session 5
   "extraction": {
     "model": "claude-haiku-4-5-20251001",
     "trigger": ["SessionEnd", "PreCompact"],
-    "max_observations_per_session": 10
+    "max_observations_per_session": 10,
   },
   "cache": {
     "enabled": true,
     "fuzzy_match": true,
     "fuzzy_threshold": 0.92, // raise to 0.95 once you have signal
     "max_entries": 10000,
-    "ttl_days": 90
+    "ttl_days": 90,
   },
   "retrieval": {
     "strategy": "bm25", // bm25 | embeddings | index | hybrid
@@ -512,17 +528,17 @@ somtum config set extraction.max_observations_per_session 5
     "bm25": { "enabled": true },
     "embeddings": {
       "enabled": false, // set true to download the 30 MB ONNX model
-      "model": "Xenova/bge-small-en-v1.5"
+      "model": "Xenova/bge-small-en-v1.5",
     },
     "index": {
       "enabled": false, // set true to use Haiku as the retriever
-      "model": "claude-haiku-4-5-20251001"
-    }
+      "model": "claude-haiku-4-5-20251001",
+    },
   },
   "file_gating": {
     "enabled": false, // set true to intercept large file reads
     "min_file_size_tokens": 500,
-    "exclude_globs": ["**/*.env", "**/secrets/**"]
+    "exclude_globs": ["**/*.env", "**/secrets/**"],
   },
   "privacy": {
     "telemetry": false,
@@ -531,14 +547,14 @@ somtum config set extraction.max_observations_per_session 5
       "bearer\\s+[A-Za-z0-9_\\-.]+",
       "sk-[A-Za-z0-9_\\-]{20,}",
       "xox[baprs]-[A-Za-z0-9-]{10,}",
-      "AKIA[0-9A-Z]{16}"
-    ]
+      "AKIA[0-9A-Z]{16}",
+    ],
   },
   "sync": {
     "enabled": false,
     "backend": "ssh",
-    "remote": null // e.g. "user@host:/home/user/.somtum/projects/<id>"
-  }
+    "remote": null, // e.g. "user@host:/home/user/.somtum/projects/<id>"
+  },
 }
 ```
 
@@ -564,12 +580,12 @@ The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction 
 
 ## Performance
 
-| Scenario | p95 budget | Actual (benchmark) |
-|---|---|---|
-| `UserPromptSubmit` hook at 1k memories | 150 ms | < 2 ms (BM25 k=8) |
-| `UserPromptSubmit` hook at 10k memories | 300 ms | < 30 ms (BM25 k=8) |
-| Exact cache hash lookup | — | < 0.1 ms |
-| `SessionEnd` hook (extract + embed) | 90 s hard cap | Exits cleanly on timeout |
+| Scenario                                | p95 budget    | Actual (benchmark)       |
+| --------------------------------------- | ------------- | ------------------------ |
+| `UserPromptSubmit` hook at 1k memories  | 150 ms        | < 2 ms (BM25 k=8)        |
+| `UserPromptSubmit` hook at 10k memories | 300 ms        | < 30 ms (BM25 k=8)       |
+| Exact cache hash lookup                 | —             | < 0.1 ms                 |
+| `SessionEnd` hook (extract + embed)     | 90 s hard cap | Exits cleanly on timeout |
 
 Run benchmarks yourself:
 
