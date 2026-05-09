@@ -6,6 +6,7 @@ import { openDb, type DB } from '../core/db.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { ConfigSchema } from '../core/schema.js';
+import { MemoryStore } from '../core/store.js';
 import { runPrePrompt } from './pre_prompt.js';
 
 let tmp: string;
@@ -91,5 +92,47 @@ describe('runPrePrompt', () => {
       { db, config: ConfigSchema.parse({}), projectId: 'p1' },
     );
     expect(r.hit).toBe(false);
+  });
+
+  it('injects relevant memories into additionalContext on cache miss', async () => {
+    const store = new MemoryStore(db);
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'learning',
+      title: 'always use pnpm',
+      body: 'This project uses pnpm, not npm. Always run pnpm install.',
+      files: [],
+      tags: [],
+    });
+
+    const r = await runPrePrompt(
+      { prompt: 'how do I install dependencies in this project', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    expect(r.hit).toBe(false);
+    expect(r.hookSpecificOutput?.hookEventName).toBe('UserPromptSubmit');
+    expect(r.hookSpecificOutput?.additionalContext).toContain('always use pnpm');
+  });
+
+  it('skips memory injection when injection.enabled is false', async () => {
+    const store = new MemoryStore(db);
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'learning',
+      title: 'always use pnpm',
+      body: 'This project uses pnpm, not npm.',
+      files: [],
+      tags: [],
+    });
+
+    const config = ConfigSchema.parse({ injection: { enabled: false } });
+    const r = await runPrePrompt(
+      { prompt: 'how do I install dependencies', cwd: tmp },
+      { db, config, projectId: 'p1' },
+    );
+    expect(r.hit).toBe(false);
+    expect(r.hookSpecificOutput).toBeUndefined();
   });
 });

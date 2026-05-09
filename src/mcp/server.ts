@@ -13,6 +13,7 @@ import {
   UpdateInput,
   CacheLookupInput,
   ForgetInput,
+  ForgetAllInput,
   ReportFalseHitInput,
   StatsInput,
   recall,
@@ -21,6 +22,7 @@ import {
   update,
   cacheLookup,
   forget,
+  forgetAll,
   reportFalseHit,
   stats,
   type ToolContext,
@@ -75,7 +77,7 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
 
   const context: ToolContext = { db, config, projectId };
 
-  const server = new McpServer({ name: 'somtum', version: '0.1.0' }, { capabilities: {} });
+  const server = new McpServer({ name: 'somtum', version: '1.4.0' }, { capabilities: {} });
 
   server.registerTool(
     'recall',
@@ -181,6 +183,22 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
     async (args) => {
       try {
         return jsonResult(forget(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'forget_all',
+    {
+      description:
+        'Soft-delete all observations in the current project. Returns the count of deleted entries.',
+      inputSchema: ForgetAllInput.shape,
+    },
+    async () => {
+      try {
+        return jsonResult(forgetAll(context));
       } catch (err) {
         return errorResult(err);
       }

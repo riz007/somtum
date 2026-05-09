@@ -8,7 +8,9 @@ import { showCommand } from './show.js';
 import { hookCommand } from './hook.js';
 import { reindexCommand } from './reindex.js';
 import { rebuildCommand } from './rebuild.js';
-import { forgetCommand } from './forget.js';
+import { forgetCommand, forgetAllCommand } from './forget.js';
+import { listCommand } from './list.js';
+import { resetCommand } from './reset.js';
 import { editCommand } from './edit.js';
 import { exportCommand } from './export.js';
 import { importCommand } from './import.js';
@@ -118,11 +120,40 @@ program
   });
 
 program
-  .command('forget <id>')
-  .description('Soft-delete an observation by id (recoverable via export --include-deleted)')
+  .command('list')
+  .description('List stored memories for the current project')
+  .option('--kind <kind>', 'Filter by kind: decision | learning | bugfix | command | file_summary | other')
+  .option('-k, --limit <n>', 'Max results (default 50)', (v) => Number.parseInt(v, 10))
   .option('--json', 'Emit JSON')
-  .action((id: string, opts: { json?: boolean }) => {
+  .action((opts: { kind?: string; limit?: number; json?: boolean }) => {
+    const code = listCommand(opts);
+    process.exit(code);
+  });
+
+program
+  .command('forget [id]')
+  .description('Soft-delete an observation by id, or use --all to soft-delete everything')
+  .option('--all', 'Soft-delete all observations in the current project', false)
+  .option('--json', 'Emit JSON')
+  .action((id: string | undefined, opts: { all?: boolean; json?: boolean }) => {
+    if (opts.all) {
+      void forgetAllCommand(opts).then((code) => process.exit(code));
+      return;
+    }
+    if (!id) {
+      console.error('somtum: provide an <id> or use --all');
+      process.exit(1);
+    }
     const code = forgetCommand(id, opts);
+    process.exit(code);
+  });
+
+program
+  .command('reset')
+  .description('Permanently delete all memories for the current project (irreversible)')
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .action(async (opts: { yes?: boolean }) => {
+    const code = await resetCommand({ yes: opts.yes ?? false });
     process.exit(code);
   });
 

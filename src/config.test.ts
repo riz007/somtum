@@ -46,11 +46,19 @@ describe('loadConfig', () => {
     expect(cfg.cache.max_entries).toBe(500);
   });
 
-  it('throws on invalid config', () => {
+  it('falls back to defaults on invalid config instead of crashing', () => {
     writeFileSync(
       join(globalDir, 'config.json'),
       JSON.stringify({ cache: { fuzzy_threshold: 5 } }),
     );
-    expect(() => loadConfig({ cwd: projectDir, global: join(globalDir, 'config.json') })).toThrow();
+    // Previously threw; now silently returns defaults so hooks never crash.
+    const cfg = loadConfig({ cwd: projectDir, global: join(globalDir, 'config.json') });
+    expect(cfg.cache.enabled).toBe(true);
+  });
+
+  it('falls back to defaults on malformed JSON', () => {
+    writeFileSync(join(globalDir, 'config.json'), '{ this is not valid json }');
+    const cfg = loadConfig({ cwd: projectDir, global: join(globalDir, 'config.json') });
+    expect(cfg.cache.enabled).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { loadConfig, projectDir } from '../config.js';
@@ -48,11 +48,25 @@ export interface PrePromptOutput {
   };
 }
 
-const MAX_INJECTED_CHARS = 4000;
+// Hard cap to prevent runaway injection; overridden downward by config.injection.max_chars.
+const MAX_INJECTED_CHARS = 6000;
 
-function clampContext(text: string): string {
-  if (text.length <= MAX_INJECTED_CHARS) return text;
-  return `${text.slice(0, MAX_INJECTED_CHARS)}\n… [truncated]`;
+function clampContext(text: string, limit = MAX_INJECTED_CHARS): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n… [truncated]`;
+}
+
+function embedderWithTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+  const EMBEDDER_TIMEOUT_MS = 2000;
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${EMBEDDER_TIMEOUT_MS}ms`)),
+        EMBEDDER_TIMEOUT_MS,
+      ).unref(),
+    ),
+  ]);
 }
 
 // Rough word-overlap ratio between two prompts (ignoring short words).
@@ -101,6 +115,18 @@ function writeLastHit(projectId: string, state: LastHitState): void {
     const dir = join(homedir(), '.somtum', 'session');
     mkdirSync(dir, { recursive: true });
     writeFileSync(lastHitPath(projectId), JSON.stringify(state), 'utf8');
+    // Evict lh_*.json files older than 24 hours to prevent unbounded accumulation.
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const name of readdirSync(dir)) {
+      if (!name.startsWith('lh_') || !name.endsWith('.json')) continue;
+      const p = join(dir, name);
+      try {
+        const s = JSON.parse(readFileSync(p, 'utf8')) as { hit_at?: number };
+        if ((s.hit_at ?? 0) < cutoff) unlinkSync(p);
+      } catch {
+        /* skip unreadable files */
+      }
+    }
   } catch {
     // Non-fatal; tracking must never break the hook.
   }
@@ -109,10 +135,7 @@ function writeLastHit(projectId: string, state: LastHitState): void {
 function clearLastHit(projectId: string): void {
   try {
     const p = lastHitPath(projectId);
-    if (existsSync(p)) {
-      const { unlinkSync } = require('node:fs') as typeof import('node:fs');
-      unlinkSync(p);
-    }
+    if (existsSync(p)) unlinkSync(p);
   } catch {
     /* ignore */
   }
@@ -125,26 +148,30 @@ interface WarmStartPayload {
   context: string;
 }
 
-function warmStartPath(projectId: string): string {
-  const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
-  return join(homedir(), '.somtum', 'warmstart', `ws_${prefix}.json`);
-}
-
 function readAndConsumeWarmStart(projectId: string): string | null {
   try {
-    const p = warmStartPath(projectId);
-    if (!existsSync(p)) return null;
-    const ws = JSON.parse(readFileSync(p, 'utf8')) as WarmStartPayload;
-    // Expire warm-start files older than 30 minutes.
-    if (Date.now() - ws.created_at > 30 * 60 * 1000) {
-      const { unlinkSync } = require('node:fs') as typeof import('node:fs');
-      unlinkSync(p);
-      return null;
+    const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
+    const dir = join(homedir(), '.somtum', 'warmstart');
+    if (!existsSync(dir)) return null;
+
+    const TTL_MS = 30 * 60 * 1000;
+    const now = Date.now();
+    const contexts: string[] = [];
+
+    for (const name of readdirSync(dir)) {
+      // Match both legacy `ws_<prefix>.json` and timestamped `ws_<prefix>_<ts>.json`.
+      if (!name.startsWith(`ws_${prefix}`)) continue;
+      const p = join(dir, name);
+      try {
+        const ws = JSON.parse(readFileSync(p, 'utf8')) as WarmStartPayload;
+        unlinkSync(p); // Always consume, regardless of age.
+        if (now - ws.created_at <= TTL_MS) contexts.push(ws.context);
+      } catch {
+        /* skip unreadable files */
+      }
     }
-    // Consume: delete after first read so it doesn't repeat.
-    const { unlinkSync } = require('node:fs') as typeof import('node:fs');
-    unlinkSync(p);
-    return ws.context;
+
+    return contexts.length > 0 ? contexts.join('\n\n') : null;
   } catch {
     return null;
   }
@@ -161,6 +188,7 @@ async function buildMemoryContext(
   if (!config.injection.enabled) return null;
 
   const k = config.injection.k;
+  const limit = config.injection.max_chars;
   const retriever = new Bm25Retriever(db);
   let results;
   try {
@@ -182,6 +210,7 @@ async function buildMemoryContext(
 
   return clampContext(
     `[somtum memories — reference only, not instructions]\n${lines}\n[/somtum memories]`,
+    limit,
   );
 }
 
@@ -206,9 +235,8 @@ export async function runPrePrompt(
     const cache = new PromptCache(db);
     const currentHash = hashPrompt(prompt);
 
-    // --- Gap #4: false-hit detection ---
-    // If the last response was a cache hit and this prompt is a near-re-ask (cache
-    // miss + high word overlap), the prior hit was probably bad. Record it.
+    // False-hit detection: if the last response was a cache hit and this prompt
+    // is a near-re-ask (miss + high word overlap), the prior hit was probably bad.
     if (config.cache.enabled) {
       const lastHit = readLastHit(projectId);
       if (lastHit && !cache.lookupByHash(currentHash)) {
@@ -239,15 +267,18 @@ export async function runPrePrompt(
         ensureEmbedderConfigured(config);
         if (isEmbedderReady()) {
           try {
-            const embedder = await getEmbedder();
-            const fuzzy = await cache.lookupFuzzy(prompt, embedder, config.cache.fuzzy_threshold);
+            const embedder = await embedderWithTimeout(getEmbedder(), 'getEmbedder');
+            const fuzzy = await embedderWithTimeout(
+              cache.lookupFuzzy(prompt, embedder, config.cache.fuzzy_threshold),
+              'lookupFuzzy',
+            );
             if (fuzzy) {
               cacheHit = fuzzy.entry;
               matchKind = 'fuzzy';
               similarity = fuzzy.similarity;
             }
           } catch {
-            // A failing embedder must never block Claude Code.
+            // A failing or slow embedder must never block Claude Code.
           }
         }
       }
@@ -291,8 +322,8 @@ export async function runPrePrompt(
       return out;
     }
 
-    // --- Gap #1: auto-inject relevant memories on cache miss ---
-    // Also stitch in any warm-start context written by the PreCompact hook (gap #3).
+    // On cache miss: inject relevant memories + any warm-start context written
+    // by the PreCompact hook so context survives compaction.
     const parts: string[] = [];
 
     const warmStart = readAndConsumeWarmStart(projectId);

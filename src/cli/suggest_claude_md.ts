@@ -7,7 +7,7 @@ import { resolveProjectId } from '../core/project_id.js';
 import { projectDir } from '../config.js';
 import type { Observation, ObservationKind } from '../core/schema.js';
 
-// Gap #6: Suggest CLAUDE.md additions based on accumulated observations.
+// Suggest CLAUDE.md additions based on accumulated observations.
 // Interactive and off by default — user must explicitly run this command.
 
 const KIND_HEADER: Record<ObservationKind, string> = {
@@ -52,10 +52,12 @@ export async function suggestClaudeMdCommand(opts: {
   limit?: number;
   yes?: boolean;
   dry?: boolean;
+  dbPath?: string;
+  projectId?: string;
 }): Promise<number> {
   const cwd = opts.cwd ?? process.cwd();
-  const projectId = resolveProjectId(cwd);
-  const dbPath = join(projectDir(projectId), 'db.sqlite');
+  const projectId = opts.projectId ?? resolveProjectId(cwd);
+  const dbPath = opts.dbPath ?? join(projectDir(projectId), 'db.sqlite');
 
   if (!existsSync(dbPath)) {
     console.error('somtum: no database found — run `somtum init` first');

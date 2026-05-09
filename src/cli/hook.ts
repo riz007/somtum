@@ -74,9 +74,16 @@ export async function hookCommand(name: string): Promise<number> {
           }),
         );
       } catch (err) {
-        hookLog(`[post_session] ERROR: ${(err as Error).message}`);
+        const msg = (err as Error).message;
+        hookLog(`[post_session] ERROR: ${msg}`);
         // Exit 0: hook failures must not break the user's Claude Code session.
-        console.error(`[somtum] post_session failed: ${(err as Error).message}`);
+        if (/401|403|authentication|api.?key/i.test(msg)) {
+          console.error(
+            `[somtum] post_session failed: ${msg}\n  Hint: check that ANTHROPIC_API_KEY is set and valid.`,
+          );
+        } else {
+          console.error(`[somtum] post_session failed: ${msg}`);
+        }
       }
       return 0;
     }
@@ -84,6 +91,11 @@ export async function hookCommand(name: string): Promise<number> {
       try {
         const payload = PrePromptPayloadSchema.parse(parsed);
         const output = await raceTimeout(runPrePrompt(payload), timeoutMs, 'pre_prompt');
+        if (output.hookSpecificOutput && !output.hit) {
+          hookLog('[pre_prompt] injected memories into context');
+        } else if (output.hit) {
+          hookLog(`[pre_prompt] cache hit kind=${output.matchKind ?? 'exact'}`);
+        }
         console.log(JSON.stringify(output));
       } catch (err) {
         console.error(`[somtum] pre_prompt failed: ${(err as Error).message}`);

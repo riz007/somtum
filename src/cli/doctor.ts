@@ -139,7 +139,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
     const cacheCount = cache.count();
     checks.push({ name: 'cache_entries', ok: true, detail: `${cacheCount} entries` });
 
-    // 10. Embeddings status
+    // 11. Embeddings status
     checks.push({
       name: 'embeddings',
       ok: true,

@@ -27,3 +27,6 @@ export {
 } from './config.js';
 export * from './core/schema.js';
 export { suggestClaudeMdCommand } from './cli/suggest_claude_md.js';
+export { listCommand } from './cli/list.js';
+export { resetCommand } from './cli/reset.js';
+export { forgetAllCommand } from './cli/forget.js';

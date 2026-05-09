@@ -190,8 +190,8 @@ async function populateFileSummaries(
   return generated;
 }
 
-// Gap #3: write a warm-start context file after PreCompact so the next
-// UserPromptSubmit hook can inject the top memories into the fresh context.
+// Write top-k memories to a warm-start file after PreCompact so the next
+// UserPromptSubmit can restore context into the fresh post-compaction session.
 function writeWarmStart(db: DB, projectId: string, k = 8): void {
   try {
     const retriever = new Bm25Retriever(db);
@@ -212,7 +212,8 @@ function writeWarmStart(db: DB, projectId: string, k = 8): void {
       const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
       const dir = join(homedir(), '.somtum', 'warmstart');
       mkdirSync(dir, { recursive: true });
-      const path = join(dir, `ws_${prefix}.json`);
+      // Include a timestamp so concurrent windows on the same project don't clobber each other.
+      const path = join(dir, `ws_${prefix}_${Date.now()}.json`);
       writeFileSync(
         path,
         JSON.stringify({ project_id: projectId, created_at: Date.now(), context }),
@@ -267,7 +268,21 @@ export async function runPostSession(
     const store = new MemoryStore(db);
 
     const resolved = resolveTranscript(parsed);
-    const transcript = resolved.text;
+    // Cap transcript size to stay within model context limits.
+    // At ~4 chars/token, 60k tokens ≈ 240 KB of text. Anything beyond that
+    // risks a context-limit error in Haiku; we take the tail (most recent turns).
+    const MAX_TRANSCRIPT_TOKENS = 60_000;
+    const rawTranscript = resolved.text;
+    const transcript =
+      countTokens(rawTranscript) > MAX_TRANSCRIPT_TOKENS
+        ? (() => {
+            const charBudget = MAX_TRANSCRIPT_TOKENS * 4;
+            hookLog(
+              `[post_session] WARN: transcript truncated to last ~${charBudget} chars (was ${rawTranscript.length})`,
+            );
+            return rawTranscript.slice(-charBudget);
+          })()
+        : rawTranscript;
     const transcriptTokens = countTokens(transcript);
 
     // Prefer the direct API when a key is present (faster, explicit model choice).
@@ -355,8 +370,6 @@ export async function runPostSession(
       now: opts.now ?? Date.now(),
     });
 
-    // Gap #3: after PreCompact capture, write a warm-start file so the next
-    // UserPromptSubmit hook can restore context into the fresh conversation.
     if (parsed.hook_event_name === 'PreCompact') {
       writeWarmStart(db, projectId);
     }

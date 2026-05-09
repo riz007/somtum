@@ -31,7 +31,6 @@ export const RememberInput = z.object({
   scope: ObservationScope.default('project'),
 });
 
-// Gap #2: update an existing observation (title/body/tags/files) via MCP.
 export const UpdateInput = z.object({
   id: z.string().min(1),
   title: z.string().min(1).max(80).optional(),
@@ -40,7 +39,6 @@ export const UpdateInput = z.object({
   files: z.array(z.string()).optional(),
 });
 
-// Gap #4: explicit false-hit reporting from the agent.
 export const ReportFalseHitInput = z.object({
   cache_entry_id: z.string().min(1),
 });
@@ -52,6 +50,8 @@ export const CacheLookupInput = z.object({
 export const ForgetInput = z.object({
   id: z.string().min(1),
 });
+
+export const ForgetAllInput = z.object({});
 
 export const StatsInput = z.object({});
 
@@ -152,16 +152,22 @@ export function remember(ctx: ToolContext, input: z.infer<typeof RememberInput>)
     },
     { redactPatterns: ctx.config.privacy.redact_patterns },
   );
-  return {
+  const result: Record<string, unknown> = {
     id: obs.id,
     title: obs.title,
     kind: obs.kind,
     scope: obs.scope,
     tokens: countTokens(obs.title) + countTokens(obs.body),
   };
+  if (obs.scope === 'workspace' || obs.scope === 'global') {
+    result.notice =
+      `Stored with scope='${obs.scope}'. Cross-project auto-injection is not yet active ` +
+      `(coming in v1.4). This memory will appear in recall() results for any project but ` +
+      `will not be injected automatically into other project prompts.`;
+  }
+  return result;
 }
 
-// Gap #2: update an existing observation's mutable fields.
 export function update(ctx: ToolContext, input: z.infer<typeof UpdateInput>): object {
   const store = new MemoryStore(ctx.db);
   const updated = store.update(
@@ -185,8 +191,6 @@ export function update(ctx: ToolContext, input: z.infer<typeof UpdateInput>): ob
   };
 }
 
-// Gap #4: explicit false-hit reporting — agent calls this when the cached
-// response did not answer the question (e.g. user had to rephrase).
 export function reportFalseHit(
   ctx: ToolContext,
   input: z.infer<typeof ReportFalseHitInput>,
@@ -221,6 +225,16 @@ export function forget(ctx: ToolContext, input: z.infer<typeof ForgetInput>): ob
   const store = new MemoryStore(ctx.db);
   const ok = store.softDelete(input.id);
   return { ok, tokens: 0 };
+}
+
+export function forgetAll(ctx: ToolContext): object {
+  const store = new MemoryStore(ctx.db);
+  const observations = store.listByProject(ctx.projectId);
+  let deleted = 0;
+  for (const o of observations) {
+    if (store.softDelete(o.id)) deleted++;
+  }
+  return { ok: true, deleted, tokens: 0 };
 }
 
 export function stats(ctx: ToolContext): object {

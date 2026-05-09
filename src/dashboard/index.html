@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Somtum — Memory</title>
+    <title>Somtum v1.4.0 — Memory</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -572,6 +572,22 @@
       .kf-file_summary { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.06); color: #38bdf8; }
       .kf-other      { border-color: rgba(107,99,80,0.3);   background: rgba(107,99,80,0.07);   color: #9e9278; }
       .kf-all        { border-color: rgba(240,160,48,0.35); background: rgba(240,160,48,0.08);  color: #f0a030; }
+
+      /* Scope badge on memory cards */
+      .mc-scope {
+        font-size: 8px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        padding: 1px 5px; border-radius: 3px;
+        background: rgba(167,139,250,0.12);
+        color: #a78bfa;
+        border: 1px solid rgba(167,139,250,0.25);
+        flex-shrink: 0;
+      }
+      .mc-scope.global {
+        background: rgba(240,160,48,0.12);
+        color: #f0a030;
+        border-color: rgba(240,160,48,0.25);
+      }
     </style>
   </head>
   <body>
@@ -764,7 +780,7 @@
       // ─── Strategy buttons ─────────────────────────────────────────────────────────
       function buildStrategyBtns() {
         const wrap = document.getElementById('strategy-btns');
-        ['bm25', 'hybrid', 'embeddings'].forEach((s) => {
+        ['bm25', 'hybrid', 'embeddings', 'index'].forEach((s) => {
           const btn = h('button', {
             class: 'strat-btn' + (s === S.strategy ? ' active' : ''),
             onclick: () => {
@@ -860,9 +876,13 @@
         );
         const preview = m.body ? h('div', { class: 'mc-body' }, m.body) : null;
         const tags = (m.tags || []).slice(0, 3).map((t) => h('span', { class: 'mc-tag' }, t));
+        const scopeBadge = m.scope && m.scope !== 'project'
+          ? h('span', { class: 'mc-scope' + (m.scope === 'global' ? ' global' : ''), title: m.scope + ' scope' }, m.scope)
+          : null;
         const footer = h('div', { class: 'mc-footer' },
           h('span', { class: 'mc-time' }, relTime(m.created_at)),
           h('div', { class: 'mc-tags' }, ...tags),
+          scopeBadge,
         );
         card.append(forget, head);
         if (preview) card.append(preview);
@@ -913,6 +933,8 @@
             h('span', {}, relTime(m.created_at)),
             saved ? h('span', { style: 'color:var(--accent-g)' }, saved) : null,
             spent ? h('span', {}, spent) : null,
+            m.scope && m.scope !== 'project' ? h('span', { style: 'color:var(--accent-v)' }, 'scope: ' + m.scope) : null,
+            m.last_confirmed_at ? h('span', {}, 'confirmed ' + relTime(m.last_confirmed_at)) : null,
           ),
           h('div', { class: 'detail-body' }, m.body || ''),
           fileChips.length || tagChips.length
@@ -1046,10 +1068,11 @@
         const cc = fs.cache || {};
         const cacheCard = card('Cache performance');
         [
-          ['Hit rate', cc.hit_rate != null ? (cc.hit_rate * 100).toFixed(1) + '%' : '—', 'var(--accent-g)'],
-          ['Hits',    cc.hit_count ?? 0,  'var(--accent-g)'],
-          ['Misses',  cc.miss_count ?? 0, 'var(--muted2)'],
-          ['Entries', cc.entry_count ?? 0, 'var(--accent-c)'],
+          ['Hit rate',   cc.hit_rate != null ? (cc.hit_rate * 100).toFixed(1) + '%' : '—', 'var(--accent-g)'],
+          ['Hits',       cc.hit_count ?? 0,       'var(--accent-g)'],
+          ['Misses',     cc.miss_count ?? 0,      'var(--muted2)'],
+          ['Entries',    cc.entry_count ?? 0,     'var(--accent-c)'],
+          ['False hits', cc.false_hit_count ?? 0, 'var(--accent-r)'],
         ].forEach(([lbl, val, color]) => {
           cacheCard.append(h('div', { class: 'cache-stat' },
             h('span', { class: 'cache-stat-lbl' }, lbl),
@@ -1085,6 +1108,26 @@
         });
         if (!tf.length) tfCard.append(h('div', { class: 'empty' }, h('div', { class: 'empty-sub' }, 'No file references yet')));
         grid.append(wrap(tfCard));
+
+        // 5. Memory health
+        const mems = S.data?.memories ?? [];
+        const staleThreshold = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const staleCount = mems.filter((m) => !m.last_confirmed_at || new Date(m.last_confirmed_at).getTime() < staleThreshold).length;
+        const workspaceCount = mems.filter((m) => m.scope === 'workspace').length;
+        const globalCount = mems.filter((m) => m.scope === 'global').length;
+        const healthCard = card('Memory health');
+        [
+          ['Total',        mems.length,    'var(--text)'],
+          ['Stale (>30d)', staleCount,     'var(--accent-r)'],
+          ['Workspace',    workspaceCount, 'var(--accent-v)'],
+          ['Global',       globalCount,    'var(--accent)'],
+        ].forEach(([lbl, val, color]) => {
+          healthCard.append(h('div', { class: 'cache-stat' },
+            h('span', { class: 'cache-stat-lbl' }, lbl),
+            h('span', { class: 'cache-stat-val', style: `color:${color}` }, String(val)),
+          ));
+        });
+        grid.append(wrap(healthCard));
       }
 
       function card(title) {

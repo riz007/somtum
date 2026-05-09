@@ -61,6 +61,7 @@ describe('MCP server', () => {
         [
           'cache_lookup',
           'forget',
+          'forget_all',
           'get',
           'recall',
           'remember',

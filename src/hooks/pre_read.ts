@@ -79,7 +79,12 @@ export function runPreRead(payload: PreReadPayload, opts: PreReadOptions = {}): 
     return { ok: true, gated: false, reason: 'excluded' };
   }
 
-  const stat = statFile(path, { cwd });
+  let stat: ReturnType<typeof statFile>;
+  try {
+    stat = statFile(path, { cwd });
+  } catch {
+    return { ok: true, gated: false, reason: 'file-missing' };
+  }
   if (!stat) return { ok: true, gated: false, reason: 'file-missing' };
   if (stat.tokens < config.file_gating.min_file_size_tokens) {
     return { ok: true, gated: false, reason: 'below-threshold' };

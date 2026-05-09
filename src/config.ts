@@ -9,9 +9,13 @@ export const PROJECT_CONFIG_RELATIVE = join('.somtum', 'config.json');
 
 function readJsonIfExists(path: string): unknown {
   if (!existsSync(path)) return undefined;
-  const raw = readFileSync(path, 'utf8');
-  if (raw.trim() === '') return undefined;
-  return JSON.parse(raw);
+  try {
+    const raw = readFileSync(path, 'utf8');
+    if (raw.trim() === '') return undefined;
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
 }
 
 function deepMerge<T>(base: T, over: unknown): T {
@@ -41,11 +45,16 @@ export function loadConfig(options: LoadOptions = {}): Config {
   const cwd = options.cwd ?? process.cwd();
   const globalPath = options.global ?? GLOBAL_CONFIG_PATH;
 
-  const globalRaw = (readJsonIfExists(globalPath) ?? {}) as ConfigInput;
-  const projectRaw = (readJsonIfExists(join(cwd, PROJECT_CONFIG_RELATIVE)) ?? {}) as ConfigInput;
-
-  const merged = deepMerge<ConfigInput>(globalRaw, projectRaw);
-  return ConfigSchema.parse(merged);
+  try {
+    const globalRaw = (readJsonIfExists(globalPath) ?? {}) as ConfigInput;
+    const projectRaw = (readJsonIfExists(join(cwd, PROJECT_CONFIG_RELATIVE)) ?? {}) as ConfigInput;
+    const merged = deepMerge<ConfigInput>(globalRaw, projectRaw);
+    return ConfigSchema.parse(merged);
+  } catch {
+    // Malformed or invalid config — silently fall back to defaults so hooks never crash.
+    // Run `somtum doctor` to surface the error.
+    return ConfigSchema.parse({});
+  }
 }
 
 export function ensureGlobalDir(): string {

@@ -398,6 +398,7 @@
       <div class="nav-links">
         <a href="#features">Flavors</a>
         <a href="#sync">Multi-Device</a>
+        <a href="#install">Install</a>
         <a href="https://github.com/riz007/somtum" class="nav-gh" target="_blank" rel="noopener">
           GitHub
         </a>
@@ -408,7 +409,7 @@
     <section id="hero">
       <div class="container">
         <div class="hero-tagline fade-up">
-          🥗 FRESHLY BLENDED FOR CLAUDE CODE
+          🥗 v1.4.0 — FRESHLY BLENDED FOR CLAUDE CODE
         </div>
         <h1 class="fade-up">The long-term memory<br /><span class="gradient">your agent craves.</span></h1>
         <p class="hero-sub fade-up">
@@ -429,14 +430,6 @@
           <div class="terminal-body">
             <div class="t-dim">$ somtum stats</div>
             <br>
-            <div class="t-green">   _____ ____  __  __________  __  ___</div>
-            <div class="t-red">  / ___/ / __ \/  |/  /_  __/ / / /  |/  /</div>
-            <div class="t-orange">  \__ \ / / / / /|_/ / / / / / / / /|_/ / </div>
-            <div class="t-green"> ___/ / /_/ / /  / / / / / /_/ / /  / /  </div>
-            <div class="t-red">/____/ \____/ /_/  /_/ /_/  \____/ /_/  /_/   </div>
-            <br>
-            <div class="t-orange">Local-first memory for Claude Code</div>
-            <br>
             <div class="t-dim">----------------------------------------</div>
             <div>project        <span class="t-blue">e394f483</span></div>
             <div>memories       <span class="t-green">142</span></div>
@@ -444,7 +437,12 @@
             <div>tokens saved   <span class="t-orange">42.5k (estimated)</span></div>
             <div>breakeven      <span class="t-green">4.2x (zesty!)</span></div>
             <br>
-            <div class="t-dim">$ somtum sync push<span class="cursor"></span></div>
+            <div class="t-dim">$ somtum list --limit 3</div>
+            <div>  <span class="t-orange">[decision]</span> Use WAL mode for SQLite writes    <span class="t-dim">2h ago</span></div>
+            <div>  <span class="t-red">[bugfix]  </span> Fix deadlock on missing API key     <span class="t-dim">1d ago</span></div>
+            <div>  <span class="t-blue">[learning]</span> BM25 outperforms embeddings &lt;50 obs <span class="t-dim">3d ago</span></div>
+            <br>
+            <div class="t-dim">$ somtum serve<span class="cursor"></span></div>
           </div>
         </div>
       </div>
@@ -483,9 +481,40 @@
             <span class="flavor-icon">🥕</span>
             <h3 class="flavor-title">Local Mortar & Pestle</h3>
             <p class="flavor-desc">
-              Everything is pounded into a local SQLite WAL database. 
-              No cloud accounts, no telemetry, no leaks. Your data stays 
+              Everything is pounded into a local SQLite WAL database.
+              No cloud accounts, no telemetry, no leaks. Your data stays
               as private as your secret recipe.
+            </p>
+          </div>
+
+          <div class="flavor-card fade-up" style="--card-glow: var(--lime); transition-delay: 300ms;">
+            <span class="flavor-icon">⚡</span>
+            <h3 class="flavor-title">Auto-Inject on Every Prompt</h3>
+            <p class="flavor-desc">
+              The UserPromptSubmit hook automatically retrieves the most relevant
+              memories and injects them before each message — no manual recall
+              needed. Configurable per-project with <code style="font-family: var(--mono); font-size: 0.9em;">injection.max_chars</code>.
+            </p>
+          </div>
+
+          <div class="flavor-card fade-up" style="--card-glow: var(--papaya); transition-delay: 400ms;">
+            <span class="flavor-icon">📊</span>
+            <h3 class="flavor-title">Visual Memory Dashboard</h3>
+            <p class="flavor-desc">
+              Run <code style="font-family: var(--mono); font-size: 0.9em;">somtum serve</code> to open a local web dashboard.
+              Browse your knowledge graph, search with BM25 or embeddings,
+              and track cache performance — all in one place.
+            </p>
+          </div>
+
+          <div class="flavor-card fade-up" style="--card-glow: var(--chili); transition-delay: 500ms;">
+            <span class="flavor-icon">🗂️</span>
+            <h3 class="flavor-title">Full Memory Lifecycle</h3>
+            <p class="flavor-desc">
+              List, filter, and manage memories with <code style="font-family: var(--mono); font-size: 0.9em;">somtum list</code>,
+              bulk-delete with <code style="font-family: var(--mono); font-size: 0.9em;">forget --all</code>,
+              or wipe everything clean with <code style="font-family: var(--mono); font-size: 0.9em;">somtum reset</code>.
+              Full control, no surprises.
             </p>
           </div>
         </div>
@@ -552,6 +581,7 @@
         <div class="footer-links">
           <a href="https://github.com/riz007/somtum">GitHub</a>
           <a href="https://github.com/riz007/somtum/blob/main/README.md">Docs</a>
+          <a href="https://github.com/riz007/somtum/blob/main/CHANGELOG.md">Changelog</a>
           <a href="https://github.com/riz007/somtum/blob/main/CONTRIBUTING.md">Contribute</a>
         </div>
         <div class="footer-copy">

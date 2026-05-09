@@ -33,6 +33,8 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
+> **v1.4.0** — `somtum list`, `somtum reset`, `somtum forget --all` · embeddings timeout safety · config crash-resilience · injection.max_chars wired up · warm-start race fix · auth-error hints
+>
 > **v1.3.0** — Auto-inject memories on every prompt · `update` MCP tool · warm-start after compaction · false-hit detection · workspace scope · `suggest-claude-md` · stale memory detection in `doctor`
 
 ---
@@ -389,12 +391,17 @@ Press `Ctrl-C` to stop.
 
 | Command                                      | Description                                                                   |
 | -------------------------------------------- | ----------------------------------------------------------------------------- |
+| `somtum list`                                | List stored memories (most recent first)                                      |
+| `somtum list --kind decision`                | Filter by kind: `decision \| learning \| bugfix \| command \| file_summary`   |
+| `somtum list --limit 20`                     | Limit to 20 results                                                           |
+| `somtum list --json`                         | Machine-readable JSON output                                                  |
 | `somtum search <query>`                      | Search observations (default: `bm25` strategy)                                |
 | `somtum search <query> --strategy hybrid`    | Force a specific retrieval strategy                                           |
 | `somtum search <query> -k 16`                | Return more results                                                           |
 | `somtum show <id>`                           | Print the full body of an observation                                         |
 | `somtum remember`                            | Manually store an observation                                                 |
-| `somtum forget <id>`                         | Soft-delete an observation                                                    |
+| `somtum forget <id>`                         | Soft-delete an observation by id                                              |
+| `somtum forget --all`                        | Soft-delete **all** observations in the current project                       |
 | `somtum edit <id>`                           | Open an observation body in `$EDITOR`                                         |
 | `somtum rebuild`                             | Regenerate `index.md` from all observations                                   |
 | `somtum reindex`                             | Recompute embeddings (after enabling embeddings or changing model)            |
@@ -414,15 +421,17 @@ Press `Ctrl-C` to stop.
 
 ### Data Management
 
-| Command                                           | Description                                         |
-| ------------------------------------------------- | --------------------------------------------------- |
-| `somtum export`                                   | Export observations to stdout as JSON               |
-| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file                                |
-| `somtum export --format markdown`                 | Export as readable Markdown                         |
-| `somtum export --include-deleted`                 | Include soft-deleted entries                        |
-| `somtum import <file>`                            | Import observations from JSON or JSONL              |
-| `somtum purge --older-than 30d`                   | Hard-delete soft-deleted entries older than 30 days |
-| `somtum purge --older-than 30d --dry-run`         | Preview without deleting                            |
+| Command                                           | Description                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
+| `somtum export`                                   | Export observations to stdout as JSON                                     |
+| `somtum export --format jsonl --output obs.jsonl` | Export as JSONL file                                                      |
+| `somtum export --format markdown`                 | Export as readable Markdown                                               |
+| `somtum export --include-deleted`                 | Include soft-deleted entries                                              |
+| `somtum import <file>`                            | Import observations from JSON or JSONL                                    |
+| `somtum purge --older-than 30d`                   | Hard-delete soft-deleted entries older than 30 days                       |
+| `somtum purge --older-than 30d --dry-run`         | Preview without deleting                                                  |
+| `somtum reset`                                    | **Permanently** wipe all memories for the current project (asks to confirm) |
+| `somtum reset --yes`                              | Skip confirmation (useful in CI or scripts)                               |
 
 ### Configuration
 
@@ -485,19 +494,21 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 
 ```
 ~/.somtum/
-├── config.json                    ← global config (merged with project config)
-├── hook.log                       ← timestamped log of every hook execution
+├── config.json                         ← global config (merged with project config)
+├── hook.log                            ← timestamped log of every hook execution
 ├── session/
-│   └── lh_<id>.json               ← last cache-hit state per project (false-hit detection)
+│   └── lh_<id>.json                    ← last cache-hit state per project (false-hit detection)
+│                                         files older than 24 h are evicted automatically
 ├── warmstart/
-│   └── ws_<id>.json               ← warm-start context written after PreCompact (30 min TTL)
+│   └── ws_<id>_<timestamp>.json        ← warm-start context written after PreCompact (30 min TTL)
+│                                         timestamped so concurrent windows don't clobber each other
 └── projects/
     └── <project_id>/
-        ├── db.sqlite              ← source of truth (SQLite WAL)
-        ├── index.md               ← human-readable mirror (regenerated)
+        ├── db.sqlite                   ← source of truth (SQLite WAL)
+        ├── index.md                    ← human-readable mirror (regenerated)
         └── memories/
             └── YYYY-MM/
-                └── <ulid>.md      ← per-observation markdown files
+                └── <ulid>.md           ← per-observation markdown files
 ```
 
 The project ID is derived from the git remote URL (or directory path if no remote). The same project maps to the same ID across machines as long as the remote URL matches.
@@ -533,7 +544,7 @@ somtum config set extraction.max_observations_per_session 5
 # Control automatic memory injection on every prompt (default: on)
 somtum config set injection.enabled false          # turn off auto-inject
 somtum config set injection.k 8                    # inject more memories (default: 5)
-somtum config set injection.max_chars 5000         # raise injection size cap
+somtum config set injection.max_chars 5000         # raise injection size cap (default: 3000)
 ```
 
 ### Full config reference
@@ -658,6 +669,8 @@ src/
     doctor.ts         # somtum doctor — health checks
     hook.ts           # internal: dispatches hook events by name
     search.ts / show.ts / forget.ts / edit.ts
+    list.ts               # somtum list
+    reset.ts              # somtum reset — wipe project DB
     export.ts / import.ts / purge.ts / sync.ts / rebuild.ts / reindex.ts
     config_cmd.ts
     suggest_claude_md.ts  # somtum suggest-claude-md
@@ -816,7 +829,7 @@ BM25 works fully offline and is fast at any corpus size.
 
 ### Stale memory warning in `somtum doctor`
 
-`doctor` now warns when memories are older than 90 days with no confirmed retrievals. These are observations that have never come up in a search. Options:
+`doctor` warns when memories are older than 90 days with no confirmed retrievals. These are observations that have never come up in a search. Options:
 
 ```bash
 # Review them before deciding
@@ -827,6 +840,24 @@ remember("...", scope="workspace")
 
 # Remove irrelevant ones
 somtum purge --older-than 90d
+```
+
+---
+
+### Starting fresh — wiping all memories
+
+To hard-reset a project's memory (irreversible):
+
+```bash
+somtum reset
+# Permanently delete all memories for this project? [y/N] y
+# somtum: reset complete — project <id> wiped.
+```
+
+To just clear everything softly (recoverable via `somtum export --include-deleted`):
+
+```bash
+somtum forget --all
 ```
 
 ---
