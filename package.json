@@ -1,6 +1,6 @@
 {
   "name": "somtum",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Local-first memory and prompt-cache layer for Claude Code",
   "type": "module",
   "license": "MIT",
