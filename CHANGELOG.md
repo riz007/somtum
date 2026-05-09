@@ -1,5 +1,11 @@
 # somtum
 
+## 1.3.4
+
+### Patch Changes
+
+- 2f3d528: update README.md with install
+
 ## 1.3.3
 
 ### Patch Changes
