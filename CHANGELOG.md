@@ -1,5 +1,11 @@
 # somtum
 
+## 1.3.2
+
+### Patch Changes
+
+- fb3cf70: fix: version no longer hardcoded to 1.0.0; fix hook deadlock when ANTHROPIC_API_KEY is unset
+
 ## 1.3.1
 
 ### Patch Changes
