@@ -2,4 +2,4 @@
 'somtum': patch
 ---
 
-improve the somtum serve webpage UI and update README.md for developers
+fix: version no longer hardcoded to 1.0.0; fix hook deadlock when ANTHROPIC_API_KEY is unset

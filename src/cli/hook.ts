@@ -36,6 +36,13 @@ function hookLog(msg: string): void {
 }
 
 export async function hookCommand(name: string): Promise<number> {
+  // Prevent re-entrant hook execution when somtum itself spawns `claude -p`
+  // during extraction. Without this guard the child claude process fires
+  // SessionEnd → somtum hook post_session again, causing a deadlock.
+  if (process.env['SOMTUM_IN_HOOK']) {
+    return 0;
+  }
+
   const raw = await readToEnd(process.stdin);
   let parsed: unknown;
   try {

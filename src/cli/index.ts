@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { initCommand } from './init.js';
 import { statsCommand } from './stats.js';
@@ -19,12 +20,15 @@ import { serveCommand } from './serve.js';
 import { runMcpServer } from '../mcp/server.js';
 import { printLogo } from './ui.js';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../../package.json') as { version: string };
+
 const program = new Command();
 
 program
   .name('somtum')
   .description('Local-first memory and prompt-cache layer for Claude Code')
-  .version('1.0.0');
+  .version(version);
 
 // Show logo unless it's an internal hook call or MCP server.
 const isInternal = process.argv.includes('hook') || process.argv.includes('mcp');
