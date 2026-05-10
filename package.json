@@ -72,7 +72,10 @@
     "lint": "eslint \"src/**/*.ts\"",
     "fmt": "prettier --write \"src/**/*.{ts,json,md}\" \"*.{md,json}\"",
     "dev:hook:post_session": "tsx src/hooks/post_session.ts",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
@@ -98,6 +101,7 @@
     "prettier": "^3.3.3",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
-    "vitest": "^2.1.1"
+    "vitest": "^2.1.1",
+    "vitepress": "^1.5.0"
   }
 }

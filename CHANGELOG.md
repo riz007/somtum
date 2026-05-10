@@ -14,6 +14,10 @@
   - **Warm-start race fix** — Warm-start files now use a `ws_<id>_<timestamp>.json` naming scheme so two Claude Code windows open on the same project no longer clobber each other's post-compaction context.
   - **Auth-error hint in hook log** — When `post_session` fails with a 401/403 or auth-related error, the hook now prints a specific hint (`check that ANTHROPIC_API_KEY is set and valid`) to stderr instead of a generic error message.
 
+### Patch Changes
+
+- Add multi-page VitePress documentation site under `docs/` covering getting started, how it works, CLI reference, configuration, MCP server, storage layout, dashboard, privacy & performance, troubleshooting, and contributing. Adds `docs:dev`, `docs:build`, and `docs:preview` scripts.
+
 ## 1.4.0
 
 ### Minor Changes
