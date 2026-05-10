@@ -35,7 +35,7 @@ describe('runPreRead', () => {
   it('passes through when gating is disabled', () => {
     const r = runPreRead(
       { tool_name: 'Read', tool_input: { file_path: 'anything' }, cwd: tmp },
-      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+      { db, config: ConfigSchema.parse({ file_gating: { enabled: false } }), projectId: 'p1' },
     );
     expect(r.gated).toBe(false);
     expect(r.reason).toBe('gating-disabled');

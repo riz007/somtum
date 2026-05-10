@@ -133,10 +133,7 @@ export const ConfigSchema = z.object({
     .default({}),
   retrieval: z
     .object({
-      // Default is hybrid; it degrades to BM25 automatically when embeddings
-      // are disabled or the model hasn't been downloaded yet, so it's safe
-      // as a default even on fresh installs.
-      strategy: RetrievalStrategy.default('hybrid'),
+      strategy: RetrievalStrategy.default('bm25'),
       k: z.number().int().positive().default(8),
       rerank_model: z.string().default('claude-haiku-4-5-20251001'),
       bm25: z.object({ enabled: z.boolean().default(true) }).default({}),
@@ -156,8 +153,8 @@ export const ConfigSchema = z.object({
     .default({}),
   file_gating: z
     .object({
-      enabled: z.boolean().default(false),
-      min_file_size_tokens: z.number().int().positive().default(500),
+      enabled: z.boolean().default(true),
+      min_file_size_tokens: z.number().int().positive().default(300),
       exclude_globs: z.array(z.string()).default(['**/*.env', '**/secrets/**']),
     })
     .default({}),
@@ -184,10 +181,13 @@ export const ConfigSchema = z.object({
     .default({}),
   injection: z
     .object({
-      // Auto-inject top-k relevant memories into every UserPromptSubmit context.
       enabled: z.boolean().default(true),
-      k: z.number().int().positive().default(5),
-      max_chars: z.number().int().positive().default(3000),
+      k: z.number().int().positive().default(3),
+      max_chars: z.number().int().positive().default(1500),
+      // Minimum BM25 relevance score to inject a memory (0 = inject all results).
+      min_relevance_score: z.number().min(0).default(0),
+      // Prepend a one-line token budget summary to every injection.
+      show_budget: z.boolean().default(true),
     })
     .default({}),
 });

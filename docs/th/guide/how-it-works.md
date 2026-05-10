@@ -1,8 +1,8 @@
-# How It Works
+# วิธีการทำงาน
 
-At the end of each Claude Code session, Somtum reads the session transcript and asks Claude Haiku to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite. **On every subsequent prompt**, Somtum automatically retrieves the most relevant memories and injects them into context.
+เมื่อสิ้นสุดแต่ละเซสชัน Claude Code Somtum จะอ่านทรานสคริปต์ของเซสชันและขอให้ Claude Haiku ดึงส่วนที่ควรจดจำ — การตัดสินใจ การแก้บั๊ก สิ่งที่เรียนรู้ ข้อสังเกตเหล่านั้นจะถูกจัดเก็บในเครื่องใน SQLite **ในทุกพรอมต์ถัดไป** Somtum จะดึงความทรงจำที่เกี่ยวข้องมากที่สุดโดยอัตโนมัติและฉีดเข้าไปในบริบท
 
-## Memory lifecycle
+## วงจรชีวิตของหน่วยความจำ
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,9 +44,9 @@ At the end of each Claude Code session, Somtum reads the session transcript and 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## What gets captured — an example
+## สิ่งที่ถูกบันทึก — ตัวอย่าง
 
-You debug an auth bug and refactor a module. At session end, Somtum extracts something like:
+คุณดีบักบั๊ก auth และปรับโครงสร้างโมดูล เมื่อสิ้นสุดเซสชัน Somtum จะดึงข้อมูลประมาณนี้:
 
 ```json
 [
@@ -65,9 +65,9 @@ You debug an auth bug and refactor a module. At session end, Somtum extracts som
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts`, Claude finds these memories and already has the context.
+ในเซสชันถัดไป เมื่อคุณถามว่า "ทำไมถึงใช้ pnpm?" หรือเปิด `src/auth/refresh.ts` Claude จะพบความทรงจำเหล่านี้และมีบริบทอยู่แล้ว
 
-## Architecture
+## สถาปัตยกรรม
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -106,39 +106,39 @@ Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts
                 └─────────────────────────────┘
 ```
 
-## Retrieval strategies
+## กลยุทธ์การดึงข้อมูล
 
-| Strategy | How it works | Best for | Cost |
+| กลยุทธ์ | วิธีการทำงาน | เหมาะสำหรับ | ค่าใช้จ่าย |
 | --- | --- | --- | --- |
-| **`bm25`** | Keyword search over title + body + tags (SQLite FTS5, no external dependencies) | Exact terms, offline setups | Near-zero |
-| **`embeddings`** | Semantic similarity using a 30 MB local ONNX model (bge-small-en-v1.5, fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories |
-| **`index`** | Sends a compact memory catalog to Haiku; the model picks relevant IDs | Paraphrased or fuzzy queries | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings results merged and re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+| **`bm25`** | ค้นหาด้วยคีย์เวิร์ดในชื่อ + เนื้อหา + แท็ก (SQLite FTS5 ไม่ต้องการ dependency ภายนอก) | คำที่ตรงกันแน่นอน การตั้งค่าออฟไลน์ | เกือบเป็นศูนย์ |
+| **`embeddings`** | ความคล้ายคลึงเชิงความหมายโดยใช้โมเดล ONNX ในเครื่องขนาด 30 MB (bge-small-en-v1.5) | คิวรีแบบ "เราตัดสินใจเรื่อง auth อย่างไร?" | ~5 ms ที่ 10k ความทรงจำ |
+| **`index`** | ส่งแคตตาล็อกความทรงจำแบบย่อไปยัง Haiku โมเดลจะเลือก ID ที่เกี่ยวข้อง | คิวรีที่ถอดความหรือ fuzzy | 1 Haiku API call |
+| **`hybrid`** | ผล BM25 + embeddings รวมและจัดอันดับใหม่โดย Haiku | กรณีทั่วไป (การดึงข้อมูลที่ดีที่สุด) | BM25 + embeddings + 1 Haiku call |
 
-**Default is `bm25`** — works offline, no setup required. Enable `hybrid` once you have embeddings downloaded.
+**ค่าเริ่มต้นคือ `bm25`** — ทำงานออฟไลน์ ไม่ต้องตั้งค่า เปิดใช้งาน `hybrid` เมื่อดาวน์โหลด embeddings แล้ว
 
-To switch strategy:
+เพื่อเปลี่ยนกลยุทธ์:
 
 ```bash
-# Enable semantic search (downloads 30 MB model once)
+# เปิดใช้งาน semantic search (ดาวน์โหลดโมเดล 30 MB ครั้งเดียว)
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 
-# Switch to hybrid for best recall
+# เปลี่ยนเป็น hybrid เพื่อการดึงข้อมูลที่ดีที่สุด
 somtum config set retrieval.strategy hybrid
 ```
 
-See [Configuration](/reference/configuration) for the full options.
+ดู [การตั้งค่า](/th/reference/configuration) สำหรับตัวเลือกทั้งหมด
 
-## Memory kinds
+## ประเภทของหน่วยความจำ
 
-Somtum captures observations in six categories:
+Somtum บันทึกข้อสังเกตใน 6 หมวดหมู่:
 
-| Kind | Description |
+| ประเภท | คำอธิบาย |
 | --- | --- |
-| `decision` | Architectural or design choices and their rationale |
-| `learning` | Things discovered during debugging or exploration |
-| `bugfix` | A fix and its root cause |
-| `command` | Useful CLI commands or workflows |
-| `file_summary` | A summary of what a file or module does |
-| `other` | Anything else worth remembering |
+| `decision` | ตัวเลือกด้านสถาปัตยกรรมหรือการออกแบบและเหตุผล |
+| `learning` | สิ่งที่ค้นพบระหว่างการดีบักหรือการสำรวจ |
+| `bugfix` | การแก้ไขและสาเหตุหลัก |
+| `command` | คำสั่ง CLI หรือ workflow ที่มีประโยชน์ |
+| `file_summary` | สรุปว่าไฟล์หรือโมดูลทำอะไร |
+| `other` | สิ่งอื่นใดที่ควรจดจำ |

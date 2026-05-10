@@ -33,6 +33,8 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
+> **v1.6.0** — Token budget mode (`injection.show_budget`) · file-gating on by default · BM25 relevance threshold (`injection.min_relevance_score`) · extractor retry no longer re-sends full transcript · injection defaults tightened (k=3, max_chars=1500)
+>
 > **v1.5.0** — Multi-page VitePress docs site · `somtum list` · `somtum reset` · `somtum forget --all` · embeddings timeout safety · config crash-resilience · `injection.max_chars` wired up · warm-start race fix · auth-error hints
 >
 > **v1.3.0** — Auto-inject memories on every prompt · `update` MCP tool · warm-start after compaction · false-hit detection · workspace scope · `suggest-claude-md` · stale memory detection in `doctor`
@@ -543,16 +545,16 @@ somtum config set retrieval.strategy hybrid
 somtum config set retrieval.index.enabled true
 somtum config set retrieval.strategy index
 
-# Intercept large file reads and summarize them (reduces context bloat)
-somtum config set file_gating.enabled true
+# Disable file-gating (on by default — intercepts large file reads and serves cached summary)
+somtum config set file_gating.enabled false
 
 # Limit observations extracted per session (default: 10)
 somtum config set extraction.max_observations_per_session 5
 
 # Control automatic memory injection on every prompt (default: on)
 somtum config set injection.enabled false          # turn off auto-inject
-somtum config set injection.k 8                    # inject more memories (default: 5)
-somtum config set injection.max_chars 5000         # raise injection size cap (default: 3000)
+somtum config set injection.k 5                    # inject more memories (default: 3)
+somtum config set injection.max_chars 3000         # raise injection size cap (default: 1500)
 ```
 
 ### Full config reference
@@ -589,12 +591,14 @@ somtum config set injection.max_chars 5000         # raise injection size cap (d
   // Uses the hot path (< 2 ms at 1k memories). Disable if you prefer pull-only.
   "injection": {
     "enabled": true,
-    "k": 5,           // max memories injected per prompt
-    "max_chars": 3000, // hard cap on injected text
+    "k": 3,                   // max memories injected per prompt
+    "max_chars": 1500,        // hard cap on injected text
+    "min_relevance_score": 0, // raise (e.g. 1.0) to only inject high-scoring matches
+    "show_budget": true,      // prepend "[somtum] injected N/M memories (~X tokens)" line
   },
   "file_gating": {
-    "enabled": false, // set true to intercept large file reads
-    "min_file_size_tokens": 500,
+    "enabled": true,          // intercepts large file reads; serves cached summary instead
+    "min_file_size_tokens": 300,
     "exclude_globs": ["**/*.env", "**/secrets/**"],
   },
   "privacy": {

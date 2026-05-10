@@ -216,3 +216,89 @@
 .dark ::-webkit-scrollbar-track        { background: var(--somtum-bg); }
 .dark ::-webkit-scrollbar-thumb        { background: var(--somtum-border-hi); border-radius: 3px; }
 .dark ::-webkit-scrollbar-thumb:hover  { background: #3d4a5c; }
+
+/* ── Mobile nav fixes ───────────────────────────────────── */
+
+/* Solid opaque background for mobile overlay so content doesn't bleed through */
+@media (max-width: 959px) {
+  .VPNavScreen {
+    background: var(--vp-c-bg) !important;
+    top: var(--vp-nav-height) !important;
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dark .VPNavScreen {
+    background: var(--somtum-bg) !important;
+    border-top: 1px solid var(--somtum-border);
+  }
+
+  /* Touch-friendly tap targets — minimum 44×44 px per WCAG */
+  .VPNavBarHamburger {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  /* Prevent the whole nav bar from overflowing horizontally */
+  .VPNavBar .content-body {
+    overflow: hidden;
+    gap: 4px;
+  }
+
+  /* Ensure nav title doesn't get clipped */
+  .VPNavBarTitle {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .VPNavBarTitle .title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Language switcher items in mobile menu — bigger tap target */
+  .VPNavScreenTranslations .items a,
+  .VPNavScreenMenuGroupLink {
+    padding: 10px 12px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Separate language switcher section with a subtle divider */
+  .VPNavScreenTranslations {
+    padding-top: 12px;
+    border-top: 1px solid var(--somtum-border, var(--vp-c-divider));
+    margin-top: 8px;
+  }
+
+  /* Give the nav screen menu items more breathing room */
+  .VPNavScreenMenuGroup {
+    border-bottom: 1px solid var(--vp-c-divider);
+  }
+}
+
+/* iOS-specific: replace backdrop-filter with solid bg to avoid rendering glitch */
+@supports (-webkit-touch-callout: none) {
+  .dark .VPNav {
+    background: rgba(9, 11, 15, 0.97);
+  }
+}
+
+/* Fix z-index stacking so mobile overlay always sits above page content */
+.VPNavScreen {
+  z-index: calc(var(--vp-z-index-nav, 100) - 1);
+}
+
+/* Prevent sidebar from overlapping nav on tablet-sized screens */
+@media (min-width: 768px) and (max-width: 959px) {
+  .VPSidebar {
+    padding-top: var(--vp-nav-height);
+  }
+}
