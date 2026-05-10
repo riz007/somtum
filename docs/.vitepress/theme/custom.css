@@ -246,7 +246,7 @@
 
   /* Prevent the whole nav bar from overflowing horizontally */
   .VPNavBar .content-body {
-    overflow: hidden;
+    overflow-x: hidden; /* x-only: overflow:hidden clips dropdown menus that render below the bar */
     gap: 4px;
   }
 
@@ -291,10 +291,8 @@
   }
 }
 
-/* Fix z-index stacking so mobile overlay always sits above page content */
-.VPNavScreen {
-  z-index: calc(var(--vp-z-index-nav, 100) - 1);
-}
+/* VPNavScreen z-index: trust VitePress default (same as nav). Overriding to nav-1
+   put it behind the nav bar on some browsers, blocking taps on the overlay. */
 
 /* Prevent sidebar from overlapping nav on tablet-sized screens */
 @media (min-width: 768px) and (max-width: 959px) {
