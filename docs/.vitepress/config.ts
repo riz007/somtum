@@ -6,8 +6,13 @@ export default defineConfig({
   // GitHub Pages URL: riz007.github.io/somtum/
   // Change to '/' if you deploy to a custom domain (e.g. docs.somtum.com)
   base: '/somtum/',
+  appearance: 'dark',
 
-  head: [['link', { rel: 'icon', href: '/logo.png' }]],
+  head: [
+    ['link', { rel: 'icon', href: '/somtum/logo.png' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+  ],
 
   themeConfig: {
     logo: '/logo.png',
@@ -72,7 +77,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2024 Rizwanul Islam Rudra',
+      copyright: 'Copyright © 2026 Rizwanul Islam Rudra',
     },
 
     search: {
