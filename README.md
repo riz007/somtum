@@ -2,7 +2,7 @@
 
 **Local-first memory and prompt-cache layer for Claude Code.**
 
-[**Docs**](https://riz007.github.io/somtum/guide/getting-started) · [**Landing Page**](https://riz007.github.io/somtum/) · [**npm**](https://www.npmjs.com/package/somtum)
+[**Docs**](https://riz007.github.io/somtum/) · [**npm**](https://www.npmjs.com/package/somtum)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
@@ -190,6 +190,14 @@ Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.t
 | **`hybrid`**     | BM25 + embeddings results merged and re-ranked by Haiku                                  | General case (best recall)                     | BM25 + embeddings + 1 Haiku call |
 
 **Default is `bm25`** — works offline, no setup. Enable `hybrid` once you have embeddings downloaded.
+
+> **Caution:** Setting `strategy=hybrid` without enabling embeddings causes a silent fallback to BM25 while paying hybrid overhead. Run `somtum doctor` — if it shows `strategy=hybrid` alongside `embeddings: disabled`, fix it:
+>
+> ```bash
+> somtum config set retrieval.strategy bm25       # match what's actually running
+> # or, to use real hybrid:
+> somtum config set retrieval.embeddings.enabled true && somtum reindex
+> ```
 
 ---
 
@@ -624,6 +632,10 @@ somtum config set injection.max_chars 5000         # raise injection size cap (d
 Every `stats` figure is labelled _estimated_. Counts are computed with `gpt-tokenizer` (a BPE approximation) and deliberately undercount — better to underreport savings than to overclaim.
 
 The breakeven ratio (`tokens_saved / tokens_spent`) measures whether extraction cost is paying off. A ratio below 1.5× triggers a warning in `somtum stats` and `somtum doctor`.
+
+**A low ratio is normal on a fresh project** (< 20 memories, few recall calls). It improves as memories accumulate and get retrieved more frequently.
+
+If the ratio stays low after a few weeks, check for the hybrid/embeddings mismatch first (`somtum doctor`). If the config is correct, reduce injection scope: lower `injection.k` or `injection.max_chars` to cut overhead.
 
 ---
 

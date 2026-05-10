@@ -1,5 +1,33 @@
 # Troubleshooting
 
+## `somtum doctor` reports `breakeven_ratio` below 1.5x
+
+This warning means somtum is spending more tokens (injecting memories) than it's saving.
+
+**Normal for small projects.** With fewer than ~20 memories and rare recall calls, the overhead of injection outweighs the benefit. The ratio improves naturally as the memory store grows.
+
+**Check for the hybrid/embeddings mismatch.** If `doctor` shows `strategy=hybrid` but `embeddings: disabled`, somtum is silently falling back to BM25 while paying hybrid overhead:
+
+```
+✓  config     strategy=hybrid, k=8
+✓  embeddings disabled
+```
+
+Fix: align the strategy with what's actually running.
+
+```bash
+# Option 1 — use BM25 (offline, no API key needed)
+somtum config set retrieval.strategy bm25
+
+# Option 2 — enable full hybrid (downloads a 30 MB ONNX model, needs ANTHROPIC_API_KEY)
+somtum config set retrieval.embeddings.enabled true
+somtum reindex
+```
+
+Run `somtum doctor` again to confirm both `config` and `embeddings` lines are consistent.
+
+---
+
 ## `somtum stats` shows `memories 0` after a session
 
 Check the hook log first:

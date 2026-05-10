@@ -96,3 +96,17 @@ somtum config set injection.max_chars 5000   # raise injection size cap (default
 | **`embeddings`** | Semantic similarity, local 30 MB ONNX model | "What did we decide about auth?" | ~5 ms at 10k memories |
 | **`index`** | Haiku picks relevant IDs from a compact catalog | Paraphrased or fuzzy queries | 1 Haiku API call |
 | **`hybrid`** | BM25 + embeddings, re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+
+::: warning Hybrid requires embeddings
+Setting `retrieval.strategy = "hybrid"` without enabling embeddings causes a silent fallback to BM25 while paying hybrid overhead. `somtum doctor` will surface this as `strategy=hybrid` / `embeddings: disabled`.
+
+Always enable embeddings first when using hybrid:
+
+```bash
+somtum config set retrieval.embeddings.enabled true
+somtum reindex   # downloads ~30 MB ONNX model once
+somtum config set retrieval.strategy hybrid
+```
+
+If you don't have an `ANTHROPIC_API_KEY` or prefer offline operation, use `bm25` instead.
+:::

@@ -80,15 +80,11 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Site title gradient */
+/* Nav title — plain weight, logo.png carries the visual identity */
 .VPNavBarTitle .title {
-  font-weight: 800;
-  font-size: 1.15rem;
+  font-weight: 700;
+  font-size: 1.1rem;
   letter-spacing: -0.02em;
-  background: linear-gradient(90deg, var(--somtum-papaya), var(--somtum-chili));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* ── Home hero ──────────────────────────────────────────── */
@@ -101,6 +97,19 @@
 
 .VPHero .tagline {
   color: #94a3b8;
+}
+
+/* Hero logo image */
+.VPHero .image-container {
+  max-width: 260px;
+}
+
+.VPHero .image-bg {
+  background: radial-gradient(circle, rgba(74, 222, 128, 0.12) 0%, transparent 70%);
+}
+
+.VPHero .image-src {
+  filter: drop-shadow(0 8px 24px rgba(74, 222, 128, 0.25));
 }
 
 /* Hero action buttons */
