@@ -2,7 +2,7 @@
 
 **Local-first memory and prompt-cache layer for Claude Code.**
 
-[**Landing Page & Demo**](https://riz007.github.io/somtum/)
+[**Docs**](https://riz007.github.io/somtum/guide/getting-started) · [**Landing Page**](https://riz007.github.io/somtum/) · [**npm**](https://www.npmjs.com/package/somtum)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
@@ -33,7 +33,7 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
-> **v1.4.0** — `somtum list`, `somtum reset`, `somtum forget --all` · embeddings timeout safety · config crash-resilience · injection.max_chars wired up · warm-start race fix · auth-error hints
+> **v1.5.0** — Multi-page VitePress docs site · `somtum list` · `somtum reset` · `somtum forget --all` · embeddings timeout safety · config crash-resilience · `injection.max_chars` wired up · warm-start race fix · auth-error hints
 >
 > **v1.3.0** — Auto-inject memories on every prompt · `update` MCP tool · warm-start after compaction · false-hit detection · workspace scope · `suggest-claude-md` · stale memory detection in `doctor`
 
