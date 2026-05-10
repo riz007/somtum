@@ -12,6 +12,11 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/somtum/logo.png' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-9621R7PP0X' }],
+    ['script', {}, `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-9621R7PP0X');`],
   ],
 
   themeConfig: {
