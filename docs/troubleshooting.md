@@ -129,6 +129,7 @@ BM25 works fully offline and is fast at any corpus size.
 2. If not installed: `somtum init --cache` (or `somtum init --all`)
 3. Confirm injection is enabled: `somtum config get injection.enabled` → should be `true`
 4. Check that memories actually exist: `somtum stats` → `memories > 0`
+5. Look for the budget line at the top of each prompt context: `[somtum] injected N/M memories (~X tokens)`. If you see `0/M`, BM25 found no matches — try a more descriptive prompt or lower `injection.min_relevance_score` to `0`.
 
 **Using the MCP server** (`somtum init --all`), Claude can also call `recall` directly when uncertain. If it's not happening:
 

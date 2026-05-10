@@ -173,14 +173,17 @@ export async function extract(
 ): Promise<ExtractionOutcome> {
   let attempt = 0;
   let lastError: string | undefined;
+  let lastRawOutput: string | undefined;
   let totalInput = 0;
   let totalOutput = 0;
 
   while (attempt <= options.maxRetries) {
+    // On retry: send only the bad output + error, not the full transcript again.
+    // Re-sending the transcript would double the token cost of every retry.
     const userPrompt =
       attempt === 0
         ? `Transcript:\n\n${transcript}`
-        : `Transcript:\n\n${transcript}\n\nPrevious attempt produced output that failed schema validation with error:\n${lastError}\n\nReturn valid JSON only.`;
+        : `Your previous response failed schema validation.\n\nError: ${lastError}\n\nYour previous output:\n${lastRawOutput}\n\nReturn valid JSON only, matching the schema in the system prompt.`;
 
     const { text, inputTokens, outputTokens } = await caller.complete({
       model: options.model,
@@ -189,6 +192,7 @@ export async function extract(
     });
     totalInput += inputTokens;
     totalOutput += outputTokens;
+    lastRawOutput = text;
 
     const blob = extractJsonBlob(text);
     let parsed: unknown;

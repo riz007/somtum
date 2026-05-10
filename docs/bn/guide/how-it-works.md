@@ -1,8 +1,8 @@
-# How It Works
+# এটি কীভাবে কাজ করে
 
-At the end of each Claude Code session, Somtum reads the session transcript and asks Claude Haiku to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite. **On every subsequent prompt**, Somtum automatically retrieves the most relevant memories and injects them into context.
+প্রতিটি Claude Code সেশন শেষে, Somtum সেশন ট্রান্সক্রিপ্ট পড়ে এবং Claude Haiku-কে রাখার মতো অংশগুলি এক্সট্র্যাক্ট করতে বলে — সিদ্ধান্ত, বাগ ফিক্স, যা শেখা হয়েছে। সেই পর্যবেক্ষণগুলি SQLite-এ স্থানীয়ভাবে সংরক্ষিত হয়। **প্রতিটি পরবর্তী প্রম্পটে**, Somtum স্বয়ংক্রিয়ভাবে সবচেয়ে প্রাসঙ্গিক মেমরিগুলি পুনরুদ্ধার করে এবং সেগুলি কনটেক্সটে ইনজেক্ট করে।
 
-## Memory lifecycle
+## মেমরি লাইফসাইকেল
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,9 +44,9 @@ At the end of each Claude Code session, Somtum reads the session transcript and 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## What gets captured — an example
+## কী ক্যাপচার হয় — একটি উদাহরণ
 
-You debug an auth bug and refactor a module. At session end, Somtum extracts something like:
+আপনি একটি auth বাগ ডিবাগ করেন এবং একটি মডিউল রিফ্যাক্টর করেন। সেশন শেষে, Somtum এরকম কিছু এক্সট্র্যাক্ট করে:
 
 ```json
 [
@@ -65,9 +65,9 @@ You debug an auth bug and refactor a module. At session end, Somtum extracts som
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts`, Claude finds these memories and already has the context.
+পরবর্তী সেশনে, আপনি যখন "আমরা কেন pnpm ব্যবহার করছি?" জিজ্ঞেস করেন বা `src/auth/refresh.ts` খোলেন, Claude এই মেমরিগুলি খুঁজে পায় এবং ইতিমধ্যেই কনটেক্সট জানে।
 
-## Architecture
+## আর্কিটেকচার
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -106,39 +106,39 @@ Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts
                 └─────────────────────────────┘
 ```
 
-## Retrieval strategies
+## রিট্রিভাল কৌশল
 
-| Strategy | How it works | Best for | Cost |
+| কৌশল | কীভাবে কাজ করে | সবচেয়ে ভালো | খরচ |
 | --- | --- | --- | --- |
-| **`bm25`** | Keyword search over title + body + tags (SQLite FTS5, no external dependencies) | Exact terms, offline setups | Near-zero |
-| **`embeddings`** | Semantic similarity using a 30 MB local ONNX model (bge-small-en-v1.5, fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories |
-| **`index`** | Sends a compact memory catalog to Haiku; the model picks relevant IDs | Paraphrased or fuzzy queries | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings results merged and re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+| **`bm25`** | শিরোনাম + বডি + ট্যাগে কীওয়ার্ড অনুসন্ধান (SQLite FTS5, কোনো বাহ্যিক নির্ভরতা নেই) | সঠিক শব্দ, অফলাইন সেটআপ | প্রায় শূন্য |
+| **`embeddings`** | একটি ৩০ MB স্থানীয় ONNX মডেল ব্যবহার করে সিমান্টিক সিমিলারিটি (bge-small-en-v1.5) | "auth সম্পর্কে আমরা কী সিদ্ধান্ত নিয়েছিলাম?" ধরনের কোয়েরি | ~৫ ms ১০k মেমরিতে |
+| **`index`** | একটি কম্প্যাক্ট মেমরি ক্যাটালগ Haiku-তে পাঠায়; মডেল প্রাসঙ্গিক ID বেছে নেয় | প্যারাফ্রেজড বা ফাজি কোয়েরি | ১টি Haiku API কল |
+| **`hybrid`** | BM25 + embeddings ফলাফল মার্জ করে Haiku দ্বারা পুনরায় র‍্যাংক করা | সাধারণ ক্ষেত্রে (সর্বোত্তম রিকল) | BM25 + embeddings + ১টি Haiku কল |
 
-**Default is `bm25`** — works offline, no setup required. Enable `hybrid` once you have embeddings downloaded.
+**ডিফল্ট হল `bm25`** — অফলাইনে কাজ করে, কোনো সেটআপ প্রয়োজন নেই। এমবেডিং ডাউনলোড হয়ে গেলে `hybrid` সক্ষম করুন।
 
-To switch strategy:
+কৌশল পরিবর্তন করতে:
 
 ```bash
-# Enable semantic search (downloads 30 MB model once)
+# সিমান্টিক সার্চ সক্ষম করুন (একবার ৩০ MB মডেল ডাউনলোড করে)
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 
-# Switch to hybrid for best recall
+# সর্বোত্তম রিকলের জন্য hybrid-এ পরিবর্তন করুন
 somtum config set retrieval.strategy hybrid
 ```
 
-See [Configuration](/reference/configuration) for the full options.
+সম্পূর্ণ বিকল্পের জন্য [কনফিগারেশন](/bn/reference/configuration) দেখুন।
 
-## Memory kinds
+## মেমরির ধরন
 
-Somtum captures observations in six categories:
+Somtum ছয়টি বিভাগে পর্যবেক্ষণ ক্যাপচার করে:
 
-| Kind | Description |
+| ধরন | বিবরণ |
 | --- | --- |
-| `decision` | Architectural or design choices and their rationale |
-| `learning` | Things discovered during debugging or exploration |
-| `bugfix` | A fix and its root cause |
-| `command` | Useful CLI commands or workflows |
-| `file_summary` | A summary of what a file or module does |
-| `other` | Anything else worth remembering |
+| `decision` | আর্কিটেকচারাল বা ডিজাইন পছন্দ এবং তাদের কারণ |
+| `learning` | ডিবাগিং বা অন্বেষণের সময় আবিষ্কৃত বিষয় |
+| `bugfix` | একটি ফিক্স এবং তার মূল কারণ |
+| `command` | দরকারী CLI কমান্ড বা ওয়ার্কফ্লো |
+| `file_summary` | একটি ফাইল বা মডিউল কী করে তার সারসংক্ষেপ |
+| `other` | মনে রাখার মতো অন্য যেকোনো কিছু |
