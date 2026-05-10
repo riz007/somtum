@@ -10,14 +10,20 @@ import {
   RecallInput,
   GetInput,
   RememberInput,
+  UpdateInput,
   CacheLookupInput,
   ForgetInput,
+  ForgetAllInput,
+  ReportFalseHitInput,
   StatsInput,
   recall,
   get,
   remember,
+  update,
   cacheLookup,
   forget,
+  forgetAll,
+  reportFalseHit,
   stats,
   type ToolContext,
 } from './tools.js';
@@ -71,7 +77,7 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
 
   const context: ToolContext = { db, config, projectId };
 
-  const server = new McpServer({ name: 'somtum', version: '0.1.0' }, { capabilities: {} });
+  const server = new McpServer({ name: 'somtum', version: '1.4.0' }, { capabilities: {} });
 
   server.registerTool(
     'recall',
@@ -121,6 +127,38 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
   );
 
   server.registerTool(
+    'update',
+    {
+      description:
+        'Update an existing observation. Pass only the fields to change (title, body, tags, files). Redaction is applied before storage.',
+      inputSchema: UpdateInput.shape,
+    },
+    async (args) => {
+      try {
+        return jsonResult(update(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'report_false_hit',
+    {
+      description:
+        'Report that a cache hit did not answer the question (the user had to rephrase or re-ask). Increments false_hit_count on the cache entry to inform threshold tuning.',
+      inputSchema: ReportFalseHitInput.shape,
+    },
+    async (args) => {
+      try {
+        return jsonResult(reportFalseHit(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
     'cache_lookup',
     {
       description:
@@ -145,6 +183,22 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
     async (args) => {
       try {
         return jsonResult(forget(context, args));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    'forget_all',
+    {
+      description:
+        'Soft-delete all observations in the current project. Returns the count of deleted entries.',
+      inputSchema: ForgetAllInput.shape,
+    },
+    async () => {
+      try {
+        return jsonResult(forgetAll(context));
       } catch (err) {
         return errorResult(err);
       }

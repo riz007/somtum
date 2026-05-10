@@ -27,8 +27,13 @@ export function claudeCodeCaller(): LlmCaller {
       const fullPrompt = `<system>\n${system}\n</system>\n\n${user}`;
 
       return new Promise((resolve, reject) => {
-        const child = spawn('claude', ['--print'], {
+        // SOMTUM_IN_HOOK tells any nested somtum hook invocations (triggered when
+        // the child claude process fires SessionEnd after completing) to exit
+        // immediately. Without this, the child's SessionEnd hook would call
+        // somtum hook post_session → claude -p → ... causing a deadlock.
+        const child = spawn('claude', ['-p', '--output-format', 'text'], {
           stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, SOMTUM_IN_HOOK: '1' },
         });
 
         const stdoutChunks: Buffer[] = [];
@@ -38,8 +43,8 @@ export function claudeCodeCaller(): LlmCaller {
 
         const timer = setTimeout(() => {
           child.kill();
-          reject(new Error('claude CLI timed out after 30s'));
-        }, 30_000);
+          reject(new Error('claude CLI timed out after 60s'));
+        }, 60_000);
 
         child.on('error', (err: NodeJS.ErrnoException) => {
           clearTimeout(timer);

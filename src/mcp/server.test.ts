@@ -52,13 +52,23 @@ function parseText(result: { content: { type: string; text?: string }[] }): unkn
 }
 
 describe('MCP server', () => {
-  it('lists all six tools', async () => {
+  it('lists all tools', async () => {
     const { client, close } = await start();
     try {
       const { tools } = await client.listTools();
       const names = tools.map((t) => t.name).sort();
       expect(names).toEqual(
-        ['cache_lookup', 'forget', 'get', 'recall', 'remember', 'stats'].sort(),
+        [
+          'cache_lookup',
+          'forget',
+          'forget_all',
+          'get',
+          'recall',
+          'remember',
+          'report_false_hit',
+          'stats',
+          'update',
+        ].sort(),
       );
     } finally {
       await close();

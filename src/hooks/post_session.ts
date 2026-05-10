@@ -1,6 +1,7 @@
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, appendFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
@@ -18,6 +19,7 @@ import {
 import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
 import { countTokens } from '../core/tokens.js';
 import { projectDir } from '../config.js';
+import { Bm25Retriever } from '../core/retriever/bm25.js';
 import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
@@ -188,6 +190,41 @@ async function populateFileSummaries(
   return generated;
 }
 
+// Write top-k memories to a warm-start file after PreCompact so the next
+// UserPromptSubmit can restore context into the fresh post-compaction session.
+function writeWarmStart(db: DB, projectId: string, k = 8): void {
+  try {
+    const retriever = new Bm25Retriever(db);
+    // Use a broad "recent" query — we want the most useful memories overall, not
+    // query-specific ones, because we don't know what comes next.
+    const results = retriever.search('recent decisions learnings bugs commands', {
+      k,
+      projectId,
+    });
+    // retriever.search is async but Bm25Retriever is synchronous under the hood;
+    // we await-via-then to stay non-blocking.
+    void Promise.resolve(results).then((hits) => {
+      if (hits.length === 0) return;
+      const lines = hits
+        .map((r) => `[${r.observation.kind}] ${r.observation.title}\n${r.observation.body}`)
+        .join('\n---\n');
+      const context = `[somtum warm-start — context restored after compaction]\n${lines}\n[/somtum warm-start]`;
+      const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
+      const dir = join(homedir(), '.somtum', 'warmstart');
+      mkdirSync(dir, { recursive: true });
+      // Include a timestamp so concurrent windows on the same project don't clobber each other.
+      const path = join(dir, `ws_${prefix}_${Date.now()}.json`);
+      writeFileSync(
+        path,
+        JSON.stringify({ project_id: projectId, created_at: Date.now(), context }),
+        'utf8',
+      );
+    });
+  } catch {
+    // Non-fatal: warm-start is a best-effort enhancement.
+  }
+}
+
 export interface RunOptions {
   cwd?: string;
   config?: Config;
@@ -231,7 +268,21 @@ export async function runPostSession(
     const store = new MemoryStore(db);
 
     const resolved = resolveTranscript(parsed);
-    const transcript = resolved.text;
+    // Cap transcript size to stay within model context limits.
+    // At ~4 chars/token, 60k tokens ≈ 240 KB of text. Anything beyond that
+    // risks a context-limit error in Haiku; we take the tail (most recent turns).
+    const MAX_TRANSCRIPT_TOKENS = 60_000;
+    const rawTranscript = resolved.text;
+    const transcript =
+      countTokens(rawTranscript) > MAX_TRANSCRIPT_TOKENS
+        ? (() => {
+            const charBudget = MAX_TRANSCRIPT_TOKENS * 4;
+            hookLog(
+              `[post_session] WARN: transcript truncated to last ~${charBudget} chars (was ${rawTranscript.length})`,
+            );
+            return rawTranscript.slice(-charBudget);
+          })()
+        : rawTranscript;
     const transcriptTokens = countTokens(transcript);
 
     // Prefer the direct API when a key is present (faster, explicit model choice).
@@ -318,6 +369,10 @@ export async function runPostSession(
       outputPath: indexPath,
       now: opts.now ?? Date.now(),
     });
+
+    if (parsed.hook_event_name === 'PreCompact') {
+      writeWarmStart(db, projectId);
+    }
 
     return {
       projectId,

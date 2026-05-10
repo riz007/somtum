@@ -1,26 +1,66 @@
 # somtum
 
-## 1.3.1
+## 1.5.1
 
 ### Patch Changes
 
-- fb3cf70: improve the somtum serve webpage UI and update README.md for developers
+- 598d461: Update GitHub Pages deployment workflow to build VitePress docs before deploying (`docs/.vitepress/dist/` is now the deploy artifact instead of raw `docs/`). Fix VitePress `base` to `/somtum/` for correct asset paths on GitHub Pages. Add docs link to README header.
+
+## 1.5.0
+
+### Minor Changes
+
+- e2b0d42: Auto-inject memories on every prompt, `update` MCP tool, warm-start after PreCompact, false-hit detection, workspace observation scope, `suggest-claude-md` CLI command, and stale memory detection in `doctor`.
+- 2122776: - **`somtum list`** — New command: lists stored memories for the current project with `--kind`, `--limit`, and `--json` filters. The fastest way to browse what Somtum has captured.
+  - **`somtum reset`** — New command: permanently wipes the project DB and associated session/warm-start files. Prompts for confirmation; `--yes` skips it. Essential for debugging and starting fresh on a project.
+  - **`somtum forget --all`** — New flag on the existing `forget` command: soft-deletes every active observation in the current project in one shot (recoverable via `export --include-deleted`).
+  - **Embeddings timeout safety** — The fuzzy-match embedder path in `UserPromptSubmit` is now wrapped in a 2-second `Promise.race`. If the embedding model is slow to initialize (e.g. first download), it falls back to BM25 rather than hanging the hook.
+  - **Config crash-resilience** — `loadConfig()` now catches malformed JSON and invalid config values, silently falling back to defaults instead of crashing the hook process. Run `somtum doctor` to surface config errors explicitly.
+  - **`injection.max_chars` wired up** — The `injection.max_chars` config key (default `3000`) now actually controls the memory injection character cap. Previously the cap was hardcoded at `4000` regardless of the config.
+  - **Warm-start race fix** — Warm-start files now use a `ws_<id>_<timestamp>.json` naming scheme so two Claude Code windows open on the same project no longer clobber each other's post-compaction context.
+  - **Auth-error hint in hook log** — When `post_session` fails with a 401/403 or auth-related error, the hook now prints a specific hint (`check that ANTHROPIC_API_KEY is set and valid`) to stderr instead of a generic error message.
+
+### Patch Changes
+
+- Add multi-page VitePress documentation site under `docs/` covering getting started, how it works, CLI reference, configuration, MCP server, storage layout, dashboard, privacy & performance, troubleshooting, and contributing. Adds `docs:dev`, `docs:build`, and `docs:preview` scripts.
+
+## 1.4.0
+
+### Minor Changes
+
+- **`somtum list`** — New command: lists stored memories for the current project with `--kind`, `--limit`, and `--json` filters. The fastest way to browse what Somtum has captured.
+
+- **`somtum reset`** — New command: permanently wipes the project DB and associated session/warm-start files. Prompts for confirmation; `--yes` skips it. Essential for debugging and starting fresh on a project.
+
+- **`somtum forget --all`** — New flag on the existing `forget` command: soft-deletes every active observation in the current project in one shot (recoverable via `export --include-deleted`).
+
+- **Embeddings timeout safety** — The fuzzy-match embedder path in `UserPromptSubmit` is now wrapped in a 2-second `Promise.race`. If the embedding model is slow to initialize (e.g. first download), it falls back to BM25 rather than hanging the hook.
+
+- **Config crash-resilience** — `loadConfig()` now catches malformed JSON and invalid config values, silently falling back to defaults instead of crashing the hook process. Run `somtum doctor` to surface config errors explicitly.
+
+- **`injection.max_chars` wired up** — The `injection.max_chars` config key (default `3000`) now actually controls the memory injection character cap. Previously the cap was hardcoded at `4000` regardless of the config.
+
+- **Warm-start race fix** — Warm-start files now use a `ws_<id>_<timestamp>.json` naming scheme so two Claude Code windows open on the same project no longer clobber each other's post-compaction context.
+
+- **Auth-error hint in hook log** — When `post_session` fails with a 401/403 or auth-related error, the hook now prints a specific hint (`check that ANTHROPIC_API_KEY is set and valid`) to stderr instead of a generic error message.
 
 ## 1.3.0
 
 ### Minor Changes
 
-- 867c695: `ANTHROPIC_API_KEY` is now optional. When not set, the `SessionEnd` hook falls back to `claude --print` (the Claude Code CLI) so Claude Code subscribers need no separate API key. The `api_key` doctor check now passes when either the key or the CLI is available, and `claudeCodeCaller()` is exported from the public API.
+- **Auto-inject memories on every prompt** — The `UserPromptSubmit` hook now runs a BM25 recall (top-k, < 2 ms) and injects relevant memories as `additionalContext` on every prompt, not just on cache hits. Memories surface automatically without requiring the agent to call `recall`. Configurable via `injection.enabled`, `injection.k`, `injection.max_chars`.
 
-## 1.2.1
+- **`update` MCP tool** — New tool to update an existing observation's `title`, `body`, `tags`, or `files` via MCP. Redaction is applied before storage. Agents can now correct bad captures without leaving the session.
 
-### Patch Changes
+- **Warm-start after `PreCompact`** — When Claude Code compacts a conversation, the `PostCompact` hook now writes a warm-start file (`~/.somtum/warmstart/ws_<id>.json`) containing the top-8 BM25 memories. The next `UserPromptSubmit` reads and consumes it (30-minute TTL), restoring context into the fresh conversation automatically.
 
-- afd256b: - Redesigned `somtum serve` dashboard UI (light/dark theme support, improved layout)
-  - `somtum stats` now shows a setup hint when no memories have been captured yet, distinguishing between a missing `ANTHROPIC_API_KEY` and a hook that has not fired yet
-  - `somtum doctor` gains a new `api_key` check that reports whether `ANTHROPIC_API_KEY` is set
-  - Hook runner logs activity to `~/.somtum/hook.log` and emits a warning when `ANTHROPIC_API_KEY` is missing before the `post_session` extraction runs
-  - `somtum serve` port option now accepts `-p` shorthand and defaults gracefully when omitted
+- **False-hit detection** — Two mechanisms for populating `false_hit_count` on cache entries: (a) automatic — if the next prompt after a cache hit is a near-re-ask (≤ 5 min, > 60% word overlap) but a cache miss, the prior hit is flagged; (b) explicit — new `report_false_hit(cache_entry_id)` MCP tool for agent-driven feedback. Data feeds future fuzzy-threshold tuning.
+
+- **Workspace / cross-project observation scope** — New `scope: 'project' | 'workspace' | 'global'` field on all observations (migration 004). The `remember` MCP tool accepts `scope`; `recall` and `get` return it. Workspace-scoped observations represent cross-project knowledge (team conventions, tool preferences).
+
+- **`somtum suggest-claude-md`** — New CLI command: groups observations by kind, previews proposed CLAUDE.md additions, and asks for interactive confirmation before writing. Supports `--dry-run`, `--yes`, `--limit`. Off by default — must be explicitly invoked.
+
+- **Stale memory detection in `somtum doctor`** — Adds a `stale_memories` check: warns when observations are older than 90 days with no confirmed retrievals (`last_confirmed_at IS NULL`). New `last_confirmed_at` column (migration 004) is bumped by `recall` and `get` on every hit. New `countStale()` and `listStale()` methods on `MemoryStore`.
 
 ## 1.2.0
 

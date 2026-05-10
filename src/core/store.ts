@@ -2,10 +2,13 @@ import { ulid } from 'ulid';
 import type { DB } from './db.js';
 import {
   ObservationInputSchema,
+  ObservationUpdateSchema,
   ObservationSchema,
   type Observation,
   type ObservationInput,
+  type ObservationUpdate,
   type ObservationKind,
+  type ObservationScope,
 } from './schema.js';
 import { redactAll } from './privacy.js';
 
@@ -25,6 +28,8 @@ interface ObservationRow {
   superseded_by: string | null;
   embedding: Buffer | null;
   deleted_at: number | null;
+  scope: ObservationScope;
+  last_confirmed_at: number | null;
 }
 
 function rowToObservation(row: ObservationRow): Observation {
@@ -43,6 +48,8 @@ function rowToObservation(row: ObservationRow): Observation {
     superseded_by: row.superseded_by,
     embedding: row.embedding,
     deleted_at: row.deleted_at,
+    scope: row.scope ?? 'project',
+    last_confirmed_at: row.last_confirmed_at ?? null,
   });
 }
 
@@ -62,16 +69,16 @@ export class MemoryStore {
 
     const id = parsed.id ?? ulid();
     const created_at = parsed.created_at ?? Date.now();
+    const scope = parsed.scope ?? 'project';
 
-    // Use an immediate transaction so writer contention fails fast
-    // instead of hanging on the serialization boundary.
     const txn = this.db.transaction(() => {
       this.db
         .prepare(
           `INSERT INTO observations
              (id, project_id, session_id, kind, title, body, files, tags,
-              created_at, tokens_saved, tokens_spent, superseded_by, embedding, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)`,
+              created_at, tokens_saved, tokens_spent, superseded_by, embedding, deleted_at,
+              scope, last_confirmed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL)`,
         )
         .run(
           id,
@@ -85,11 +92,86 @@ export class MemoryStore {
           created_at,
           parsed.tokens_saved,
           parsed.tokens_spent,
+          scope,
         );
     });
     txn.immediate();
 
     return this.get(id)!;
+  }
+
+  update(id: string, patch: ObservationUpdate, options: InsertOptions = {}): Observation | null {
+    const parsed = ObservationUpdateSchema.parse(patch);
+    const existing = this.get(id);
+    if (!existing || existing.deleted_at !== null) return null;
+
+    const patterns = options.redactPatterns ?? [];
+    const title = parsed.title !== undefined ? redactAll(parsed.title, patterns) : existing.title;
+    const body = parsed.body !== undefined ? redactAll(parsed.body, patterns) : existing.body;
+    const files =
+      parsed.files !== undefined ? JSON.stringify(parsed.files) : JSON.stringify(existing.files);
+    const tags =
+      parsed.tags !== undefined ? JSON.stringify(parsed.tags) : JSON.stringify(existing.tags);
+
+    const txn = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE observations SET title = ?, body = ?, files = ?, tags = ? WHERE id = ?`,
+        )
+        .run(title, body, files, tags, id);
+    });
+    txn.immediate();
+
+    return this.get(id);
+  }
+
+  // Bump last_confirmed_at to signal that this memory was retrieved and was useful.
+  confirmRetrieval(id: string, now: number = Date.now()): void {
+    this.db
+      .prepare(`UPDATE observations SET last_confirmed_at = ? WHERE id = ?`)
+      .run(now, id);
+  }
+
+  // Observations that have never been confirmed and are older than olderThanDays.
+  listStale(
+    projectId: string,
+    olderThanDays: number,
+    opts: { limit?: number } = {},
+  ): Observation[] {
+    const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL
+           AND last_confirmed_at IS NULL AND created_at < ?
+         ORDER BY created_at ASC LIMIT ?`,
+      )
+      .all(projectId, cutoff, Math.floor(opts.limit ?? 100)) as ObservationRow[];
+    return rows.map(rowToObservation);
+  }
+
+  countStale(projectId: string, olderThanDays: number): number {
+    const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL
+           AND last_confirmed_at IS NULL AND created_at < ?`,
+      )
+      .get(projectId, cutoff) as { n: number };
+    return row.n;
+  }
+
+  // All non-deleted observations with scope = 'workspace' or 'global' for any project.
+  listByScope(scope: ObservationScope, limit = 50): Observation[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE scope = ? AND deleted_at IS NULL
+         ORDER BY tokens_saved DESC, created_at DESC LIMIT ?`,
+      )
+      .all(scope, Math.floor(limit)) as ObservationRow[];
+    return rows.map(rowToObservation);
   }
 
   get(id: string): Observation | null {

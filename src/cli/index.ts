@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { initCommand } from './init.js';
 import { statsCommand } from './stats.js';
@@ -7,24 +8,30 @@ import { showCommand } from './show.js';
 import { hookCommand } from './hook.js';
 import { reindexCommand } from './reindex.js';
 import { rebuildCommand } from './rebuild.js';
-import { forgetCommand } from './forget.js';
+import { forgetCommand, forgetAllCommand } from './forget.js';
+import { listCommand } from './list.js';
+import { resetCommand } from './reset.js';
 import { editCommand } from './edit.js';
 import { exportCommand } from './export.js';
 import { importCommand } from './import.js';
 import { purgeCommand } from './purge.js';
 import { syncCommand } from './sync.js';
 import { doctorCommand } from './doctor.js';
+import { suggestClaudeMdCommand } from './suggest_claude_md.js';
 import { configGetCommand, configSetCommand } from './config_cmd.js';
 import { serveCommand } from './serve.js';
 import { runMcpServer } from '../mcp/server.js';
 import { printLogo } from './ui.js';
+
+const require = createRequire(import.meta.url);
+const { version } = require('../../package.json') as { version: string };
 
 const program = new Command();
 
 program
   .name('somtum')
   .description('Local-first memory and prompt-cache layer for Claude Code')
-  .version('1.0.0');
+  .version(version);
 
 // Show logo unless it's an internal hook call or MCP server.
 const isInternal = process.argv.includes('hook') || process.argv.includes('mcp');
@@ -113,11 +120,40 @@ program
   });
 
 program
-  .command('forget <id>')
-  .description('Soft-delete an observation by id (recoverable via export --include-deleted)')
+  .command('list')
+  .description('List stored memories for the current project')
+  .option('--kind <kind>', 'Filter by kind: decision | learning | bugfix | command | file_summary | other')
+  .option('-k, --limit <n>', 'Max results (default 50)', (v) => Number.parseInt(v, 10))
   .option('--json', 'Emit JSON')
-  .action((id: string, opts: { json?: boolean }) => {
+  .action((opts: { kind?: string; limit?: number; json?: boolean }) => {
+    const code = listCommand(opts);
+    process.exit(code);
+  });
+
+program
+  .command('forget [id]')
+  .description('Soft-delete an observation by id, or use --all to soft-delete everything')
+  .option('--all', 'Soft-delete all observations in the current project', false)
+  .option('--json', 'Emit JSON')
+  .action((id: string | undefined, opts: { all?: boolean; json?: boolean }) => {
+    if (opts.all) {
+      void forgetAllCommand(opts).then((code) => process.exit(code));
+      return;
+    }
+    if (!id) {
+      console.error('somtum: provide an <id> or use --all');
+      process.exit(1);
+    }
     const code = forgetCommand(id, opts);
+    process.exit(code);
+  });
+
+program
+  .command('reset')
+  .description('Permanently delete all memories for the current project (irreversible)')
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .action(async (opts: { yes?: boolean }) => {
+    const code = await resetCommand({ yes: opts.yes ?? false });
     process.exit(code);
   });
 
@@ -246,6 +282,24 @@ program
     if (opts.port !== undefined) serveOpts.port = opts.port;
     if (opts.open !== undefined) serveOpts.open = opts.open;
     const code = await serveCommand(serveOpts);
+    process.exit(code);
+  });
+
+program
+  .command('suggest-claude-md')
+  .description(
+    'Suggest CLAUDE.md additions from accumulated observations (interactive, off by default)',
+  )
+  .option('--limit <n>', 'Max observations to consider', (v) => Number.parseInt(v, 10))
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .option('--dry-run', 'Preview suggestions without writing', false)
+  .action(async (opts: { limit?: number; yes?: boolean; dryRun?: boolean }) => {
+    const cmdOpts: Parameters<typeof suggestClaudeMdCommand>[0] = {
+      yes: opts.yes ?? false,
+      dry: opts.dryRun ?? false,
+    };
+    if (opts.limit !== undefined) cmdOpts.limit = opts.limit;
+    const code = await suggestClaudeMdCommand(cmdOpts);
     process.exit(code);
   });
 

@@ -88,7 +88,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
 
     // 6. All expected migrations applied
     const applied = appliedVersions(db);
-    const expectedVersions = [1, 2, 3];
+    const expectedVersions = [1, 2, 3, 4];
     const missing = expectedVersions.filter((v) => !applied.includes(v));
     checks.push({
       name: 'migrations',
@@ -123,12 +123,23 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
       checks.push({ name: 'breakeven_ratio', ok: true, detail: 'n/a (no extraction cost yet)' });
     }
 
-    // 9. Cache entries
+    // 9. Stale memories: older than 90 days, never confirmed via retrieval
+    const staleCount = store.countStale(projectId, 90);
+    checks.push({
+      name: 'stale_memories',
+      ok: staleCount === 0,
+      detail:
+        staleCount === 0
+          ? 'no stale memories detected'
+          : `${staleCount} memor${staleCount === 1 ? 'y' : 'ies'} older than 90 days with no retrieval — consider \`somtum purge\` or reviewing with \`somtum search\``,
+    });
+
+    // 10. Cache entries
     const cache = new PromptCache(db);
     const cacheCount = cache.count();
     checks.push({ name: 'cache_entries', ok: true, detail: `${cacheCount} entries` });
 
-    // 10. Embeddings status
+    // 11. Embeddings status
     checks.push({
       name: 'embeddings',
       ok: true,

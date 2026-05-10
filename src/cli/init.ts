@@ -6,6 +6,7 @@ import { loadConfig } from '../config.js';
 import { projectNameFromCwd } from '../core/project_id.js';
 
 const SESSION_END = 'SessionEnd';
+const PRE_COMPACT = 'PreCompact';
 const USER_PROMPT_SUBMIT = 'UserPromptSubmit';
 const PRE_TOOL_USE = 'PreToolUse';
 
@@ -104,7 +105,7 @@ export function runInit(options: InitOptions = {}): InitResult {
 
   if (options.force) {
     if (settings.hooks) {
-      for (const event of [SESSION_END, USER_PROMPT_SUBMIT, PRE_TOOL_USE]) {
+      for (const event of [SESSION_END, PRE_COMPACT, USER_PROMPT_SUBMIT, PRE_TOOL_USE]) {
         const matchers = settings.hooks[event];
         if (!matchers) continue;
         settings.hooks[event] = matchers.filter(
@@ -114,7 +115,12 @@ export function runInit(options: InitOptions = {}): InitResult {
     }
   }
 
+  // SessionEnd: extract observations + populate cache entries.
   if (addHook(settings, SESSION_END, POST_SESSION_CMD())) added.push('SessionEnd');
+
+  // PreCompact: same pipeline, plus writes a warm-start file so the next
+  // UserPromptSubmit hook can restore context after compaction.
+  if (addHook(settings, PRE_COMPACT, POST_SESSION_CMD())) added.push('PreCompact');
 
   if (options.withCache) {
     if (addHook(settings, USER_PROMPT_SUBMIT, PRE_PROMPT_CMD())) added.push('UserPromptSubmit');

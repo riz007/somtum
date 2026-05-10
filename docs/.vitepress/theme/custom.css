@@ -1,0 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Somtum palette ─────────────────────────────────────── */
+:root {
+  --somtum-papaya:    #4ade80;
+  --somtum-chili:     #f87171;
+  --somtum-carrot:    #fbbf24;
+  --somtum-lime:      #a3e635;
+  --somtum-bg:        #090b0f;
+  --somtum-bg-card:   #11141b;
+  --somtum-bg-raised: #181c25;
+  --somtum-border:    #1e242f;
+  --somtum-border-hi: #2a3241;
+}
+
+/* ── Typography ─────────────────────────────────────────── */
+:root {
+  --vp-font-family-base: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Light mode brand (muted greens so it's readable) ───── */
+:root {
+  --vp-c-brand-1:    #16a34a;
+  --vp-c-brand-2:    #15803d;
+  --vp-c-brand-3:    #166534;
+  --vp-c-brand-soft: rgba(22, 163, 74, 0.12);
+}
+
+/* ── Dark mode — full Somtum palette ────────────────────── */
+.dark {
+  /* Backgrounds */
+  --vp-c-bg:        #090b0f;
+  --vp-c-bg-alt:    #0d1017;
+  --vp-c-bg-soft:   #11141b;
+  --vp-c-bg-mute:   #181c25;
+  --vp-c-bg-elv:    #11141b;
+
+  /* Brand — papaya green */
+  --vp-c-brand-1:   #4ade80;
+  --vp-c-brand-2:   #86efac;
+  --vp-c-brand-3:   #a3e635;
+  --vp-c-brand-soft: rgba(74, 222, 128, 0.14);
+
+  /* Text */
+  --vp-c-text-1:    #f0f2f5;
+  --vp-c-text-2:    #94a3b8;
+  --vp-c-text-3:    #64748b;
+
+  /* Borders & dividers */
+  --vp-c-divider:   #1e242f;
+  --vp-c-border:    #1e242f;
+  --vp-c-gutter:    #0d1017;
+
+  /* Semantic — chili red for danger, carrot for warning, papaya for tip */
+  --vp-c-danger-1:  #f87171;
+  --vp-c-danger-2:  #fca5a5;
+  --vp-c-danger-soft: rgba(248, 113, 113, 0.14);
+
+  --vp-c-warning-1: #fbbf24;
+  --vp-c-warning-2: #fcd34d;
+  --vp-c-warning-soft: rgba(251, 191, 36, 0.14);
+
+  --vp-c-tip-1:     #4ade80;
+  --vp-c-tip-2:     #86efac;
+  --vp-c-tip-soft:  rgba(74, 222, 128, 0.14);
+
+  /* Code blocks */
+  --vp-code-block-bg: #0d1117;
+  --vp-code-color:    #e6edf3;
+
+  /* Nav */
+  --vp-nav-bg-color:   rgba(9, 11, 15, 0.85);
+  --vp-nav-border-color: #1e242f;
+}
+
+/* ── Nav bar ────────────────────────────────────────────── */
+.dark .VPNav {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Nav title — plain weight, logo.png carries the visual identity */
+.VPNavBarTitle .title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+/* ── Home hero ──────────────────────────────────────────── */
+.VPHero .name .clip {
+  background: linear-gradient(135deg, var(--somtum-papaya) 0%, var(--somtum-lime) 45%, var(--somtum-carrot) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.VPHero .tagline {
+  color: #94a3b8;
+}
+
+/* Hero logo image */
+.VPHero .image-container {
+  max-width: 260px;
+}
+
+.VPHero .image-bg {
+  background: radial-gradient(circle, rgba(74, 222, 128, 0.12) 0%, transparent 70%);
+}
+
+.VPHero .image-src {
+  filter: drop-shadow(0 8px 24px rgba(74, 222, 128, 0.25));
+}
+
+/* Hero action buttons */
+.dark .VPButton.brand {
+  background: var(--somtum-papaya);
+  border-color: var(--somtum-papaya);
+  color: #052e16;
+  font-weight: 700;
+}
+
+.dark .VPButton.brand:hover {
+  background: var(--somtum-lime);
+  border-color: var(--somtum-lime);
+  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.3);
+}
+
+/* ── Feature cards ──────────────────────────────────────── */
+.dark .VPFeature {
+  background: var(--somtum-bg-card);
+  border-color: var(--somtum-border);
+  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+
+.dark .VPFeature:hover {
+  border-color: var(--somtum-border-hi);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.dark .VPFeature .title {
+  color: var(--somtum-papaya);
+  font-weight: 700;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+.dark .VPSidebar {
+  background: var(--somtum-bg-alt, #0d1017);
+  border-right-color: var(--somtum-border);
+}
+
+.dark .VPSidebarItem.is-active > .item .link .text {
+  color: var(--somtum-papaya);
+}
+
+/* ── Content area ───────────────────────────────────────── */
+.dark .VPDoc .vp-doc h1 { color: #f0f2f5; }
+.dark .VPDoc .vp-doc h2 {
+  color: #f0f2f5;
+  border-top-color: var(--somtum-border);
+}
+.dark .VPDoc .vp-doc h3 { color: #e2e8f0; }
+
+/* Inline code */
+.dark .vp-doc code {
+  background: var(--somtum-bg-raised);
+  color: var(--somtum-lime);
+  border-radius: 4px;
+}
+
+/* Code blocks */
+.dark .vp-doc div[class*='language-'] {
+  background: #0d1117;
+  border: 1px solid var(--somtum-border);
+  border-radius: 10px;
+}
+
+/* Custom container borders (tip / warning / danger) */
+.dark .custom-block.tip    { border-color: var(--somtum-papaya); }
+.dark .custom-block.warning{ border-color: var(--somtum-carrot); }
+.dark .custom-block.danger { border-color: var(--somtum-chili);  }
+
+/* ── Table ──────────────────────────────────────────────── */
+.dark .vp-doc table {
+  border-collapse: collapse;
+}
+.dark .vp-doc tr {
+  border-top-color: var(--somtum-border);
+}
+.dark .vp-doc th {
+  background: var(--somtum-bg-card);
+  color: var(--somtum-papaya);
+}
+.dark .vp-doc tr:nth-child(2n) {
+  background: var(--somtum-bg-card);
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+.dark .VPFooter {
+  background: var(--somtum-bg);
+  border-top-color: var(--somtum-border);
+  color: #64748b;
+}
+
+/* ── Search ─────────────────────────────────────────────── */
+.dark .VPLocalSearchBox {
+  --vp-local-search-bg: var(--somtum-bg-card);
+  --vp-local-search-result-bg: var(--somtum-bg-raised);
+  --vp-local-search-highlight-bg: rgba(74, 222, 128, 0.2);
+  --vp-local-search-highlight-text: var(--somtum-papaya);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+.dark ::-webkit-scrollbar               { width: 6px; }
+.dark ::-webkit-scrollbar-track        { background: var(--somtum-bg); }
+.dark ::-webkit-scrollbar-thumb        { background: var(--somtum-border-hi); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb:hover  { background: #3d4a5c; }

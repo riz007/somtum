@@ -15,13 +15,18 @@ afterEach(() => {
 });
 
 describe('runInit', () => {
-  it('creates .claude/settings.json with the SessionEnd hook', () => {
+  it('creates .claude/settings.json with SessionEnd and PreCompact hooks', () => {
     const r = runInit({ cwd: tmp });
     const settings = JSON.parse(readFileSync(r.settingsPath, 'utf8')) as {
-      hooks: { SessionEnd: { hooks: { command: string }[] }[] };
+      hooks: {
+        SessionEnd: { hooks: { command: string }[] }[];
+        PreCompact: { hooks: { command: string }[] }[];
+      };
     };
     expect(settings.hooks.SessionEnd[0]?.hooks[0]?.command).toMatch(/hook post_session/);
+    expect(settings.hooks.PreCompact[0]?.hooks[0]?.command).toMatch(/hook post_session/);
     expect(r.hooksInstalled).toContain('SessionEnd');
+    expect(r.hooksInstalled).toContain('PreCompact');
   });
 
   it('writes MCP config when withMcp is true', () => {
@@ -57,9 +62,10 @@ describe('runInit', () => {
     expect(r2.hooksInstalled).toHaveLength(0);
     expect(r2.alreadyInstalled).toBe(true);
     const settings = JSON.parse(readFileSync(r2.settingsPath, 'utf8')) as {
-      hooks: { SessionEnd: { hooks: unknown[] }[] };
+      hooks: { SessionEnd: { hooks: unknown[] }[]; PreCompact: { hooks: unknown[] }[] };
     };
     expect(settings.hooks.SessionEnd).toHaveLength(1);
+    expect(settings.hooks.PreCompact).toHaveLength(1);
   });
 
   it('force removes previous somtum hooks before reinstalling', () => {
