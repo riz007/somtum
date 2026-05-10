@@ -12,27 +12,6 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/somtum/logo.png' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    ['link', { rel: 'canonical', href: 'https://riz007.github.io/somtum/' }],
-
-    // SEO
-    ['meta', { name: 'keywords', content: 'Claude Code, AI memory, developer tools, local SQLite, prompt cache, Claude, Anthropic, session memory' }],
-    ['meta', { name: 'author', content: 'Rizwanul Islam Rudra' }],
-
-    // Open Graph
-    ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:site_name', content: 'Somtum' }],
-    ['meta', { property: 'og:title', content: 'Somtum — Local-first memory for Claude Code' }],
-    ['meta', { property: 'og:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code session — and injects them back on the next one. No cloud. No config. Just memory.' }],
-    ['meta', { property: 'og:url', content: 'https://riz007.github.io/somtum/' }],
-    ['meta', { property: 'og:image', content: 'https://riz007.github.io/somtum/logo.png' }],
-
-    // Twitter / X card
-    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:title', content: 'Somtum — Local-first memory for Claude Code' }],
-    ['meta', { name: 'twitter:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code session — and injects them back on the next one. No cloud. No config. Just memory.' }],
-    ['meta', { name: 'twitter:image', content: 'https://riz007.github.io/somtum/logo.png' }],
-
-    // Google Analytics
     ['script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-9621R7PP0X' }],
     ['script', {}, `window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
