@@ -1,5 +1,11 @@
 # somtum
 
+## 1.5.1
+
+### Patch Changes
+
+- 598d461: Update GitHub Pages deployment workflow to build VitePress docs before deploying (`docs/.vitepress/dist/` is now the deploy artifact instead of raw `docs/`). Fix VitePress `base` to `/somtum/` for correct asset paths on GitHub Pages. Add docs link to README header.
+
 ## 1.5.0
 
 ### Minor Changes
