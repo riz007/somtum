@@ -32,9 +32,15 @@ features:
   - icon: 🥕
     title: Local-Only Storage
     details: All data lives in a local SQLite WAL database at ~/.somtum/. No cloud accounts, no telemetry, no data leaves your machine except to the Anthropic API.
+  - icon: 🌐
+    title: Global Memory
+    details: Store personal preferences or workspace conventions once with `scope='global'` — they are injected across every project automatically via ~/.somtum/global.db.
+  - icon: 🔁
+    title: Memory Deduplication
+    details: After each session, near-duplicate observations are detected by title similarity and the older one is marked superseded. Your memory stays clean without manual pruning.
   - icon: 📊
     title: Visual Dashboard
-    details: Run `somtum serve` to open a browser dashboard — searchable memory browser, knowledge graph, analytics, and a forget button.
+    details: Run `somtum serve` to open a browser dashboard — searchable memory browser, knowledge graph, analytics, and a forget button. GitHub dark theme, readable at any zoom.
   - icon: 🔄
     title: Multi-Device Sync
     details: Synchronize memories across machines with SSH. Hostname-aware merging ensures no data loss across sessions from different machines.

@@ -162,12 +162,12 @@ export class MemoryStore {
     return row.n;
   }
 
-  // All non-deleted observations with scope = 'workspace' or 'global' for any project.
+  // All non-deleted, non-superseded observations with the given scope across all projects.
   listByScope(scope: ObservationScope, limit = 50): Observation[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM observations
-         WHERE scope = ? AND deleted_at IS NULL
+         WHERE scope = ? AND deleted_at IS NULL AND superseded_by IS NULL
          ORDER BY tokens_saved DESC, created_at DESC LIMIT ?`,
       )
       .all(scope, Math.floor(limit)) as ObservationRow[];
@@ -181,13 +181,20 @@ export class MemoryStore {
     return row ? rowToObservation(row) : null;
   }
 
+  markSuperseded(id: string, supersededBy: string): void {
+    this.db
+      .prepare(`UPDATE observations SET superseded_by = ? WHERE id = ? AND superseded_by IS NULL`)
+      .run(supersededBy, id);
+  }
+
   listByProject(
     projectId: string,
-    options: { includeDeleted?: boolean; limit?: number } = {},
+    options: { includeDeleted?: boolean; includeSuperseded?: boolean; limit?: number } = {},
   ): Observation[] {
-    const where = options.includeDeleted
-      ? `WHERE project_id = ?`
-      : `WHERE project_id = ? AND deleted_at IS NULL`;
+    const conditions = ['project_id = ?'];
+    if (!options.includeDeleted) conditions.push('deleted_at IS NULL');
+    if (!options.includeSuperseded) conditions.push('superseded_by IS NULL');
+    const where = `WHERE ${conditions.join(' AND ')}`;
     const limit = options.limit ? `LIMIT ${Math.floor(options.limit)}` : '';
     const rows = this.db
       .prepare(`SELECT * FROM observations ${where} ORDER BY created_at DESC ${limit}`)
@@ -204,7 +211,10 @@ export class MemoryStore {
 
   countByProject(projectId: string): number {
     const row = this.db
-      .prepare(`SELECT COUNT(*) AS n FROM observations WHERE project_id = ? AND deleted_at IS NULL`)
+      .prepare(
+        `SELECT COUNT(*) AS n FROM observations
+         WHERE project_id = ? AND deleted_at IS NULL AND superseded_by IS NULL`,
+      )
       .get(projectId) as { n: number };
     return row.n;
   }
@@ -286,24 +296,25 @@ export class MemoryStore {
     return info.changes;
   }
 
-  // Observations newer than `sinceMs`, most-recent first.
+  // Observations newer than `sinceMs`, most-recent first (excludes superseded).
   listRecent(projectId: string, sinceMs: number, limit = 100): Observation[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM observations
-         WHERE project_id = ? AND deleted_at IS NULL AND created_at >= ?
+         WHERE project_id = ? AND deleted_at IS NULL AND superseded_by IS NULL
+           AND created_at >= ?
          ORDER BY created_at DESC LIMIT ?`,
       )
       .all(projectId, sinceMs, Math.floor(limit)) as ObservationRow[];
     return rows.map(rowToObservation);
   }
 
-  // Latest N observations of a given kind.
+  // Latest N observations of a given kind (excludes superseded).
   listByKind(projectId: string, kind: ObservationKind, limit = 50): Observation[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM observations
-         WHERE project_id = ? AND kind = ? AND deleted_at IS NULL
+         WHERE project_id = ? AND kind = ? AND deleted_at IS NULL AND superseded_by IS NULL
          ORDER BY created_at DESC LIMIT ?`,
       )
       .all(projectId, kind, Math.floor(limit)) as ObservationRow[];

@@ -1,14 +1,16 @@
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { openDb } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { PromptCache } from '../core/cache.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { resolveProjectId } from '../core/project_id.js';
-import { projectDir } from '../config.js';
+import { projectDir, globalDbPath, GLOBAL_PROJECT_ID } from '../config.js';
 
 export interface StatsSnapshot {
   project_id: string;
   memories: number;
+  global_memories: number;
   by_kind: Record<string, number>;
   cache_entries: number;
   cache_hits: number;
@@ -28,6 +30,8 @@ export function collectStats(
   const projectId = opts.projectId ?? resolveProjectId(cwd);
   const dbPath = opts.dbPath ?? join(projectDir(projectId), 'db.sqlite');
   const db = openDb({ path: dbPath });
+  const gPath = globalDbPath();
+  const globalDb = existsSync(gPath) ? openDb({ path: gPath }) : null;
   try {
     const store = new MemoryStore(db);
     const cache = new PromptCache(db);
@@ -36,9 +40,13 @@ export function collectStats(
     const spent = store.totalTokensSpent(projectId);
     const cacheHits = statsStore.getCacheHitSummary(projectId);
     const retrievalBreakdown = statsStore.getRetrievalBreakdown(projectId);
+    const globalMemories = globalDb
+      ? new MemoryStore(globalDb).countByProject(GLOBAL_PROJECT_ID)
+      : 0;
     return {
       project_id: projectId,
       memories: store.countByProject(projectId),
+      global_memories: globalMemories,
       by_kind: store.countByKind(projectId),
       cache_entries: cache.count(),
       cache_hits: cacheHits.hit_count,
@@ -52,12 +60,14 @@ export function collectStats(
     };
   } finally {
     db.close();
+    globalDb?.close();
   }
 }
 
 function printHuman(s: StatsSnapshot): void {
   console.log(`project        ${s.project_id}`);
   console.log(`memories       ${s.memories}`);
+  if (s.global_memories > 0) console.log(`global         ${s.global_memories}`);
   for (const [k, n] of Object.entries(s.by_kind)) {
     if (n > 0) console.log(`  ${k.padEnd(15)} ${n}`);
   }

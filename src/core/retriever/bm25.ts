@@ -43,6 +43,7 @@ export class Bm25Retriever implements Retriever {
          WHERE observations_fts MATCH ?
            AND o.project_id = ?
            AND o.deleted_at IS NULL
+           AND o.superseded_by IS NULL
          ORDER BY score DESC
          LIMIT ?`,
       )

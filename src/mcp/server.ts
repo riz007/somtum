@@ -1,8 +1,7 @@
 import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadConfig } from '../config.js';
-import { projectDir } from '../config.js';
+import { loadConfig, projectDir, globalDbPath } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { resolveProjectId } from '../core/project_id.js';
 import type { Config } from '../core/schema.js';
@@ -75,7 +74,10 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
   const dbPath = opts.dbPath ?? join(projectDir(projectId), 'db.sqlite');
   const db = opts.db ?? openDb({ path: dbPath });
 
-  const context: ToolContext = { db, config, projectId };
+  // Always open global.db so remember(scope='global') can create it on first use.
+  const globalDb = openDb({ path: globalDbPath() });
+
+  const context: ToolContext = { db, config, projectId, globalDb };
 
   const server = new McpServer({ name: 'somtum', version: '1.4.0' }, { capabilities: {} });
 
@@ -226,6 +228,7 @@ export function buildServer(opts: BuildOptions = {}): BuildResult {
     context,
     close: () => {
       if (ownsDb) db.close();
+      globalDb.close();
     },
   };
 }

@@ -33,6 +33,7 @@ import {
   summaryHash,
 } from '../core/file_summary.js';
 import { writeMemoryMarkdown, memoriesDir } from '../core/memory_files.js';
+import { deduplicateObservations } from '../core/dedup.js';
 import type { Config } from '../core/schema.js';
 
 export const HookPayloadSchema = z
@@ -239,6 +240,7 @@ export interface RunOptions {
 export interface RunResult {
   projectId: string;
   inserted: number;
+  superseded: number;
   tokensSpent: number;
   tokensSavedTotal: number;
   indexPath: string;
@@ -315,6 +317,7 @@ export async function runPostSession(
     );
 
     let inserted = 0;
+    const insertedIds: string[] = [];
     for (const obs of outcome.observations) {
       const saved = estimateTokensSaved(transcriptTokens, obs, total);
       const stored = store.insert(
@@ -337,8 +340,12 @@ export async function runPostSession(
       } catch {
         // Non-fatal: SQLite is the source of truth.
       }
+      insertedIds.push(stored.id);
       inserted += 1;
     }
+
+    // M10: deduplicate — mark near-duplicate observations from prior sessions as superseded.
+    const dedupResult = deduplicateObservations(db, projectId, insertedIds);
 
     const tokensSavedTotal = store.totalTokensSaved(projectId);
 
@@ -377,6 +384,7 @@ export async function runPostSession(
     return {
       projectId,
       inserted,
+      superseded: dedupResult.superseded,
       tokensSpent: outcome.tokensSpent,
       tokensSavedTotal,
       indexPath,
@@ -409,13 +417,14 @@ export async function main(): Promise<void> {
     const payload = HookPayloadSchema.parse(JSON.parse(raw));
     const result = await runPostSession(payload);
     hookLog(
-      `[post_session] ok — inserted=${result.inserted} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
+      `[post_session] ok — inserted=${result.inserted} superseded=${result.superseded} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
     );
     // Hooks communicate via stdout; keep output structured.
     console.log(
       JSON.stringify({
         ok: true,
         inserted: result.inserted,
+        superseded: result.superseded,
         cache_entries_added: result.cacheEntriesAdded,
         summaries_generated: result.summariesGenerated,
         tokens_spent_estimated: result.tokensSpent,

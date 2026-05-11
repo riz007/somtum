@@ -5,7 +5,7 @@ const enNav = [
   { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
   { text: 'Troubleshooting', link: '/troubleshooting' },
   {
-    text: 'v1.5.0',
+    text: 'v2.0.0',
     items: [
       { text: 'Changelog', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -20,6 +20,7 @@ const enSidebar = [
       { text: 'Introduction', link: '/' },
       { text: 'Getting Started', link: '/guide/getting-started' },
       { text: 'How It Works', link: '/guide/how-it-works' },
+      { text: 'Limitations', link: '/guide/limitations' },
     ],
   },
   {
@@ -52,7 +53,7 @@ const thNav = [
   { text: 'เอกสารอ้างอิง', link: '/th/reference/cli', activeMatch: '/th/reference/' },
   { text: 'การแก้ปัญหา', link: '/th/troubleshooting' },
   {
-    text: 'v1.5.0',
+    text: 'v2.0.0',
     items: [
       { text: 'บันทึกการเปลี่ยนแปลง', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -67,6 +68,7 @@ const thSidebar = [
       { text: 'บทนำ', link: '/th/' },
       { text: 'เริ่มต้นใช้งาน', link: '/th/guide/getting-started' },
       { text: 'วิธีการทำงาน', link: '/th/guide/how-it-works' },
+      { text: 'ข้อจำกัด', link: '/th/guide/limitations' },
     ],
   },
   {
@@ -99,7 +101,7 @@ const bnNav = [
   { text: 'রেফারেন্স', link: '/bn/reference/cli', activeMatch: '/bn/reference/' },
   { text: 'সমস্যা সমাধান', link: '/bn/troubleshooting' },
   {
-    text: 'v1.5.0',
+    text: 'v2.0.0',
     items: [
       { text: 'পরিবর্তনলগ', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -114,6 +116,7 @@ const bnSidebar = [
       { text: 'পরিচিতি', link: '/bn/' },
       { text: 'শুরু করা', link: '/bn/guide/getting-started' },
       { text: 'এটি কীভাবে কাজ করে', link: '/bn/guide/how-it-works' },
+      { text: 'সীমাবদ্ধতা', link: '/bn/guide/limitations' },
     ],
   },
   {

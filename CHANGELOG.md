@@ -1,6 +1,6 @@
 # somtum
 
-## 2.0.0
+## 3.0.0
 
 ### Major Changes
 
@@ -35,6 +35,18 @@
   ```
 
   Run `somtum doctor` after upgrading to verify your config is valid.
+
+## 2.0.0
+
+### Major Changes
+
+- **Stats instrumentation fix** — `pre_prompt.ts` now records cache hits, cache misses, and BM25 retrievals via `RetrievalStatsStore`. Hook-path usage is reflected in `somtum stats` output, not just MCP tool calls.
+
+- **M9 — Global DB + cross-project workspace recall** — `scope='global'` observations are routed to `~/.somtum/global.db` (sentinel `project_id='__global__'`). Both `pre_prompt` auto-inject and MCP `recall` now query project + global DB and merge results. `somtum stats` shows a `global N` line. `remember` MCP tool returns `stored_in: 'global' | 'project'`. `get` falls back to `globalDb` when the id is not found in the project DB.
+
+- **M10 — Memory deduplication** — After each session extraction, `deduplicateObservations` runs a Jaccard title-similarity pass (threshold 0.6) over same-kind observations from prior sessions and marks near-duplicates as `superseded_by` the new observation. All retrieval queries (BM25, `listByProject`, `listByKind`, etc.) default to `AND superseded_by IS NULL`. `somtum list --show-superseded` opt-in flag restores the old behavior. Migration `005_dedup_index.sql` adds an index on `superseded_by`.
+
+- **Dashboard redesign** — Switched from Syne + Fira Code (amber theme) to Inter + JetBrains Mono with a GitHub dark palette (`#0d1117` background, `#2f81f7` accent). Removed grain overlay and ambient glow. Minimum font size raised from 9px → 11px, body text 13px → 14px. Filter chips now pill-shaped. All text is readable at any zoom level.
 
 ## 1.5.1
 

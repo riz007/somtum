@@ -2,6 +2,8 @@
 
 Somtum includes a local web dashboard for browsing and managing your memories visually.
 
+The dashboard uses a GitHub-style dark theme (Inter font, `#0d1117` background, `#2f81f7` accent) and is designed to be readable at all zoom levels — minimum font size 11px, body text 14px.
+
 ## Starting the dashboard
 
 ```bash

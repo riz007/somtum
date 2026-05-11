@@ -118,14 +118,16 @@ cat ~/.somtum/hook.log
 A successful run:
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
+
+The `superseded=N` field shows how many older near-duplicate memories were marked superseded by newly extracted ones.
 
 Using the `claude` CLI fallback (no API key):
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
 2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
 **2. Check stats**

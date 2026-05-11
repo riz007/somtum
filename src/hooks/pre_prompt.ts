@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { loadConfig, projectDir } from '../config.js';
+import { loadConfig, projectDir, globalDbPath, GLOBAL_PROJECT_ID } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { MemoryStore } from '../core/store.js';
@@ -12,7 +12,9 @@ import { fingerprintFiles } from '../core/fingerprint.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
 import { getEmbedder, isEmbedderReady } from '../core/embeddings.js';
+import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import type { Config, CacheEntry } from '../core/schema.js';
+import type { RetrievalResult } from '../core/retriever/types.js';
 
 export const PrePromptPayloadSchema = z
   .object({
@@ -184,10 +186,27 @@ interface MemoryContextResult {
   injectedChars: number;
 }
 
+// Merge results from multiple DBs: dedup by id, sort by score descending, take top k.
+function mergeResults(sets: RetrievalResult[][], k: number): RetrievalResult[] {
+  const seen = new Set<string>();
+  const merged: RetrievalResult[] = [];
+  for (const set of sets) {
+    for (const r of set) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        merged.push(r);
+      }
+    }
+  }
+  return merged.sort((a, b) => b.score - a.score).slice(0, k);
+}
+
 // Build the memory injection block for a given prompt. Uses BM25 (fast, no
 // embedding needed) so it fits within the hot-path latency budget.
+// Also queries globalDb (if provided) and merges results for cross-project memories.
 async function buildMemoryContext(
   db: DB,
+  globalDb: DB | null,
   projectId: string,
   prompt: string,
   config: Config,
@@ -195,21 +214,48 @@ async function buildMemoryContext(
   if (!config.injection.enabled) return null;
 
   const { k, max_chars: limit, min_relevance_score: minScore } = config.injection;
-  const retriever = new Bm25Retriever(db);
-  let results;
+
+  const projectRetriever = new Bm25Retriever(db);
+  let projectResults: RetrievalResult[];
   try {
-    results = await retriever.search(prompt, { k, projectId });
+    projectResults = await projectRetriever.search(prompt, { k, projectId });
   } catch {
     return null;
   }
+
+  // Also search global.db for cross-project memories.
+  let globalResults: RetrievalResult[] = [];
+  if (globalDb) {
+    try {
+      const globalRetriever = new Bm25Retriever(globalDb);
+      globalResults = await globalRetriever.search(prompt, {
+        k: Math.ceil(k / 2),
+        projectId: GLOBAL_PROJECT_ID,
+      });
+    } catch {
+      // Non-fatal: global db search failure must not block the hot path.
+    }
+  }
+
+  let results = mergeResults([projectResults, globalResults], k);
 
   // Filter by relevance threshold — avoids injecting weakly matched memories.
   if (minScore > 0) results = results.filter((r) => r.score >= minScore);
   if (results.length === 0) return null;
 
+  new RetrievalStatsStore(db).incrementRetrieval(projectId, 'bm25');
   const store = new MemoryStore(db);
-  for (const r of results) store.confirmRetrieval(r.id);
-  const totalCount = store.countByProject(projectId);
+  const globalStore = globalDb ? new MemoryStore(globalDb) : null;
+  for (const r of results) {
+    if (r.observation.scope === 'global' && globalStore) {
+      globalStore.confirmRetrieval(r.id);
+    } else {
+      store.confirmRetrieval(r.id);
+    }
+  }
+  const totalCount =
+    store.countByProject(projectId) +
+    (globalStore ? globalStore.countByProject(GLOBAL_PROJECT_ID) : 0);
 
   const lines = results
     .map((r) => `[${r.observation.kind}] ${r.observation.title}\n${r.observation.body}`)
@@ -239,6 +285,10 @@ export async function runPrePrompt(
   const ownsDb = opts.db === undefined;
   const dbPath = opts.dbPath ?? join(projectDir(projectId), 'db.sqlite');
   const db = opts.db ?? openDb({ path: dbPath });
+
+  // Open global.db if it exists so cross-project memories can be injected.
+  const gPath = globalDbPath();
+  const globalDb = existsSync(gPath) ? openDb({ path: gPath }) : null;
 
   try {
     const cache = new PromptCache(db);
@@ -304,6 +354,7 @@ export async function runPrePrompt(
 
     if (cacheHit) {
       cache.touch(cacheHit.id);
+      new RetrievalStatsStore(db).incrementCacheHit(projectId);
       writeLastHit(projectId, {
         cache_entry_id: cacheHit.id,
         prompt_hash: currentHash,
@@ -333,12 +384,15 @@ export async function runPrePrompt(
 
     // On cache miss: inject relevant memories + any warm-start context written
     // by the PreCompact hook so context survives compaction.
+    if (config.cache.enabled) {
+      new RetrievalStatsStore(db).incrementCacheMiss(projectId);
+    }
     const parts: string[] = [];
 
     const warmStart = readAndConsumeWarmStart(projectId);
     if (warmStart) parts.push(warmStart);
 
-    const memResult = await buildMemoryContext(db, projectId, prompt, config);
+    const memResult = await buildMemoryContext(db, globalDb, projectId, prompt, config);
     if (memResult) parts.push(memResult.context);
 
     if (parts.length > 0) {
@@ -367,5 +421,6 @@ export async function runPrePrompt(
     return { ok: true, hit: false, reason };
   } finally {
     if (ownsDb) db.close();
+    globalDb?.close();
   }
 }
