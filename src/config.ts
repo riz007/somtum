@@ -7,6 +7,14 @@ export const GLOBAL_DIR = process.env['SOMTUM_HOME'] ?? join(homedir(), '.somtum
 export const GLOBAL_CONFIG_PATH = join(GLOBAL_DIR, 'config.json');
 export const PROJECT_CONFIG_RELATIVE = join('.somtum', 'config.json');
 
+// Sentinel project_id used for observations stored in global.db.
+// All scope='global' memories are written here so they're retrievable across projects.
+export const GLOBAL_PROJECT_ID = '__global__';
+
+export function globalDbPath(): string {
+  return join(GLOBAL_DIR, 'global.db');
+}
+
 function readJsonIfExists(path: string): unknown {
   if (!existsSync(path)) return undefined;
   try {

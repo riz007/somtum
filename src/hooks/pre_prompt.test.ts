@@ -7,6 +7,7 @@ import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { ConfigSchema } from '../core/schema.js';
 import { MemoryStore } from '../core/store.js';
+import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { runPrePrompt } from './pre_prompt.js';
 
 let tmp: string;
@@ -113,6 +114,48 @@ describe('runPrePrompt', () => {
     expect(r.hit).toBe(false);
     expect(r.hookSpecificOutput?.hookEventName).toBe('UserPromptSubmit');
     expect(r.hookSpecificOutput?.additionalContext).toContain('always use pnpm');
+  });
+
+  it('records a cache hit in retrieval_stats', async () => {
+    writeFileSync(join(tmp, 'readme.md'), 'stable');
+    seed('explain caching', 'Caching stores prompt->response pairs.', ['readme.md']);
+    await runPrePrompt(
+      { prompt: 'explain caching', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    const stats = new RetrievalStatsStore(db).getCacheHitSummary('p1');
+    expect(stats.hit_count).toBe(1);
+    expect(stats.miss_count).toBe(0);
+  });
+
+  it('records a cache miss in retrieval_stats', async () => {
+    await runPrePrompt(
+      { prompt: 'something not cached', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    const stats = new RetrievalStatsStore(db).getCacheHitSummary('p1');
+    expect(stats.miss_count).toBe(1);
+    expect(stats.hit_count).toBe(0);
+  });
+
+  it('records bm25 retrieval in retrieval_stats when memories are injected', async () => {
+    const store = new MemoryStore(db);
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'decision',
+      title: 'use vitest not jest',
+      body: 'Switched to vitest for speed.',
+      files: [],
+      tags: [],
+    });
+    await runPrePrompt(
+      { prompt: 'which test framework does this project use', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    const breakdown = new RetrievalStatsStore(db).getRetrievalBreakdown('p1');
+    const bm25 = breakdown.find((r) => r.strategy === 'bm25');
+    expect(bm25?.call_count).toBeGreaterThanOrEqual(1);
   });
 
   it('skips memory injection when injection.enabled is false', async () => {

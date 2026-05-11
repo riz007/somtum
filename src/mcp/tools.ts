@@ -7,6 +7,8 @@ import { makeRetriever, strategyAvailable } from '../core/retriever/factory.js';
 import { RetrievalStrategy, ObservationKind, ObservationScope } from '../core/schema.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { countTokens } from '../core/tokens.js';
+import { GLOBAL_PROJECT_ID } from '../config.js';
+import type { RetrievalResult } from '../core/retriever/types.js';
 
 // Shared zod-derived JSON schemas for the six MCP tools.
 // Response bodies always include a `tokens` field to keep callers honest
@@ -59,6 +61,23 @@ export interface ToolContext {
   db: DB;
   config: Config;
   projectId: string;
+  // Open connection to ~/.somtum/global.db for cross-project recall (M9).
+  globalDb?: DB;
+}
+
+// Merge results from multiple DBs: dedup by id, sort by score descending, take top k.
+function mergeResults(sets: RetrievalResult[][], k: number): RetrievalResult[] {
+  const seen = new Set<string>();
+  const merged: RetrievalResult[] = [];
+  for (const set of sets) {
+    for (const r of set) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        merged.push(r);
+      }
+    }
+  }
+  return merged.sort((a, b) => b.score - a.score).slice(0, k);
 }
 
 export async function recall(
@@ -69,16 +88,37 @@ export async function recall(
   const k = input.k ?? ctx.config.retrieval.k;
   const retriever = makeRetriever(strategy, ctx.db, ctx.config);
   const fallback = !strategyAvailable(strategy, ctx.config);
-  const results = await retriever.search(input.query, { k, projectId: ctx.projectId });
+  const projectResults = await retriever.search(input.query, { k, projectId: ctx.projectId });
+
+  // M9: also search global.db so cross-project memories are surfaced.
+  let globalResults: RetrievalResult[] = [];
+  if (ctx.globalDb) {
+    try {
+      const globalRetriever = makeRetriever('bm25', ctx.globalDb, ctx.config);
+      globalResults = await globalRetriever.search(input.query, {
+        k: Math.ceil(k / 2),
+        projectId: GLOBAL_PROJECT_ID,
+      });
+    } catch {
+      // Non-fatal: global db failure must not break recall.
+    }
+  }
+
+  const results = mergeResults([projectResults, globalResults], k);
 
   // Log which strategy was actually used.
   const statsStore = new RetrievalStatsStore(ctx.db);
   statsStore.incrementRetrieval(ctx.projectId, retriever.name as typeof strategy);
 
-  // Confirm retrieval so last_confirmed_at stays fresh (gap #7 staleness tracking).
+  // Confirm retrieval so last_confirmed_at stays fresh.
   const store = new MemoryStore(ctx.db);
+  const globalStore = ctx.globalDb ? new MemoryStore(ctx.globalDb) : null;
   for (const r of results) {
-    store.confirmRetrieval(r.id);
+    if (r.observation.scope === 'global' && globalStore) {
+      globalStore.confirmRetrieval(r.id);
+    } else {
+      store.confirmRetrieval(r.id);
+    }
   }
 
   const resultsPayload = results.map((r) => ({
@@ -112,13 +152,19 @@ export function wrapMemoryBody(body: string): string {
 
 export function get(ctx: ToolContext, input: z.infer<typeof GetInput>): object {
   const store = new MemoryStore(ctx.db);
+  // Also check globalDb — the id might belong to a global observation.
+  const globalStore = ctx.globalDb ? new MemoryStore(ctx.globalDb) : null;
+
   const observations = input.ids
-    .map((id) => store.get(id))
+    .map((id) => store.get(id) ?? globalStore?.get(id) ?? null)
     .filter((o): o is NonNullable<typeof o> => o !== null && o.deleted_at === null);
 
-  // Confirm retrieval so last_confirmed_at stays fresh (gap #7 staleness tracking).
   for (const o of observations) {
-    store.confirmRetrieval(o.id);
+    if (o.scope === 'global' && globalStore) {
+      globalStore.confirmRetrieval(o.id);
+    } else {
+      store.confirmRetrieval(o.id);
+    }
   }
 
   return {
@@ -138,10 +184,15 @@ export function get(ctx: ToolContext, input: z.infer<typeof GetInput>): object {
 }
 
 export function remember(ctx: ToolContext, input: z.infer<typeof RememberInput>): object {
-  const store = new MemoryStore(ctx.db);
+  // M9: route global-scope memories to global.db.
+  const isGlobal = input.scope === 'global';
+  const targetDb = isGlobal && ctx.globalDb ? ctx.globalDb : ctx.db;
+  const targetProjectId = isGlobal ? GLOBAL_PROJECT_ID : ctx.projectId;
+
+  const store = new MemoryStore(targetDb);
   const obs = store.insert(
     {
-      project_id: ctx.projectId,
+      project_id: targetProjectId,
       session_id: 'manual',
       kind: input.kind,
       title: input.title,
@@ -152,20 +203,14 @@ export function remember(ctx: ToolContext, input: z.infer<typeof RememberInput>)
     },
     { redactPatterns: ctx.config.privacy.redact_patterns },
   );
-  const result: Record<string, unknown> = {
+  return {
     id: obs.id,
     title: obs.title,
     kind: obs.kind,
     scope: obs.scope,
+    stored_in: isGlobal ? 'global' : 'project',
     tokens: countTokens(obs.title) + countTokens(obs.body),
   };
-  if (obs.scope === 'workspace' || obs.scope === 'global') {
-    result.notice =
-      `Stored with scope='${obs.scope}'. Cross-project auto-injection is not yet active ` +
-      `(coming in v1.4). This memory will appear in recall() results for any project but ` +
-      `will not be injected automatically into other project prompts.`;
-  }
-  return result;
 }
 
 export function update(ctx: ToolContext, input: z.infer<typeof UpdateInput>): object {
@@ -245,9 +290,15 @@ export function stats(ctx: ToolContext): object {
   const spent = store.totalTokensSpent(ctx.projectId);
   const cacheHits = statsStore.getCacheHitSummary(ctx.projectId);
   const retrievalBreakdown = statsStore.getRetrievalBreakdown(ctx.projectId);
+
+  const globalMemories = ctx.globalDb
+    ? new MemoryStore(ctx.globalDb).countByProject(GLOBAL_PROJECT_ID)
+    : 0;
+
   return {
     project_id: ctx.projectId,
     memories: store.countByProject(ctx.projectId),
+    global_memories: globalMemories,
     by_kind: store.countByKind(ctx.projectId),
     cache_entries: cache.count(),
     cache_hits: cacheHits.hit_count,

@@ -1,5 +1,53 @@
 # somtum
 
+## 3.0.0
+
+### Major Changes
+
+- 3d1f0fa: **Breaking defaults — check before upgrading.**
+
+  Several defaults changed in ways that affect existing installations silently. If you upgrade without reading this, your injection window will shrink and file-gating will turn on.
+
+  ### What changed
+
+  | Setting                            | Old default | New default | Impact                                                                          |
+  | ---------------------------------- | ----------- | ----------- | ------------------------------------------------------------------------------- |
+  | `file_gating.enabled`              | `false`     | `true`      | File reads are now intercepted and replaced with cached summaries by default    |
+  | `file_gating.min_file_size_tokens` | `500`       | `300`       | More files are gated (smaller threshold)                                        |
+  | `injection.k`                      | `5`         | `3`         | Fewer memories injected per prompt                                              |
+  | `injection.max_chars`              | `3000`      | `1500`      | Smaller injection window                                                        |
+  | `retrieval.strategy`               | `hybrid`    | `bm25`      | Hybrid required embeddings that are off by default — bm25 is the honest default |
+
+  ### New features (non-breaking)
+  - **`injection.show_budget`** (default: `true`) — Prepends a `[somtum] injected N/M memories (~X tokens)` line to every prompt so you can see exactly what is being injected.
+  - **`injection.min_relevance_score`** (default: `0`) — Raise to a positive value (e.g. `1.0`) to filter out weakly-matched memories and reduce noise.
+  - **Extractor retry is cheaper** — On schema-validation failure, retries now send only the bad output + error instead of the full transcript again. Halves the token cost of every failed extraction attempt.
+
+  ### How to keep v1.x behaviour after upgrading
+
+  Add these to `~/.somtum/config.json` (or `.somtum/config.json` in your project):
+
+  ```json
+  {
+    "file_gating": { "enabled": false },
+    "injection": { "k": 5, "max_chars": 3000 }
+  }
+  ```
+
+  Run `somtum doctor` after upgrading to verify your config is valid.
+
+## 2.0.0
+
+### Major Changes
+
+- **Stats instrumentation fix** — `pre_prompt.ts` now records cache hits, cache misses, and BM25 retrievals via `RetrievalStatsStore`. Hook-path usage is reflected in `somtum stats` output, not just MCP tool calls.
+
+- **M9 — Global DB + cross-project workspace recall** — `scope='global'` observations are routed to `~/.somtum/global.db` (sentinel `project_id='__global__'`). Both `pre_prompt` auto-inject and MCP `recall` now query project + global DB and merge results. `somtum stats` shows a `global N` line. `remember` MCP tool returns `stored_in: 'global' | 'project'`. `get` falls back to `globalDb` when the id is not found in the project DB.
+
+- **M10 — Memory deduplication** — After each session extraction, `deduplicateObservations` runs a Jaccard title-similarity pass (threshold 0.6) over same-kind observations from prior sessions and marks near-duplicates as `superseded_by` the new observation. All retrieval queries (BM25, `listByProject`, `listByKind`, etc.) default to `AND superseded_by IS NULL`. `somtum list --show-superseded` opt-in flag restores the old behavior. Migration `005_dedup_index.sql` adds an index on `superseded_by`.
+
+- **Dashboard redesign** — Switched from Syne + Fira Code (amber theme) to Inter + JetBrains Mono with a GitHub dark palette (`#0d1117` background, `#2f81f7` accent). Removed grain overlay and ambient glow. Minimum font size raised from 9px → 11px, body text 13px → 14px. Filter chips now pill-shaped. All text is readable at any zoom level.
+
 ## 1.5.1
 
 ### Patch Changes

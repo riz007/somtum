@@ -33,7 +33,7 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
-> **v1.6.0** — Token budget mode (`injection.show_budget`) · file-gating on by default · BM25 relevance threshold (`injection.min_relevance_score`) · extractor retry no longer re-sends full transcript · injection defaults tightened (k=3, max_chars=1500)
+> **v2.0.0** — Global DB (`~/.somtum/global.db`) · cross-project workspace recall · memory deduplication (`superseded_by`) · `--show-superseded` on `somtum list` · stats instrumentation fix · dashboard dark-mode redesign
 >
 > **v1.5.0** — Multi-page VitePress docs site · `somtum list` · `somtum reset` · `somtum forget --all` · embeddings timeout safety · config crash-resilience · `injection.max_chars` wired up · warm-start race fix · auth-error hints
 >
@@ -326,7 +326,7 @@ A successful run:
 
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
 Using the `claude` CLI fallback (no API key):
@@ -334,7 +334,7 @@ Using the `claude` CLI fallback (no API key):
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
 2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
+2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
 Neither backend available:
@@ -401,10 +401,11 @@ Press `Ctrl-C` to stop.
 
 | Command                                      | Description                                                                   |
 | -------------------------------------------- | ----------------------------------------------------------------------------- |
-| `somtum list`                                | List stored memories (most recent first)                                      |
+| `somtum list`                                | List stored memories (most recent first, superseded hidden by default)        |
 | `somtum list --kind decision`                | Filter by kind: `decision \| learning \| bugfix \| command \| file_summary`   |
 | `somtum list --limit 20`                     | Limit to 20 results                                                           |
 | `somtum list --json`                         | Machine-readable JSON output                                                  |
+| `somtum list --show-superseded`              | Include memories that have been superseded by a newer duplicate               |
 | `somtum search <query>`                      | Search observations (default: `bm25` strategy)                                |
 | `somtum search <query> --strategy hybrid`    | Force a specific retrieval strategy                                           |
 | `somtum search <query> -k 16`                | Return more results                                                           |
@@ -470,16 +471,16 @@ Somtum uses hostname-aware syncing — merging observations from multiple machin
 
 When you run `somtum init --all`, Somtum registers an MCP server that Claude can call autonomously during a session:
 
-| Tool                | What Claude does with it                                                                       |
-| ------------------- | ---------------------------------------------------------------------------------------------- |
-| `recall`            | Searches memories when unsure about a project detail. Accepts `strategy` and `scope` overrides |
-| `get`               | Retrieves full observation bodies by ID. Bumps `last_confirmed_at` on each hit                 |
-| `remember`          | Stores an observation manually. Accepts `scope: 'project' \| 'workspace' \| 'global'`          |
-| `update`            | Updates an existing observation's title, body, tags, or files. Redaction applied               |
-| `cache_lookup`      | Checks the prompt cache directly                                                               |
-| `report_false_hit`  | Reports that a cached response didn't answer the question (tunes fuzzy threshold data)         |
-| `forget`            | Soft-deletes an observation                                                                    |
-| `stats`             | Reports tokens saved, cache hit rate, false-hit count, and corpus size                         |
+| Tool                | What Claude does with it                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `recall`            | Searches memories when unsure about a project detail. Merges project + global DB results. Accepts `strategy`    |
+| `get`               | Retrieves full observation bodies by ID. Checks global DB if not found in project DB. Bumps `last_confirmed_at` |
+| `remember`          | Stores an observation manually. `scope='global'` routes to `~/.somtum/global.db`; returns `stored_in` field     |
+| `update`            | Updates an existing observation's title, body, tags, or files. Redaction applied                                |
+| `cache_lookup`      | Checks the prompt cache directly                                                                                 |
+| `report_false_hit`  | Reports that a cached response didn't answer the question (tunes fuzzy threshold data)                          |
+| `forget`            | Soft-deletes an observation                                                                                      |
+| `stats`             | Reports tokens saved, cache hit rate, false-hit count, corpus size, and `global_memories` count                 |
 
 Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
 
@@ -506,6 +507,8 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 ~/.somtum/
 ├── config.json                         ← global config (merged with project config)
 ├── hook.log                            ← timestamped log of every hook execution
+├── global.db                           ← global-scope memories (scope='global'), queried
+│                                         alongside every project DB on recall + auto-inject
 ├── session/
 │   └── lh_<id>.json                    ← last cache-hit state per project (false-hit detection)
 │                                         files older than 24 h are evicted automatically

@@ -16,6 +16,7 @@ export function listCommand(opts: {
   kind?: string;
   limit?: number;
   json?: boolean;
+  showSuperseded?: boolean;
 } = {}): number {
   const cwd = opts.cwd ?? process.cwd();
   const projectId = opts.projectId ?? resolveProjectId(cwd);
@@ -36,7 +37,10 @@ export function listCommand(opts: {
   const db = openDb({ path: dbPath });
   try {
     const store = new MemoryStore(db);
-    let observations = store.listByProject(projectId, { limit: opts.limit ?? 50 });
+    let observations = store.listByProject(projectId, {
+      limit: opts.limit ?? 50,
+      ...(opts.showSuperseded ? { includeSuperseded: true } : {}),
+    });
 
     if (opts.kind) {
       observations = observations.filter((o) => o.kind === (opts.kind as ObservationKindType));

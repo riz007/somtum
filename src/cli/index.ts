@@ -124,8 +124,9 @@ program
   .description('List stored memories for the current project')
   .option('--kind <kind>', 'Filter by kind: decision | learning | bugfix | command | file_summary | other')
   .option('-k, --limit <n>', 'Max results (default 50)', (v) => Number.parseInt(v, 10))
+  .option('--show-superseded', 'Include observations that have been superseded by newer ones')
   .option('--json', 'Emit JSON')
-  .action((opts: { kind?: string; limit?: number; json?: boolean }) => {
+  .action((opts: { kind?: string; limit?: number; showSuperseded?: boolean; json?: boolean }) => {
     const code = listCommand(opts);
     process.exit(code);
   });
