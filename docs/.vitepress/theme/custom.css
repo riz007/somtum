@@ -70,12 +70,21 @@
   --vp-code-color:    #e6edf3;
 
   /* Nav */
-  --vp-nav-bg-color:   rgba(9, 11, 15, 0.85);
-  --vp-nav-border-color: #1e242f;
+  --vp-nav-bg-color:        rgba(9, 11, 15, 0.85);
+  --vp-nav-border-color:    #1e242f;
+  --vp-nav-screen-bg-color: #090b0f;
 }
 
 /* ── Nav bar ────────────────────────────────────────────── */
-.dark .VPNav {
+/*
+ * backdrop-filter MUST be on .VPNavBar, not .VPNav.
+ * .VPNav wraps both .VPNavBar and .VPNavScreen as siblings.
+ * Applying backdrop-filter to .VPNav creates a stacking/compositing context
+ * that traps .VPNavScreen — on iOS Safari, position:fixed inside a
+ * backdrop-filter parent becomes relative to that parent instead of the
+ * viewport, so the mobile menu never escapes the 64 px nav bar.
+ */
+.dark .VPNavBar {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -222,8 +231,19 @@
 /* Solid opaque background for mobile overlay so content doesn't bleed through */
 @media (max-width: 959px) {
   .VPNavScreen {
-    background: var(--vp-c-bg) !important;
+    /*
+     * z-index must be declared here (not inside .VPNav's stacking context)
+     * so the screen stacks above the page body on all browsers.
+     * backdrop-filter was moved off .VPNav so this fixed element is now
+     * positioned relative to the viewport, not the nav container.
+     */
+    position: fixed !important;
     top: var(--vp-nav-height) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 100 !important;
+    background: var(--vp-c-bg) !important;
     padding-bottom: env(safe-area-inset-bottom, 24px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -262,20 +282,83 @@
     text-overflow: ellipsis;
   }
 
-  /* Language switcher items in mobile menu — bigger tap target */
-  .VPNavScreenTranslations .items a,
+  /* VitePress sets display:flex on .VPNavScreen.open via scoped CSS.
+     A flex container's overflow-y:auto only scrolls when children have
+     min-height:0 — without it the container grows to fit children instead
+     of scrolling them. Switching to block is simpler and always scrolls. */
+  .VPNavScreen {
+    display: block !important;
+  }
+
+  /* Ensure the inner container never clips its children */
+  .VPNavScreen .container {
+    min-height: 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+  }
+
+  /* ── Language switcher (VPNavScreenTranslations) ─────────── */
+  /* VitePress uses class "list" for the expanded ul, not "items". */
+  .VPNavScreenTranslations {
+    padding-top: 12px;
+    border-top: 1px solid var(--somtum-border, var(--vp-c-divider));
+    margin-top: 8px;
+  }
+
+  /* Title button — full-width, tappable, matches VPNavScreenMenu heading style */
+  .VPNavScreenTranslations .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 0;
+    min-height: 44px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: #213547;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    font-family: inherit;
+  }
+
+  .dark .VPNavScreenTranslations .title {
+    color: #f0f2f5;
+  }
+
+  /* Language list — overflow visible so entries aren't clipped */
+  .VPNavScreenTranslations .list {
+    overflow: visible;
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0 0;
+  }
+
+  /* Individual language link — 44 px tap target, matches nav screen link style */
+  .VPNavScreenTranslations .list .item {
+    display: block;
+  }
+
+  .VPNavScreenTranslations .list .link {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    min-height: 44px;
+    color: #213547;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .dark .VPNavScreenTranslations .list .link {
+    color: #f0f2f5;
+  }
+
+  /* Menu group links — bigger tap target */
   .VPNavScreenMenuGroupLink {
     padding: 10px 12px;
     min-height: 44px;
     display: flex;
     align-items: center;
-  }
-
-  /* Separate language switcher section with a subtle divider */
-  .VPNavScreenTranslations {
-    padding-top: 12px;
-    border-top: 1px solid var(--somtum-border, var(--vp-c-divider));
-    margin-top: 8px;
   }
 
   /* Give the nav screen menu items more breathing room */
@@ -286,7 +369,7 @@
 
 /* iOS-specific: replace backdrop-filter with solid bg to avoid rendering glitch */
 @supports (-webkit-touch-callout: none) {
-  .dark .VPNav {
+  .dark .VPNavBar {
     background: rgba(9, 11, 15, 0.97);
   }
 }
