@@ -1,5 +1,30 @@
 # Getting Started
 
+## Before you begin — pick your setup
+
+**Using Claude Code (subscription)?**
+You do not need an API key. Somtum calls the `claude` CLI that ships with Claude Code.
+Confirm it is installed:
+
+```bash
+which claude
+```
+
+If nothing prints, reinstall Claude Code or add its binary to your PATH.
+
+**Using the Anthropic API directly?**
+Add your key to your shell profile (not just the current terminal tab):
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export ANTHROPIC_API_KEY="sk-ant-..."
+source ~/.zshrc
+```
+
+Both paths work. Most Claude Code users should use Option A.
+
+---
+
 ## Requirements
 
 - **Node.js 20+**
@@ -36,27 +61,7 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ## Quickstart
 
-### Step 1 — Choose an extraction backend
-
-Somtum calls a Claude model at session end to extract observations. Pick one:
-
-**Option A: Claude Code subscription (no extra setup)**
-
-If you have Claude Code installed, you're done. Somtum calls `claude --print` automatically when no API key is present. Skip to Step 2.
-
-**Option B: Direct Anthropic API key (optional — faster, lets you pick the model)**
-
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export ANTHROPIC_API_KEY="sk-ant-..."
-source ~/.zshrc
-```
-
-::: warning
-The key must be in your shell profile, not just exported in an open terminal tab. The `SessionEnd` hook inherits the environment of the shell that *started* Claude Code.
-:::
-
-### Step 2 — Initialize in your project
+### Step 1 — Initialize in your project
 
 Run from the **root of the project you work on with Claude Code**:
 
@@ -73,6 +78,31 @@ somtum init --all
 #   - UserPromptSubmit cache hook  (prompt cache + auto-inject)
 #   - PreToolUse file-gating hook  (large file summarization)
 #   - MCP server in .mcp.json     (Claude can call recall/remember tools)
+```
+
+### Step 2 — Verify your setup
+
+Run doctor immediately after init to confirm everything is connected:
+
+```bash
+somtum doctor
+```
+
+All checks should show a checkmark. The two most important are:
+
+- **`api_key`** — confirms Somtum has a way to call Claude for extraction
+- **`hooks_installed`** — confirms the SessionEnd and cache hooks are registered
+
+::: warning
+Do not proceed to Step 3 until all checks pass. Fix any failing checks now — troubleshooting after a session is harder.
+:::
+
+Each failing check now shows an inline fix command. For example:
+
+```
+✗  api_key                Neither ANTHROPIC_API_KEY nor claude CLI available — extraction will fail
+               Fix A (Claude Code): which claude
+               Fix B (API key):     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc
 ```
 
 ### Step 3 — Work normally
@@ -94,14 +124,6 @@ somtum serve
 ```
 
 If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](/troubleshooting).
-
-### Step 5 — Diagnose issues
-
-```bash
-somtum doctor
-```
-
-This checks your API key, DB health, hook installation, migrations, cache, and breakeven ratio — with specific fix instructions for each failing check.
 
 ---
 

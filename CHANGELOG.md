@@ -1,5 +1,38 @@
 # somtum
 
+## 2.2.0
+
+### Minor Changes
+
+- Improve onboarding diagnostics and silent-failure detection (v2.2.0)
+
+  **FIX-01 — Backend warning on `somtum init`**
+  If neither `claude` CLI nor `ANTHROPIC_API_KEY` is available when `somtum init` runs, a prominent warning is now printed to stderr with exact fix commands. Previously the tool completed silently and users discovered the problem only after a zero-memory session.
+
+  **FIX-02 — Shell profile detection on `somtum init`**
+  If `ANTHROPIC_API_KEY` is set in the current terminal but not in `~/.zshrc`, `~/.bashrc`, or `~/.profile`, a targeted notice is printed explaining that the SessionEnd hook subprocess will not inherit the key.
+
+  **FIX-03 — `somtum doctor` moved to Step 2 of Getting Started**
+  Doctor now appears immediately after `somtum init` in the docs, before the first session. The surrounding copy explicitly tells users not to proceed until all checks pass.
+
+  **FIX-04 — Two-path setup callout at the top of Getting Started**
+  A "Before you begin" section now appears as the first content block on the Getting Started page, explaining both the Claude Code subscription path (no API key needed) and the direct API key path with equal weight.
+
+  **FIX-05 — Auto-diagnostic after first zero-memory session**
+  After the first session completes with zero memories, the next `somtum` command automatically surfaces the key doctor checks (`api_key`, `hooks_installed`) so users can self-heal without visiting the docs. Runs at most once per project. Opt out with `somtum config set diagnostics.first_session_check false`.
+
+  **FIX-06 — Inline fix commands in `somtum doctor`**
+  Every failing check now shows indented, copy-pasteable fix commands directly in the output. Affects `db_file`, `api_key`, `hooks_installed`, `breakeven_ratio`, and `stale_memories`.
+
+  **FIX-07 — Wrong directory warning on `somtum init`**
+  If no project root indicators (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `.git`) are found in the current directory, a soft warning is printed with the current path. On interactive terminals, init waits for Enter before continuing. Skip with `--yes` or `--force`.
+
+  **FIX-10 — README quickstart improvement**
+  Added a "Before you begin — pick your setup" block at the top of the README Quickstart section. Mirrors the Getting Started two-path callout so users who skip the docs still see the backend requirements before hitting a silent failure. Doctor also promoted to Step 3 in the README sequence.
+
+  **New config key**: `diagnostics.first_session_check` (boolean, default `true`)
+  **New CLI flag**: `somtum init --yes` — skip interactive prompts for scripted installs
+
 ## 2.1.0
 
 ### Minor Changes

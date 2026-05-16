@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
@@ -23,6 +25,47 @@ function somtumOnPath(): boolean {
   } catch {
     return false;
   }
+}
+
+function claudeInPath(): boolean {
+  try {
+    execFileSync('which', ['claude'], { stdio: ['ignore', 'ignore', 'ignore'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function keyInProfile(): boolean {
+  const home = homedir();
+  const profiles = [join(home, '.zshrc'), join(home, '.bashrc'), join(home, '.profile')];
+  for (const f of profiles) {
+    try {
+      if (existsSync(f) && readFileSync(f, 'utf8').includes('ANTHROPIC_API_KEY')) return true;
+    } catch {
+      // unreadable profile — skip
+    }
+  }
+  return false;
+}
+
+// FIX-07: detect whether cwd looks like a project root.
+const PROJECT_ROOT_INDICATORS = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', '.git'];
+
+function isProjectRoot(cwd: string): boolean {
+  return PROJECT_ROOT_INDICATORS.some((ind) => existsSync(join(cwd, ind)));
+}
+
+async function promptContinue(message: string): Promise<void> {
+  process.stderr.write(message);
+  if (!process.stdin.isTTY) return;
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  await new Promise<void>((resolve) => {
+    rl.question('', () => {
+      rl.close();
+      resolve();
+    });
+  });
 }
 
 function hookCommand(subcommand: string): string {
@@ -168,15 +211,39 @@ function writeMcpConfig(cwd: string): string {
   return mcpPath;
 }
 
-export function initCommand(options: {
+export async function initCommand(options: {
   cwd?: string;
   force?: boolean;
+  yes?: boolean;
   cache?: boolean;
   fileGating?: boolean;
   mcp?: boolean;
   all?: boolean;
-} = {}): number {
+} = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
+  const yes = options.yes ?? options.force ?? false;
+
+  // FIX-07: warn when run from outside a project root.
+  if (!isProjectRoot(cwd) && !yes) {
+    await promptContinue(
+      [
+        '',
+        'NOTICE: No project root indicators found in the current directory.',
+        `  (checked for: ${PROJECT_ROOT_INDICATORS.join(', ')})`,
+        '',
+        'Somtum works best when initialized from the root of the project you open',
+        'with Claude Code. If you launch Claude Code from a different directory,',
+        'it will read a different settings.json and the hooks will not fire.',
+        '',
+        `Current directory: ${cwd}`,
+        '',
+        'If this is intentional, continue. Otherwise, cd to your project root first.',
+        'Press Enter to continue or Ctrl+C to cancel.',
+        '',
+      ].join('\n'),
+    );
+  }
+
   const withCache = options.all === true ? true : (options.cache ?? false);
   const withFileGating = options.all === true ? true : (options.fileGating ?? false);
   const withMcp = options.all === true ? true : (options.mcp ?? true);
@@ -201,5 +268,53 @@ export function initCommand(options: {
     console.log(`somtum: registered MCP server in ${result.mcpPath}`);
   }
   if (result.embeddingsNotice) console.log(result.embeddingsNotice);
+
+  // FIX-01: warn when no extraction backend is available.
+  const apiKeySet = !!(process.env['ANTHROPIC_API_KEY']?.trim());
+  const hasClaude = claudeInPath();
+  if (!apiKeySet && !hasClaude) {
+    process.stderr.write(
+      [
+        '',
+        'WARNING: No extraction backend found.',
+        '',
+        '  Claude CLI:        not found in PATH',
+        '  ANTHROPIC_API_KEY: not set',
+        '',
+        'Somtum cannot extract memories without at least one of these.',
+        '',
+        'To fix:',
+        '  Option A — Confirm Claude Code is installed: which claude',
+        '  Option B — Add your API key to ~/.zshrc:',
+        '             export ANTHROPIC_API_KEY="sk-ant-..."',
+        '             source ~/.zshrc',
+        '',
+        'Run `somtum doctor` after fixing to confirm.',
+        '',
+      ].join('\n'),
+    );
+  }
+
+  // FIX-02: warn when the key is in the env but not in any shell profile.
+  if (apiKeySet && !keyInProfile()) {
+    process.stderr.write(
+      [
+        '',
+        'NOTICE: ANTHROPIC_API_KEY is set in this terminal session but was not found',
+        'in your shell profile (~/.zshrc or ~/.bashrc).',
+        '',
+        'The SessionEnd hook runs as a subprocess and will not inherit a key that is',
+        'only exported in an open terminal tab.',
+        '',
+        'To fix, add the following to ~/.zshrc (or ~/.bashrc):',
+        '  export ANTHROPIC_API_KEY="sk-ant-..."',
+        '',
+        'Then run:',
+        '  source ~/.zshrc',
+        '',
+      ].join('\n'),
+    );
+  }
+
   return 0;
 }
