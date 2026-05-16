@@ -22,6 +22,7 @@ import { configGetCommand, configSetCommand } from './config_cmd.js';
 import { serveCommand } from './serve.js';
 import { runMcpServer } from '../mcp/server.js';
 import { printLogo } from './ui.js';
+import { checkFirstSession } from './first_session_check.js';
 
 const require = createRequire(import.meta.url);
 const { version } = require('../../package.json') as { version: string };
@@ -37,20 +38,24 @@ program
 const isInternal = process.argv.includes('hook') || process.argv.includes('mcp');
 if (!isInternal) {
   printLogo();
+  // FIX-05: surface a diagnostic message when the first session produced zero memories.
+  checkFirstSession();
 }
 
 program
   .command('init')
   .description('Install the SessionEnd capture hook (and optional extras) in the current project')
   .option('-f, --force', 'Reinstall even if the hook is already present', false)
+  .option('-y, --yes', 'Skip interactive prompts (for scripted installs)', false)
   .option('--cache', 'Also install the UserPromptSubmit cache hook', false)
   .option('--file-gating', 'Also install the PreToolUse file-gating hook', false)
   .option('--no-mcp', 'Do not register the somtum MCP server in .mcp.json')
   .option('--all', 'Enable cache + file-gating + MCP', false)
   .action(
-    (opts: { force: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
-      const code = initCommand({
+    async (opts: { force: boolean; yes: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
+      const code = await initCommand({
         force: opts.force,
+        yes: opts.yes,
         cache: opts.cache,
         fileGating: opts.fileGating,
         mcp: opts.mcp,

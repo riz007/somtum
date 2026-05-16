@@ -190,6 +190,12 @@ export const ConfigSchema = z.object({
       show_budget: z.boolean().default(true),
     })
     .default({}),
+  diagnostics: z
+    .object({
+      // Set false to suppress the auto-doctor check after a zero-memory first session.
+      first_session_check: z.boolean().default(true),
+    })
+    .default({}),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 export type ConfigInput = z.input<typeof ConfigSchema>;

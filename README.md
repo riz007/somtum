@@ -239,6 +239,26 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ## Quickstart
 
+### Before you begin — pick your setup
+
+**Using Claude Code (subscription)?**
+You do not need an API key. Somtum calls the `claude` CLI that ships with Claude Code.
+Confirm it is installed: `which claude`
+If nothing prints, reinstall Claude Code or add its binary to your PATH.
+
+**Using the Anthropic API directly?**
+Add your key to your shell profile (not just the current terminal tab):
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export ANTHROPIC_API_KEY="sk-ant-..."
+source ~/.zshrc
+```
+
+Both paths work. Most Claude Code users should use Option A.
+
+---
+
 ### Step 1 — Choose your extraction backend
 
 Somtum needs to call a Claude model at session end to extract observations. Pick one:
@@ -282,11 +302,26 @@ somtum init --all
 #   - MCP server in .mcp.json     (Claude can call recall/remember tools)
 ```
 
-### Step 3 — Use Claude Code normally
+### Step 3 — Verify your setup
+
+Run doctor immediately after init to confirm everything is connected:
+
+```bash
+somtum doctor
+```
+
+All checks should show `✓`. The two most important are:
+
+- **`api_key`** — confirms Somtum has a way to call Claude for extraction
+- **`hooks_installed`** — confirms the SessionEnd hook is registered
+
+Do not start your first session until all checks pass. Each failing check shows an inline fix command.
+
+### Step 4 — Use Claude Code normally
 
 Open a Claude Code session **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
 
-### Step 4 — Check your memory
+### Step 5 — Check your memory
 
 ```bash
 # How many observations were captured?
@@ -301,14 +336,6 @@ somtum serve
 ```
 
 If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](#troubleshooting).
-
-### Step 5 — Diagnose any issues
-
-```bash
-somtum doctor
-```
-
-This checks your API key, DB health, hook installation, migrations, cache, and breakeven ratio — with specific fix instructions for each failing check.
 
 ---
 

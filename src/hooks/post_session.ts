@@ -407,6 +407,34 @@ function hookLog(msg: string): void {
   }
 }
 
+// FIX-05: track whether the first session has been processed and how many memories were found.
+// Written once — subsequent sessions do not overwrite it.
+function writeFirstSessionFlag(projectId: string, inserted: number): void {
+  try {
+    const dir = join(homedir(), '.somtum', 'projects', projectId);
+    mkdirSync(dir, { recursive: true });
+    const flagPath = join(dir, 'first_session.json');
+    // Only write if the flag does not already exist.
+    try {
+      const existing = JSON.parse(readFileSync(flagPath, 'utf8')) as Record<string, unknown>;
+      if (existing['first_session_completed']) return;
+    } catch {
+      // File absent — fall through to write.
+    }
+    writeFileSync(
+      flagPath,
+      JSON.stringify({
+        first_session_completed: true,
+        first_session_inserted: inserted,
+        first_session_timestamp: new Date().toISOString(),
+      }),
+      'utf8',
+    );
+  } catch {
+    // Non-fatal.
+  }
+}
+
 export async function main(): Promise<void> {
   hookLog('[post_session] starting');
   if (!process.env['ANTHROPIC_API_KEY']) {
@@ -419,6 +447,7 @@ export async function main(): Promise<void> {
     hookLog(
       `[post_session] ok — inserted=${result.inserted} superseded=${result.superseded} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
     );
+    writeFirstSessionFlag(result.projectId, result.inserted);
     // Hooks communicate via stdout; keep output structured.
     console.log(
       JSON.stringify({

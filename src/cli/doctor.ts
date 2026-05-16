@@ -16,6 +16,8 @@ export interface DoctorCheck {
   name: string;
   ok: boolean;
   detail: string;
+  /** Actionable fix instructions shown only when ok=false. */
+  fix?: string[];
 }
 
 export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
@@ -62,6 +64,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
     name: 'db_file',
     ok: dbExists,
     detail: dbExists ? dbPath : `not found at ${dbPath} — run \`somtum init\` first`,
+    ...(dbExists ? {} : { fix: ['somtum init'] }),
   });
 
   if (!dbExists) {
@@ -118,6 +121,17 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         name: 'breakeven_ratio',
         ok,
         detail: `${ratio.toFixed(2)}x${ok ? '' : ' — below 1.5x, extraction cost may exceed savings'}`,
+        ...(ok
+          ? {}
+          : {
+              fix: [
+                'somtum config set retrieval.strategy bm25   # match what is actually running',
+                '# or, to enable real hybrid retrieval:',
+                'somtum config set retrieval.embeddings.enabled true && somtum reindex',
+                '# or reduce injection overhead:',
+                'somtum config set injection.k 2',
+              ],
+            }),
       });
     } else {
       checks.push({ name: 'breakeven_ratio', ok: true, detail: 'n/a (no extraction cost yet)' });
@@ -132,6 +146,14 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         staleCount === 0
           ? 'no stale memories detected'
           : `${staleCount} memor${staleCount === 1 ? 'y' : 'ies'} older than 90 days with no retrieval — consider \`somtum purge\` or reviewing with \`somtum search\``,
+      ...(staleCount === 0
+        ? {}
+        : {
+            fix: [
+              'somtum purge --older-than 90d --dry-run   # preview what would be removed',
+              'somtum purge --older-than 90d             # remove stale memories',
+            ],
+          }),
     });
 
     // 10. Cache entries
@@ -160,14 +182,25 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         // not in PATH
       }
     }
+    const apiKeyOk = hasApiKey || claudeCliAvailable;
     checks.push({
       name: 'api_key',
-      ok: hasApiKey || claudeCliAvailable,
+      ok: apiKeyOk,
       detail: hasApiKey
         ? 'ANTHROPIC_API_KEY is set'
         : claudeCliAvailable
           ? 'No ANTHROPIC_API_KEY — using claude CLI fallback (Claude Code subscription)'
           : 'Neither ANTHROPIC_API_KEY nor claude CLI available — extraction will fail',
+      ...(apiKeyOk
+        ? {}
+        : {
+            fix: [
+              'Fix A (Claude Code): which claude',
+              '  If nothing prints, reinstall Claude Code or add its binary to PATH.',
+              'Fix B (API key):     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc',
+              'Docs: https://riz007.github.io/somtum/troubleshooting.html#memories-0',
+            ],
+          }),
     });
 
     // 12. Hook files in .claude/settings.json
@@ -183,12 +216,16 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
           detail: hasSessionEnd
             ? 'somtum hooks found in .claude/settings.json'
             : 'somtum hooks not found — run `somtum init`',
+          ...(hasSessionEnd
+            ? {}
+            : { fix: ['somtum init --all   # run from the project root you open with Claude Code'] }),
         });
       } catch {
         checks.push({
           name: 'hooks_installed',
           ok: false,
           detail: 'could not parse .claude/settings.json',
+          fix: ['somtum init --all'],
         });
       }
     } else {
@@ -196,6 +233,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         name: 'hooks_installed',
         ok: false,
         detail: '.claude/settings.json not found — run `somtum init`',
+        fix: ['somtum init --all   # run from the project root you open with Claude Code'],
       });
     }
   } finally {
@@ -219,6 +257,12 @@ export async function doctorCommand(
   for (const check of result.checks) {
     const icon = check.ok ? '✓' : '✗';
     console.log(`${icon}  ${check.name.padEnd(22)} ${check.detail}`);
+    if (!check.ok && check.fix && check.fix.length > 0) {
+      const indent = '               ';
+      for (const line of check.fix) {
+        console.log(`${indent}${line}`);
+      }
+    }
   }
   if (!result.ok) {
     console.log('');
