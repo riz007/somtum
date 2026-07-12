@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { existsSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { existsSync, appendFileSync, writeFileSync } from 'node:fs';
 import * as readline from 'node:readline/promises';
 import { openDb } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';

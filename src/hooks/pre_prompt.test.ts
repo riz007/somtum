@@ -158,6 +158,38 @@ describe('runPrePrompt', () => {
     expect(bm25?.call_count).toBeGreaterThanOrEqual(1);
   });
 
+  it('does not re-inject the same memory twice within one session', async () => {
+    const store = new MemoryStore(db);
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'learning',
+      title: 'always use pnpm',
+      body: 'This project uses pnpm, not npm. Always run pnpm install.',
+      files: [],
+      tags: [],
+    });
+
+    const first = await runPrePrompt(
+      { prompt: 'how do I install dependencies with pnpm', cwd: tmp, session_id: 'sess-a' },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    expect(first.hookSpecificOutput?.additionalContext).toContain('always use pnpm');
+
+    const second = await runPrePrompt(
+      { prompt: 'remind me how to install dependencies with pnpm', cwd: tmp, session_id: 'sess-a' },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    expect(second.hookSpecificOutput?.additionalContext ?? '').not.toContain('always use pnpm');
+
+    // A new session gets the memory again.
+    const fresh = await runPrePrompt(
+      { prompt: 'how do I install dependencies with pnpm', cwd: tmp, session_id: 'sess-b' },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    expect(fresh.hookSpecificOutput?.additionalContext).toContain('always use pnpm');
+  });
+
   it('skips memory injection when injection.enabled is false', async () => {
     const store = new MemoryStore(db);
     store.insert({

@@ -78,6 +78,15 @@ export function runMigrations(db: DB, dir: string = MIGRATIONS_DIR): number {
     // BEGIN IMMEDIATE fails fast under writer contention instead of hanging.
     db.exec('BEGIN IMMEDIATE');
     try {
+      // Re-check under the write lock: another process may have applied this
+      // migration between our initial read and acquiring the transaction.
+      const raced = db
+        .prepare(`SELECT 1 FROM schema_migrations WHERE version = ?`)
+        .get(version);
+      if (raced) {
+        db.exec('ROLLBACK');
+        continue;
+      }
       db.exec(sql);
       insert.run(version, file, Date.now());
       db.exec('COMMIT');

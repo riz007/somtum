@@ -5,8 +5,8 @@
 // Reads a JSON payload on stdin and dispatches to the named hook module.
 
 import { appendFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { GLOBAL_DIR } from '../config.js';
 import { readToEnd, runPostSession, HookPayloadSchema } from '../hooks/post_session.js';
 import { runPrePrompt, PrePromptPayloadSchema } from '../hooks/pre_prompt.js';
 import { runPreRead, PreReadPayloadSchema } from '../hooks/pre_read.js';
@@ -28,7 +28,7 @@ function raceTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 
 function hookLog(msg: string): void {
   try {
-    const logPath = join(homedir(), '.somtum', 'hook.log');
+    const logPath = join(GLOBAL_DIR, 'hook.log');
     appendFileSync(logPath, `${new Date().toISOString()} ${msg}\n`, 'utf8');
   } catch {
     /* non-fatal */

@@ -13,6 +13,8 @@ interface ClaudeCodeLine {
   type?: string;
   role?: string;
   timestamp?: string;
+  isMeta?: boolean;
+  isSidechain?: boolean;
   message?: {
     role?: string;
     content?: unknown;
@@ -21,6 +23,27 @@ interface ClaudeCodeLine {
 }
 
 const FILE_TOOL_NAMES = new Set(['Read', 'Edit', 'Write', 'NotebookEdit']);
+
+// Tool results can be huge (full file dumps, command output). Keep enough for
+// the extractor to understand what happened without letting a single result
+// crowd real conversation out of the transcript token budget.
+const MAX_TOOL_RESULT_CHARS = 1000;
+
+// Claude Code transcripts deliver tool results as user-role messages whose
+// content is tool_result blocks. Those are not real user prompts: treating
+// them as such splits prompt→response pairs at every tool call and pollutes
+// the cache. Detect them so they can be reclassified as role 'tool'.
+function isToolResultContent(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  let sawToolResult = false;
+  for (const block of content) {
+    if (block == null || typeof block !== 'object') continue;
+    const t = (block as { type?: string }).type;
+    if (t === 'tool_result') sawToolResult = true;
+    else if (t === 'text') return false;
+  }
+  return sawToolResult;
+}
 
 function extractFilesFromBlock(block: unknown): string[] {
   if (block == null || typeof block !== 'object') return [];
@@ -62,7 +85,11 @@ function coerceContent(content: unknown): { text: string; files: string[] } {
           (block as { type: string }).type === 'tool_result'
         ) {
           const b = block as { content?: unknown };
-          return `[tool_result ${coerceContent(b.content).text}]`;
+          let inner = coerceContent(b.content).text;
+          if (inner.length > MAX_TOOL_RESULT_CHARS) {
+            inner = `${inner.slice(0, MAX_TOOL_RESULT_CHARS)}… [truncated]`;
+          }
+          return `[tool_result ${inner}]`;
         }
         return '';
       })
@@ -92,9 +119,13 @@ export function parseTranscript(raw: string): Turn[] {
     } catch {
       continue;
     }
-    const role = (obj.message?.role ?? obj.role ?? obj.type ?? 'user') as Turn['role'];
+    // Meta lines (caveats, command wrappers) and sidechain (subagent) turns
+    // are not part of the main conversation.
+    if (obj.isMeta === true || obj.isSidechain === true) continue;
+    let role = (obj.message?.role ?? obj.role ?? obj.type ?? 'user') as Turn['role'];
     if (role !== 'user' && role !== 'assistant' && role !== 'system' && role !== 'tool') continue;
     const content = obj.message?.content ?? obj.content;
+    if (role === 'user' && isToolResultContent(content)) role = 'tool';
     const { text, files } = coerceContent(content);
     if (text.length === 0) continue;
     const turn: Turn = { role, text };
@@ -119,15 +150,28 @@ export interface PromptResponsePair {
   files_touched: string[];
 }
 
+// Synthetic user turns that must never become cache keys: slash-command
+// wrappers, local command output, and interruption markers.
+function isSyntheticPrompt(text: string): boolean {
+  const t = text.trimStart();
+  return (
+    t.startsWith('<command-name>') ||
+    t.startsWith('<local-command') ||
+    t.startsWith('<system-reminder>') ||
+    t.startsWith('[Request interrupted')
+  );
+}
+
 // Extract user→assistant turn pairs for cache population. Only pairs where
 // the user turn is immediately followed by one or more assistant turns are
 // included. Assistant turns get concatenated so tool-heavy replies still
-// attribute to the single user prompt that kicked them off.
+// attribute to the single user prompt that kicked them off. Tool turns
+// (tool results) neither break a pair nor contribute to the response.
 export function extractPromptResponsePairs(turns: Turn[]): PromptResponsePair[] {
   const pairs: PromptResponsePair[] = [];
   for (let i = 0; i < turns.length; i += 1) {
     const t = turns[i];
-    if (!t || t.role !== 'user') continue;
+    if (!t || t.role !== 'user' || isSyntheticPrompt(t.text)) continue;
     const responses: string[] = [];
     const files = new Set<string>();
     let j = i + 1;

@@ -188,6 +188,26 @@ export class PromptCache {
     this.db.prepare(`UPDATE cache_entries SET invalidated = 1 WHERE id = ?`).run(id);
   }
 
+  // Enforce the retention policy from config (cache.ttl_days, cache.max_entries).
+  // Drops invalidated entries, entries not hit within the TTL, and — if the
+  // cache is still over capacity — the least-recently-hit overflow.
+  prune(opts: { ttlDays: number; maxEntries: number; now?: number }): number {
+    const now = opts.now ?? Date.now();
+    const cutoff = now - opts.ttlDays * 24 * 60 * 60 * 1000;
+    let removed = this.db
+      .prepare(`DELETE FROM cache_entries WHERE invalidated = 1 OR last_hit_at < ?`)
+      .run(cutoff).changes;
+    removed += this.db
+      .prepare(
+        `DELETE FROM cache_entries WHERE id IN (
+           SELECT id FROM cache_entries
+           ORDER BY last_hit_at DESC
+           LIMIT -1 OFFSET ?)`,
+      )
+      .run(opts.maxEntries).changes;
+    return removed;
+  }
+
   count(): number {
     const row = this.db.prepare(`SELECT COUNT(*) AS n FROM cache_entries`).get() as {
       n: number;

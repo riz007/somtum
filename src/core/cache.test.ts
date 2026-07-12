@@ -119,3 +119,43 @@ describe('PromptCache', () => {
     expect(miss).toBeNull();
   });
 });
+
+describe('PromptCache.prune', () => {
+  function seed(prompt: string): string {
+    return cache.put({
+      prompt_hash: hashPrompt(prompt),
+      prompt_text: prompt,
+      response: `re: ${prompt}`,
+      model: 'm',
+      context_fingerprint: 'fp',
+    }).id;
+  }
+
+  it('removes invalidated and TTL-expired entries', () => {
+    const keep = seed('fresh');
+    const dead = seed('invalidated');
+    cache.invalidate(dead);
+    const expired = seed('expired');
+    db.prepare('UPDATE cache_entries SET last_hit_at = ? WHERE id = ?').run(
+      Date.now() - 100 * 24 * 60 * 60 * 1000,
+      expired,
+    );
+
+    const removed = cache.prune({ ttlDays: 90, maxEntries: 100 });
+    expect(removed).toBe(2);
+    expect(cache.getById(keep)).not.toBeNull();
+    expect(cache.getById(dead)).toBeNull();
+    expect(cache.getById(expired)).toBeNull();
+  });
+
+  it('evicts least-recently-hit entries beyond max_entries', () => {
+    const ids = ['a', 'b', 'c', 'd'].map(seed);
+    // Make 'a' the oldest by hit recency.
+    db.prepare('UPDATE cache_entries SET last_hit_at = 1 WHERE id = ?').run(ids[0]);
+
+    const removed = cache.prune({ ttlDays: 90, maxEntries: 3 });
+    expect(removed).toBe(1);
+    expect(cache.getById(ids[0]!)).toBeNull();
+    expect(cache.count()).toBe(3);
+  });
+});

@@ -1,11 +1,10 @@
 import { readFileSync, appendFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { isAbsolute, join, resolve as resolvePath } from 'node:path';
-import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
-import { loadConfig } from '../config.js';
+import { loadConfig, GLOBAL_DIR } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { generateIndex } from '../core/index_gen.js';
@@ -86,7 +85,7 @@ function resolveTranscript(payload: HookPayload): ResolvedTranscript {
 function populateCache(
   db: DB,
   turns: ReturnType<typeof parseTranscript>,
-  opts: { cwd: string; model: string },
+  opts: { cwd: string; model: string; cache: Config['cache'] },
 ): number {
   const cache = new PromptCache(db);
   const pairs = extractPromptResponsePairs(turns);
@@ -104,6 +103,7 @@ function populateCache(
     });
     inserted += 1;
   }
+  cache.prune({ ttlDays: opts.cache.ttl_days, maxEntries: opts.cache.max_entries });
   return inserted;
 }
 
@@ -211,7 +211,7 @@ function writeWarmStart(db: DB, projectId: string, k = 8): void {
         .join('\n---\n');
       const context = `[somtum warm-start — context restored after compaction]\n${lines}\n[/somtum warm-start]`;
       const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
-      const dir = join(homedir(), '.somtum', 'warmstart');
+      const dir = join(GLOBAL_DIR, 'warmstart');
       mkdirSync(dir, { recursive: true });
       // Include a timestamp so concurrent windows on the same project don't clobber each other.
       const path = join(dir, `ws_${prefix}_${Date.now()}.json`);
@@ -350,7 +350,7 @@ export async function runPostSession(
     const tokensSavedTotal = store.totalTokensSaved(projectId);
 
     const cacheEntriesAdded = config.cache.enabled
-      ? populateCache(db, resolved.turns, { cwd, model: config.extraction.model })
+      ? populateCache(db, resolved.turns, { cwd, model: config.extraction.model, cache: config.cache })
       : 0;
 
     let embeddingsAdded = 0;
@@ -399,7 +399,7 @@ export async function runPostSession(
 
 function hookLog(msg: string): void {
   try {
-    const logPath = join(homedir(), '.somtum', 'hook.log');
+    const logPath = join(GLOBAL_DIR, 'hook.log');
     const ts = new Date().toISOString();
     appendFileSync(logPath, `${ts} ${msg}\n`, 'utf8');
   } catch {
@@ -411,9 +411,9 @@ function hookLog(msg: string): void {
 // Written once — subsequent sessions do not overwrite it.
 function writeFirstSessionFlag(projectId: string, inserted: number): void {
   try {
-    const dir = join(homedir(), '.somtum', 'projects', projectId);
-    mkdirSync(dir, { recursive: true });
-    const flagPath = join(dir, 'first_session.json');
+    // Must match the read path in first_session_check.ts (projectDir is
+    // SOMTUM_HOME-aware; a hardcoded ~/.somtum diverges when it's set).
+    const flagPath = join(projectDir(projectId), 'first_session.json');
     // Only write if the flag does not already exist.
     try {
       const existing = JSON.parse(readFileSync(flagPath, 'utf8')) as Record<string, unknown>;

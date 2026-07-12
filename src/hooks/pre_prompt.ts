@@ -1,9 +1,8 @@
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { loadConfig, projectDir, globalDbPath, GLOBAL_PROJECT_ID } from '../config.js';
+import { loadConfig, projectDir, globalDbPath, GLOBAL_DIR, GLOBAL_PROJECT_ID } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { MemoryStore } from '../core/store.js';
@@ -22,6 +21,7 @@ export const PrePromptPayloadSchema = z
     user_prompt: z.string().optional(),
     cwd: z.string().optional(),
     project_id: z.string().optional(),
+    session_id: z.string().optional(),
     hook_event_name: z.string().optional(),
   })
   .refine((v) => v.prompt !== undefined || v.user_prompt !== undefined, {
@@ -99,7 +99,7 @@ interface LastHitState {
 
 function lastHitPath(projectId: string): string {
   const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
-  return join(homedir(), '.somtum', 'session', `lh_${prefix}.json`);
+  return join(GLOBAL_DIR, 'session', `lh_${prefix}.json`);
 }
 
 function readLastHit(projectId: string): LastHitState | null {
@@ -114,7 +114,7 @@ function readLastHit(projectId: string): LastHitState | null {
 
 function writeLastHit(projectId: string, state: LastHitState): void {
   try {
-    const dir = join(homedir(), '.somtum', 'session');
+    const dir = join(GLOBAL_DIR, 'session');
     mkdirSync(dir, { recursive: true });
     writeFileSync(lastHitPath(projectId), JSON.stringify(state), 'utf8');
     // Evict lh_*.json files older than 24 hours to prevent unbounded accumulation.
@@ -143,6 +143,50 @@ function clearLastHit(projectId: string): void {
   }
 }
 
+// Per-project injection state: which memory ids were already injected into the
+// current session. Injected context persists in the session's context window,
+// so re-injecting the same memory on a later prompt is pure token waste.
+interface InjectionState {
+  session_id: string;
+  injected_ids: string[];
+  updated_at: number;
+}
+
+const MAX_TRACKED_INJECTED_IDS = 200;
+
+function injectionStatePath(projectId: string): string {
+  const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
+  return join(GLOBAL_DIR, 'session', `inj_${prefix}.json`);
+}
+
+function readInjectionState(projectId: string, sessionId: string): Set<string> {
+  try {
+    const p = injectionStatePath(projectId);
+    if (!existsSync(p)) return new Set();
+    const state = JSON.parse(readFileSync(p, 'utf8')) as InjectionState;
+    // A different session means a fresh context window — nothing is injected yet.
+    if (state.session_id !== sessionId) return new Set();
+    return new Set(state.injected_ids);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeInjectionState(projectId: string, sessionId: string, ids: Set<string>): void {
+  try {
+    const dir = join(GLOBAL_DIR, 'session');
+    mkdirSync(dir, { recursive: true });
+    const state: InjectionState = {
+      session_id: sessionId,
+      injected_ids: [...ids].slice(-MAX_TRACKED_INJECTED_IDS),
+      updated_at: Date.now(),
+    };
+    writeFileSync(injectionStatePath(projectId), JSON.stringify(state), 'utf8');
+  } catch {
+    // Non-fatal; tracking must never break the hook.
+  }
+}
+
 // Warm-start file written by the PreCompact post_session hook.
 interface WarmStartPayload {
   project_id: string;
@@ -153,7 +197,7 @@ interface WarmStartPayload {
 function readAndConsumeWarmStart(projectId: string): string | null {
   try {
     const prefix = createHash('sha1').update(projectId).digest('hex').slice(0, 12);
-    const dir = join(homedir(), '.somtum', 'warmstart');
+    const dir = join(GLOBAL_DIR, 'warmstart');
     if (!existsSync(dir)) return null;
 
     const TTL_MS = 30 * 60 * 1000;
@@ -182,6 +226,7 @@ function readAndConsumeWarmStart(projectId: string): string | null {
 interface MemoryContextResult {
   context: string;
   injectedCount: number;
+  injectedIds: string[];
   totalCount: number;
   injectedChars: number;
 }
@@ -210,6 +255,7 @@ async function buildMemoryContext(
   projectId: string,
   prompt: string,
   config: Config,
+  alreadyInjected: ReadonlySet<string>,
 ): Promise<MemoryContextResult | null> {
   if (!config.injection.enabled) return null;
 
@@ -241,6 +287,8 @@ async function buildMemoryContext(
 
   // Filter by relevance threshold — avoids injecting weakly matched memories.
   if (minScore > 0) results = results.filter((r) => r.score >= minScore);
+  // Skip memories already injected earlier in this session — they're still in context.
+  results = results.filter((r) => !alreadyInjected.has(r.id));
   if (results.length === 0) return null;
 
   new RetrievalStatsStore(db).incrementRetrieval(projectId, 'bm25');
@@ -266,7 +314,13 @@ async function buildMemoryContext(
     limit,
   );
 
-  return { context, injectedCount: results.length, totalCount, injectedChars: context.length };
+  return {
+    context,
+    injectedCount: results.length,
+    injectedIds: results.map((r) => r.id),
+    totalCount,
+    injectedChars: context.length,
+  };
 }
 
 export async function runPrePrompt(
@@ -392,8 +446,26 @@ export async function runPrePrompt(
     const warmStart = readAndConsumeWarmStart(projectId);
     if (warmStart) parts.push(warmStart);
 
-    const memResult = await buildMemoryContext(db, globalDb, projectId, prompt, config);
+    const sessionId = parsed.session_id;
+    // A consumed warm-start means compaction wiped the context window, so
+    // previously injected memories are gone — start tracking from scratch.
+    const alreadyInjected =
+      sessionId && !warmStart ? readInjectionState(projectId, sessionId) : new Set<string>();
+
+    const memResult = await buildMemoryContext(
+      db,
+      globalDb,
+      projectId,
+      prompt,
+      config,
+      alreadyInjected,
+    );
     if (memResult) parts.push(memResult.context);
+
+    if (sessionId && memResult) {
+      for (const id of memResult.injectedIds) alreadyInjected.add(id);
+      writeInjectionState(projectId, sessionId, alreadyInjected);
+    }
 
     if (parts.length > 0) {
       const combined = clampContext(parts.join('\n\n'), config.injection.max_chars);

@@ -19,7 +19,7 @@ export interface LlmCaller {
 
 export function claudeCodeCaller(): LlmCaller {
   return {
-    async complete({ system, user }) {
+    async complete({ model, system, user }) {
       const { spawn } = await import('node:child_process');
 
       // Combine system + user since the claude CLI doesn't expose a --system flag.
@@ -31,7 +31,11 @@ export function claudeCodeCaller(): LlmCaller {
         // the child claude process fires SessionEnd after completing) to exit
         // immediately. Without this, the child's SessionEnd hook would call
         // somtum hook post_session → claude -p → ... causing a deadlock.
-        const child = spawn('claude', ['-p', '--output-format', 'text'], {
+        // Pass the extraction model through — otherwise the CLI falls back to
+        // the user's default model (often Opus), making extraction ~10× pricier.
+        const args = ['-p', '--output-format', 'text'];
+        if (model && model.trim().length > 0) args.push('--model', model);
+        const child = spawn('claude', args, {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: { ...process.env, SOMTUM_IN_HOOK: '1' },
         });
