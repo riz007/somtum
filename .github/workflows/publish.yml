@@ -10,8 +10,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 permissions:
   contents: write
   pull-requests: write
-  # npm trusted publishing: the job exchanges a GitHub OIDC token for a
-  # short-lived npm publish token. No NPM_TOKEN secret is used.
+  # Lets npm sign a provenance attestation for each published version.
   id-token: write
 
 jobs:
@@ -27,12 +26,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Trusted publishing needs Node >= 22.14 and npm >= 11.5.1.
           node-version: 22
           cache: 'pnpm'
-
-      - name: Update npm for trusted publishing
-        run: npm install -g npm@^11.5.1
 
       - name: Install Dependencies
         run: pnpm install
@@ -47,5 +42,6 @@ jobs:
           publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Do not add NPM_TOKEN back: when it is set, changesets/action writes it
-          # to .npmrc and npm uses it instead of trusted publishing.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # pnpm publish hands off to npm publish with this env, so npm attaches provenance.
+          NPM_CONFIG_PROVENANCE: true
