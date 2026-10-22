@@ -1,7 +1,7 @@
 {
   "name": "somtum",
   "version": "2.3.0",
-  "description": "Local-first memory and prompt-cache layer for Claude Code",
+  "description": "Local-first memory and prompt-cache layer for coding agents: Claude Code and Codex",
   "type": "module",
   "license": "MIT",
   "author": {
@@ -18,6 +18,10 @@
   },
   "keywords": [
     "claude-code",
+    "codex",
+    "openai-codex",
+    "coding-agents",
+    "agents-md",
     "memory",
     "prompt-cache",
     "sqlite",

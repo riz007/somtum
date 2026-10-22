@@ -11,7 +11,7 @@ export const SOMTUM_LOGO = `
  ${GREEN}___/ / ${RED}/_/ / ${YELLOW}/  / / ${GREEN}/ / / /_/ / ${RED}/  / /  ${YELLOW}
 ${GREEN}/____/ ${RED}\\____/ ${YELLOW}/_/  /_/ ${GREEN}/_/  \\____/ ${RED}/_/  /_/   ${RESET}
                                           
-   ${BOLD}${GREEN}Local-first memory for Claude Code${RESET}
+   ${BOLD}${GREEN}Local-first memory for coding agents${RESET}
 `;
 
 export function printLogo(): void {

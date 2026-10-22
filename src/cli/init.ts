@@ -29,15 +29,6 @@ export function somtumOnPath(): boolean {
   }
 }
 
-function claudeInPath(): boolean {
-  try {
-    execFileSync('which', ['claude'], { stdio: ['ignore', 'ignore', 'ignore'] });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function keyInProfile(): boolean {
   const home = homedir();
   const profiles = [join(home, '.zshrc'), join(home, '.bashrc'), join(home, '.profile')];
@@ -235,8 +226,8 @@ export async function initCommand(options: {
         `  (checked for: ${PROJECT_ROOT_INDICATORS.join(', ')})`,
         '',
         'Somtum works best when initialized from the root of the project you open',
-        'with Claude Code. If you launch Claude Code from a different directory,',
-        'it will read a different settings.json and the hooks will not fire.',
+        'in Claude Code or Codex. If you launch the agent from a different directory,',
+        'it reads different hook settings and the hooks will not fire.',
         '',
         `Current directory: ${cwd}`,
         '',
@@ -280,25 +271,14 @@ export async function initCommand(options: {
   if (result.embeddingsNotice) console.log(result.embeddingsNotice);
 
   // FIX-01: warn when no extraction backend is available.
-  const apiKeySet = !!(process.env['ANTHROPIC_API_KEY']?.trim());
-  const hasClaude = claudeInPath();
-  if (!apiKeySet && !hasClaude) {
+  const apiKeySet = !!process.env['ANTHROPIC_API_KEY']?.trim();
+  if (!pickBackend(loadConfig({ cwd }))) {
     process.stderr.write(
       [
         '',
-        'WARNING: No extraction backend found.',
+        `WARNING: ${NO_BACKEND_MESSAGE}`,
         '',
-        '  Claude CLI:        not found in PATH',
-        '  ANTHROPIC_API_KEY: not set',
-        '',
-        'Somtum cannot extract memories without at least one of these.',
-        '',
-        'To fix:',
-        '  Option A — Confirm Claude Code is installed: which claude',
-        '  Option B — Add your API key to ~/.zshrc:',
-        '             export ANTHROPIC_API_KEY="sk-ant-..."',
-        '             source ~/.zshrc',
-        '',
+        'Somtum cannot extract memories until one is available.',
         'Run `somtum doctor` after fixing to confirm.',
         '',
       ].join('\n'),

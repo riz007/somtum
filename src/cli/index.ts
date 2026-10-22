@@ -31,7 +31,7 @@ const program = new Command();
 
 program
   .name('somtum')
-  .description('Local-first memory and prompt-cache layer for Claude Code')
+  .description('Local-first memory and prompt-cache layer for coding agents (Claude Code, Codex)')
   .version(version);
 
 // Show logo unless it's an internal hook call or MCP server.
