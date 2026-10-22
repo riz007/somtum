@@ -1,35 +1,33 @@
 # Getting Started
 
-## Before you begin — pick your setup
+Somtum works with **Claude Code** and **Codex**. Both agents share one memory per project, so you can install it for either or both.
 
-**Using Claude Code (subscription)?**
-You do not need an API key. Somtum calls the `claude` CLI that ships with Claude Code.
-Confirm it is installed:
+## Before you begin — pick an extraction backend
+
+At the end of each session Somtum asks a small model to pull out what's worth remembering. It picks the first backend that's available, so most people need to do nothing:
+
+| You have | Backend used | Extra setup |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` in your shell profile | Anthropic API (Haiku) | none |
+| `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` (GLM or another Anthropic-compatible provider) | that provider | none |
+| Claude Code installed (`which claude` prints a path) | `claude` CLI, on your subscription | none |
+| Codex installed (`which codex` prints a path) | `codex` CLI, on your ChatGPT plan | none |
+
+Keys must be in `~/.zshrc` or `~/.bashrc`, not just exported in one terminal tab. Hooks run as subprocesses and won't see them otherwise.
+
+To pin a backend instead of auto-detecting:
 
 ```bash
-which claude
+somtum config set extraction.backend codex-cli   # or: anthropic, claude-cli, auto
 ```
-
-If nothing prints, reinstall Claude Code or add its binary to your PATH.
-
-**Using the Anthropic API directly?**
-Add your key to your shell profile (not just the current terminal tab):
-
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export ANTHROPIC_API_KEY="sk-ant-..."
-source ~/.zshrc
-```
-
-Both paths work. Most Claude Code users should use Option A.
 
 ---
 
 ## Requirements
 
 - **Node.js 20+**
-- **Claude Code** — Somtum hooks into Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` events
-- **`ANTHROPIC_API_KEY`** _(optional)_ — if set, Somtum calls the Anthropic API directly for extraction. Without it, Somtum falls back to the `claude` CLI that ships with Claude Code, so **no separate API key is required for Claude Code subscribers**.
+- **Claude Code or Codex** — Somtum uses their `SessionEnd`, `PreCompact` and `UserPromptSubmit` hooks
+- **One extraction backend** from the table above. Claude Code and Codex subscribers need no separate API key.
 
 ## Install
 
@@ -63,22 +61,35 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ### Step 1 — Initialize in your project
 
-Run from the **root of the project you work on with Claude Code**:
+Run from the **root of the project you open in your agent**.
 
-```bash
-somtum init
-```
-
-To enable all features at once (recommended):
+**Claude Code**
 
 ```bash
 somtum init --all
 # Installs:
-#   - SessionEnd capture hook      (memory extraction)
-#   - UserPromptSubmit cache hook  (prompt cache + auto-inject)
-#   - PreToolUse file-gating hook  (large file summarization)
-#   - MCP server in .mcp.json     (Claude can call recall/remember tools)
+#   - SessionEnd + PreCompact capture hooks  (memory extraction)
+#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
+#   - PreToolUse file-gating hook            (large file summarization)
+#   - MCP server in .mcp.json                (recall/remember tools)
 ```
+
+::: tip Use --all
+A plain `somtum init` installs only the capture hooks. Memories are then saved but not injected into your prompts, and the agent sees them only if it calls the MCP `recall` tool.
+:::
+
+**Codex**
+
+```bash
+somtum init --agent codex
+# Installs:
+#   - .codex/hooks.json   SessionEnd + PreCompact capture, UserPromptSubmit auto-inject
+#   - .codex/config.toml  [mcp_servers.somtum]
+```
+
+Codex loads project-level config only for projects you've marked as trusted. Sessions are read from `~/.codex/sessions` (or `$CODEX_HOME/sessions`).
+
+Using both agents on the same project? Run both commands. They write to different files and share one memory store.
 
 ### Step 2 — Verify your setup
 
@@ -90,8 +101,8 @@ somtum doctor
 
 All checks should show a checkmark. The two most important are:
 
-- **`api_key`** — confirms Somtum has a way to call Claude for extraction
-- **`hooks_installed`** — confirms the SessionEnd and cache hooks are registered
+- **`extraction_backend`** — confirms Somtum has a model to extract memories with
+- **`hooks_installed`** — confirms hooks are registered for Claude Code, Codex, or both
 
 ::: warning
 Do not proceed to Step 3 until all checks pass. Fix any failing checks now — troubleshooting after a session is harder.
@@ -100,14 +111,15 @@ Do not proceed to Step 3 until all checks pass. Fix any failing checks now — t
 Each failing check now shows an inline fix command. For example:
 
 ```
-✗  api_key                Neither ANTHROPIC_API_KEY nor claude CLI available — extraction will fail
-               Fix A (Claude Code): which claude
-               Fix B (API key):     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc
+✗  extraction_backend     none available — extraction will fail
+               Claude Code: which claude   (reinstall or add it to PATH if nothing prints)
+               Codex:       which codex
+               API key:     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc
 ```
 
 ### Step 3 — Work normally
 
-Open Claude Code from the same directory where you ran `somtum init`. Work as usual. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
+Open Claude Code or Codex from the same directory where you ran `somtum init`. Work as usual. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
 
 ### Step 4 — Check your memory
 
@@ -129,7 +141,7 @@ If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](/tro
 
 ## Verifying the setup
 
-After your first Claude Code session ends:
+After your first session ends:
 
 **1. Check the hook log**
 
@@ -145,11 +157,9 @@ A successful run:
 
 The `superseded=N` field shows how many older near-duplicate memories were marked superseded by newly extracted ones.
 
-Using the `claude` CLI fallback (no API key):
+Each run also logs which backend it used:
 ```
-2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
+2026-04-30T10:15:42.124Z [post_session] extraction backend: claude-cli
 ```
 
 **2. Check stats**
@@ -166,4 +176,4 @@ You should see `memories > 0` after a substantive session. Short or trivial sess
 somtum doctor
 ```
 
-All checks should show `✓`. The `api_key` and `hooks_installed` checks are the most commonly failing.
+All checks should show `✓`. The `extraction_backend` and `hooks_installed` checks are the most commonly failing.

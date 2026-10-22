@@ -10,6 +10,8 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 permissions:
   contents: write
   pull-requests: write
+  # Lets npm sign a provenance attestation for each published version.
+  id-token: write
 
 jobs:
   publish:
@@ -24,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install Dependencies
@@ -41,3 +43,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # pnpm publish hands off to npm publish with this env, so npm attaches provenance.
+          NPM_CONFIG_PROVENANCE: true

@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { openDb, hasFts5, appliedVersions } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { PromptCache } from '../core/cache.js';
 import { resolveProjectId } from '../core/project_id.js';
+import { pickBackend } from '../core/llm_backend.js';
 import { loadConfig, projectDir, GLOBAL_DIR, GLOBAL_CONFIG_PATH } from '../config.js';
 
 export interface DoctorResult {
@@ -170,72 +170,58 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         : 'disabled (set retrieval.embeddings.enabled=true to enable)',
     });
 
-    // 11. Extraction auth: ANTHROPIC_API_KEY or claude CLI fallback
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
-    const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
-    let claudeCliAvailable = false;
-    if (!hasApiKey) {
-      try {
-        execSync('claude --version', { stdio: 'pipe' });
-        claudeCliAvailable = true;
-      } catch {
-        // not in PATH
-      }
-    }
-    const apiKeyOk = hasApiKey || claudeCliAvailable;
+    // 11. Extraction backend: Anthropic credentials, claude CLI or codex CLI
+    const backend = pickBackend(config);
     checks.push({
-      name: 'api_key',
-      ok: apiKeyOk,
-      detail: hasApiKey
-        ? 'ANTHROPIC_API_KEY is set'
-        : claudeCliAvailable
-          ? 'No ANTHROPIC_API_KEY — using claude CLI fallback (Claude Code subscription)'
-          : 'Neither ANTHROPIC_API_KEY nor claude CLI available — extraction will fail',
-      ...(apiKeyOk
+      name: 'extraction_backend',
+      ok: backend !== null,
+      detail: backend
+        ? `${backend}${config.extraction.backend === 'auto' ? ' (auto)' : ''}`
+        : 'none available — extraction will fail',
+      ...(backend
         ? {}
         : {
             fix: [
-              'Fix A (Claude Code): which claude',
-              '  If nothing prints, reinstall Claude Code or add its binary to PATH.',
-              'Fix B (API key):     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc',
+              'Claude Code: which claude   (reinstall or add it to PATH if nothing prints)',
+              'Codex:       which codex',
+              'API key:     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc',
               'Docs: https://riz007.github.io/somtum/troubleshooting.html#memories-0',
             ],
           }),
     });
 
-    // 12. Hook files in .claude/settings.json
-    const settingsPath = join(cwd, '.claude', 'settings.json');
-    if (existsSync(settingsPath)) {
+    // 12. Hooks: Claude Code (.claude/settings.json) and/or Codex (.codex/hooks.json)
+    const hookFiles = [join('.claude', 'settings.json'), join('.codex', 'hooks.json')];
+    const installedIn: string[] = [];
+    const unreadable: string[] = [];
+    for (const rel of hookFiles) {
+      const path = join(cwd, rel);
+      if (!existsSync(path)) continue;
       try {
-        const raw = JSON.parse(readFileSync(settingsPath, 'utf8'));
-        const hooks = (raw as Record<string, unknown>)['hooks'];
-        const hasSessionEnd = hooks && JSON.stringify(hooks).includes('somtum');
-        checks.push({
-          name: 'hooks_installed',
-          ok: Boolean(hasSessionEnd),
-          detail: hasSessionEnd
-            ? 'somtum hooks found in .claude/settings.json'
-            : 'somtum hooks not found — run `somtum init`',
-          ...(hasSessionEnd
-            ? {}
-            : { fix: ['somtum init --all   # run from the project root you open with Claude Code'] }),
-        });
+        const hooks = (JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>)['hooks'];
+        if (hooks && JSON.stringify(hooks).includes('somtum')) installedIn.push(rel);
       } catch {
-        checks.push({
-          name: 'hooks_installed',
-          ok: false,
-          detail: 'could not parse .claude/settings.json',
-          fix: ['somtum init --all'],
-        });
+        unreadable.push(rel);
       }
-    } else {
-      checks.push({
-        name: 'hooks_installed',
-        ok: false,
-        detail: '.claude/settings.json not found — run `somtum init`',
-        fix: ['somtum init --all   # run from the project root you open with Claude Code'],
-      });
     }
+    checks.push({
+      name: 'hooks_installed',
+      ok: installedIn.length > 0,
+      detail:
+        installedIn.length > 0
+          ? `somtum hooks found in ${installedIn.join(', ')}`
+          : unreadable.length > 0
+            ? `could not parse ${unreadable.join(', ')}`
+            : 'no somtum hooks in .claude/settings.json or .codex/hooks.json',
+      ...(installedIn.length > 0
+        ? {}
+        : {
+            fix: [
+              'somtum init --all            # Claude Code, from the project root',
+              'somtum init --agent codex    # Codex, from the project root',
+            ],
+          }),
+    });
   } finally {
     db.close();
   }

@@ -3,23 +3,22 @@ import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
 import { loadConfig, GLOBAL_DIR } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { generateIndex } from '../core/index_gen.js';
 import {
   extract,
-  anthropicCaller,
-  claudeCodeCaller,
   estimateTokensSaved,
   type LlmCaller,
 } from '../core/extractor.js';
 import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
 import { countTokens } from '../core/tokens.js';
+import { pickBackend, callerFor, NO_BACKEND_MESSAGE } from '../core/llm_backend.js';
 import { projectDir } from '../config.js';
 import { Bm25Retriever } from '../core/retriever/bm25.js';
 import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
+import { findTranscript } from '../agents/index.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
@@ -41,12 +40,13 @@ export const HookPayloadSchema = z
     cwd: z.string().optional(),
     project_id: z.string().optional(),
     transcript: z.string().optional(),
-    transcript_path: z.string().optional(),
-    // Claude Code includes these; we ignore them here but allow passthrough.
+    // Codex documents this as possibly null; session_id then locates the file.
+    transcript_path: z.string().nullish(),
+    // Agents include these; we ignore them here but allow passthrough.
     hook_event_name: z.string().optional(),
   })
-  .refine((v) => v.transcript !== undefined || v.transcript_path !== undefined, {
-    message: 'Either `transcript` or `transcript_path` is required',
+  .refine((v) => v.transcript !== undefined || v.transcript_path || v.session_id, {
+    message: 'One of `transcript`, `transcript_path` or `session_id` is required',
   });
 
 export type HookPayload = z.infer<typeof HookPayloadSchema>;
@@ -67,14 +67,13 @@ interface ResolvedTranscript {
 }
 
 function resolveTranscript(payload: HookPayload): ResolvedTranscript {
-  const raw =
-    payload.transcript !== undefined
-      ? payload.transcript
-      : payload.transcript_path !== undefined
-        ? readFileSync(payload.transcript_path, 'utf8')
-        : (() => {
-            throw new Error('Unreachable: schema requires one of transcript | transcript_path');
-          })();
+  let raw = payload.transcript;
+  if (raw === undefined) {
+    const path =
+      payload.transcript_path ?? (payload.session_id ? findTranscript(payload.session_id) : null);
+    if (!path) throw new Error(`No transcript found for session ${payload.session_id ?? '?'}`);
+    raw = readFileSync(path, 'utf8');
+  }
 
   const turns = parseTranscript(raw);
   // If the parser found structured turns, render them compactly for the extractor.
@@ -119,11 +118,13 @@ function collectSessionFiles(turns: ReturnType<typeof parseTranscript>): string[
 // original behaviour; 3 parallel cuts wall-clock time by ~3× for busy sessions
 // without saturating the Haiku rate limit.
 const SUMMARY_CONCURRENCY = 3;
+// The hook is killed at 90s. Leave headroom for a summary batch already in flight.
+const SUMMARY_BUDGET_MS = 55_000;
 
 async function populateFileSummaries(
   db: DB,
   turns: ReturnType<typeof parseTranscript>,
-  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller },
+  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller; deadline?: number },
 ): Promise<number> {
   const paths = collectSessionFiles(turns);
   if (paths.length === 0) return 0;
@@ -159,6 +160,7 @@ async function populateFileSummaries(
   // still keeping pressure on the Haiku rate limit manageable.
   let generated = 0;
   for (let i = 0; i < work.length; i += SUMMARY_CONCURRENCY) {
+    if (opts.deadline !== undefined && Date.now() > opts.deadline) break;
     const batch = work.slice(i, i + SUMMARY_CONCURRENCY);
     const results = await Promise.allSettled(
       batch.map(({ path, contents }) =>
@@ -253,6 +255,7 @@ export async function runPostSession(
   payload: HookPayload,
   opts: RunOptions = {},
 ): Promise<RunResult> {
+  const startedAt = Date.now();
   const parsed = HookPayloadSchema.parse(payload);
   const cwd = opts.cwd ?? parsed.cwd ?? process.cwd();
   const config = opts.config ?? loadConfig({ cwd });
@@ -287,20 +290,13 @@ export async function runPostSession(
         : rawTranscript;
     const transcriptTokens = countTokens(transcript);
 
-    // Prefer the direct API when a key is present (faster, explicit model choice).
-    // Fall back to the claude CLI so Claude Code subscribers need no separate key.
-    const caller =
-      opts.caller ??
-      (() => {
-        const apiKey = process.env['ANTHROPIC_API_KEY'];
-        if (apiKey && apiKey.trim().length > 0) {
-          // 25 s per API call — the SDK default is 600 s which lets a single
-          // slow Haiku call block the hook process for 10 minutes.
-          return anthropicCaller(new Anthropic({ apiKey, timeout: 25_000 }));
-        }
-        hookLog('[post_session] ANTHROPIC_API_KEY not set — using claude CLI fallback');
-        return claudeCodeCaller();
-      })();
+    let caller = opts.caller;
+    if (!caller) {
+      const backend = pickBackend(config);
+      if (!backend) throw new Error(NO_BACKEND_MESSAGE);
+      hookLog(`[post_session] extraction backend: ${backend}`);
+      caller = callerFor(backend, config);
+    }
 
     const outcome = await extract(transcript, caller, {
       model: config.extraction.model,
@@ -334,7 +330,7 @@ export async function runPostSession(
         },
         { redactPatterns: config.privacy.redact_patterns },
       );
-      // Write the human-readable markdown mirror (SPEC.md §5.2).
+      // Write the human-readable markdown mirror alongside the SQLite row.
       try {
         writeMemoryMarkdown(stored, memDir);
       } catch {
@@ -364,10 +360,6 @@ export async function runPostSession(
       }
     }
 
-    const summariesGenerated = config.file_gating.enabled
-      ? await populateFileSummaries(db, resolved.turns, { cwd, projectId, config, caller })
-      : 0;
-
     generateIndex({
       projectName,
       projectId,
@@ -380,6 +372,18 @@ export async function runPostSession(
     if (parsed.hook_event_name === 'PreCompact') {
       writeWarmStart(db, projectId);
     }
+
+    // Summaries are optional work: run them last, and only while the hook's
+    // time budget lasts, so they can never cost us the index or warm-start.
+    const summariesGenerated = config.file_gating.enabled
+      ? await populateFileSummaries(db, resolved.turns, {
+          cwd,
+          projectId,
+          config,
+          caller,
+          deadline: startedAt + SUMMARY_BUDGET_MS,
+        })
+      : 0;
 
     return {
       projectId,

@@ -1,10 +1,10 @@
 # เซิร์ฟเวอร์ MCP
 
-เมื่อคุณรัน `somtum init --all` Somtum จะลงทะเบียน MCP server ที่ Claude สามารถเรียกได้โดยอัตโนมัติระหว่างเซสชัน
+เมื่อคุณรัน `somtum init --all` (Claude Code) หรือ `somtum init --agent codex` Somtum จะลงทะเบียน MCP server ที่ agent สามารถเรียกได้เองระหว่างเซสชัน MCP client อื่นๆ ก็ใช้ได้ผ่าน `somtum mcp` (stdio)
 
 ## เครื่องมือที่มี
 
-| เครื่องมือ | สิ่งที่ Claude ทำกับมัน |
+| เครื่องมือ | สิ่งที่ agent ทำกับมัน |
 | --- | --- |
 | `recall` | ค้นหาความทรงจำเมื่อไม่แน่ใจเกี่ยวกับรายละเอียดโปรเจกต์ รองรับ `strategy` และ `scope` overrides |
 | `get` | ดึงเนื้อหาข้อสังเกตเต็มรูปแบบด้วย ID อัปเดต `last_confirmed_at` ในแต่ละ hit |
@@ -15,7 +15,7 @@
 | `forget` | ลบข้อสังเกตแบบ soft-delete |
 | `stats` | รายงานโทเคนที่ประหยัด อัตราการโดน cache จำนวน false-hit และขนาด corpus |
 
-ทุก MCP response มีฟิลด์ `tokens` เพื่อให้ Claude คำนวณค่าใช้จ่ายในการดึงข้อมูล
+ทุก MCP response มีฟิลด์ `tokens` เพื่อให้ agent คำนวณค่าใช้จ่ายในการดึงข้อมูล
 
 ## ขอบเขตหน่วยความจำ
 
@@ -47,7 +47,15 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 }
 ```
 
-รีสตาร์ท Claude Code หลังจากรัน `somtum init --all` เพื่อรับ MCP configuration
+สำหรับ Codex คำสั่ง `somtum init --agent codex` จะเพิ่ม server เดียวกันลงใน `.codex/config.toml` ของโปรเจกต์:
+
+```toml
+[mcp_servers.somtum]
+command = "somtum"
+args = ["mcp"]
+```
+
+รีสตาร์ท agent หลังจากรัน `init` เพื่อรับ MCP configuration (Codex อ่าน config เฉพาะโปรเจกต์ที่ trusted)
 
 ::: tip การยืนยัน
 ตรวจสอบว่า `.mcp.json` มีอยู่ใน root ของโปรเจกต์:

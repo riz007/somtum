@@ -56,9 +56,6 @@ export async function hookCommand(name: string): Promise<number> {
 
   switch (name) {
     case 'post_session': {
-      if (!process.env['ANTHROPIC_API_KEY']) {
-        hookLog('[post_session] WARN: ANTHROPIC_API_KEY not set — extraction will fail');
-      }
       try {
         const payload = HookPayloadSchema.parse(parsed);
         const r = await raceTimeout(runPostSession(payload), timeoutMs, 'post_session');

@@ -1,6 +1,5 @@
-// Writes individual per-observation markdown files as the human-readable mirror
-// described in SPEC.md §5.2: memories/<YYYY-MM>/<ulid>.md
-// SQLite is the source of truth; these files are derived and regenerated on import.
+// Human-readable mirror: memories/<YYYY-MM>/<ulid>.md
+// SQLite is the source of truth; these are derived and regenerated on import.
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Observation } from './schema.js';

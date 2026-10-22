@@ -56,7 +56,7 @@ Setting `strategy=hybrid` without enabling embeddings causes a silent fallback t
 
 ## No Windows-native testing
 
-**The problem:** Somtum's hook pipeline has been tested and developed primarily on macOS and Linux. The hooks depend on Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` event system, and the path handling, shell environment inheritance, and `better-sqlite3` native builds haven't been verified exhaustively on Windows.
+**The problem:** Somtum's hook pipeline has been tested and developed primarily on macOS and Linux. The hooks depend on Claude Code's and Codex's `SessionEnd`, `UserPromptSubmit` and `PreCompact` events, and the path handling, shell environment inheritance, and `better-sqlite3` native builds haven't been verified exhaustively on Windows.
 
 **Known issues:**
 - `better-sqlite3` may require `windows-build-tools` on some Windows setups (see [Troubleshooting](/troubleshooting#installation-fails-node-gyp--better-sqlite3)).
@@ -66,15 +66,15 @@ Setting `strategy=hybrid` without enabling embeddings causes a silent fallback t
 
 ---
 
-## Somtum complements CLAUDE.md — it doesn't replace it
+## Somtum complements CLAUDE.md and AGENTS.md — it doesn't replace them
 
-**The problem:** Somtum captures _accumulated experience_ from sessions — it's observation-driven. CLAUDE.md is _authored intent_ — things you want Claude to always know, written and maintained by you. They serve different purposes.
+**The problem:** Somtum captures _accumulated experience_ from sessions — it's observation-driven. CLAUDE.md (Claude Code) and AGENTS.md (Codex) are _authored intent_ — things you want the agent to always know, written and maintained by you. They serve different purposes.
 
-Relying on Somtum alone to keep Claude informed about critical project rules is risky. Somtum retrieves based on relevance to the current prompt; a rule that doesn't match the BM25 query won't be injected.
+Relying on Somtum alone to keep the agent informed about critical project rules is risky. Somtum retrieves based on relevance to the current prompt; a rule that doesn't match the BM25 query won't be injected.
 
 **What to do:**
 - Use `somtum suggest-claude-md` to promote high-signal observations from Somtum into CLAUDE.md — this is the designed workflow.
-- Keep permanent rules (team conventions, project architecture constraints, non-negotiables) in CLAUDE.md.
+- Keep permanent rules (team conventions, project architecture constraints, non-negotiables) in CLAUDE.md or AGENTS.md. The suggestions `suggest-claude-md` prints work in either file.
 - Let Somtum handle the long tail: past bugs, specific decisions, one-off learnings.
 
 ---
@@ -106,9 +106,10 @@ Consider a monthly pruning pass on long-lived projects.
 
 ## The extraction cost is real
 
-**The problem:** Every session end triggers a Claude Haiku call to extract observations (unless the session is trivially short). On the Anthropic API, this is a real cost — typically a few hundred to a few thousand input tokens per session. Somtum tracks this in `tokens_spent` and shows the breakeven ratio.
+**The problem:** Every session end (and every compaction) triggers one extraction call. The transcript sent is capped at 60k tokens; long real sessions measured 38k–72k tokens per call, short ones far less. On the Anthropic API that is billed per call. Somtum tracks it in `tokens_spent` and shows the breakeven ratio.
 
 **What to do:**
-- Use `ANTHROPIC_API_KEY` unset + `claude` CLI fallback if you're on a Claude Code subscription — extraction then uses your subscription quota rather than API credits.
+- On a Claude Code or Codex subscription, leave `ANTHROPIC_API_KEY` unset. Extraction then runs through the `claude` or `codex` CLI on your plan's quota rather than API credits.
+- Upgrade from v2: earlier versions sent Claude Code's own ~37k-token system prompt and tool list with every `claude` CLI extraction call, and sent tool-call arguments (whole files) untrimmed. Both are fixed in v3.
 - Reduce `extraction.max_observations_per_session` if you're generating too many low-quality observations per session.
 - Run `somtum stats` regularly to check whether savings are outpacing spend.

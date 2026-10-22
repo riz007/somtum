@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { runDoctor } from './doctor.js';
 import { join } from 'node:path';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { ulid } from 'ulid';
+import { openDb } from '../core/db.js';
+import { projectDir } from '../config.js';
 
 vi.mock('../core/db.js', async () => {
   const actual = await vi.importActual('../core/db.js');
@@ -42,5 +44,27 @@ describe('doctor', () => {
 
     // This is hard to test fully without deep mocking but let's see
     // The current runDoctor might still fail on real DB open if not fully mocked
+  });
+
+  it('accepts Codex hooks when there is no Claude Code settings file', () => {
+    const dir = projectDir('test-proj');
+    mkdirSync(dir, { recursive: true });
+    openDb({ path: join(dir, 'db.sqlite') }).close();
+    mkdirSync(join(tempDir, '.codex'));
+    writeFileSync(
+      join(tempDir, '.codex', 'hooks.json'),
+      JSON.stringify({
+        hooks: { SessionEnd: [{ hooks: [{ command: 'somtum hook post_session' }] }] },
+      }),
+    );
+
+    try {
+      const check = runDoctor({ cwd: tempDir }).checks.find((c) => c.name === 'hooks_installed');
+      expect(check?.ok).toBe(true);
+      expect(check?.detail).toContain(join('.codex', 'hooks.json'));
+    } finally {
+      // SOMTUM_HOME is shared across runs; a leftover DB breaks the no-DB test.
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

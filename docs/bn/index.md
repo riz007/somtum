@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Somtum"
-  text: "Claude Code-এর জন্য লোকাল-ফার্স্ট মেমরি"
-  tagline: প্রতিটি সেশন থেকে সিদ্ধান্ত, বাগ ফিক্স এবং শিক্ষাগুলি স্বয়ংক্রিয়ভাবে ক্যাপচার করে — এবং পরবর্তী সেশনে আবার ইনজেক্ট করে। কোনো ক্লাউড নেই। কোনো কনফিগ নেই। শুধু মেমরি।
+  text: "কোডিং এজেন্টের জন্য লোকাল-ফার্স্ট মেমরি"
+  tagline: প্রতিটি Claude Code ও Codex সেশন থেকে সিদ্ধান্ত, বাগ ফিক্স এবং শিক্ষাগুলি স্বয়ংক্রিয়ভাবে ক্যাপচার করে — এবং পরবর্তী সেশনে, যেকোনো এজেন্টে, আবার ইনজেক্ট করে। কোনো ক্লাউড নেই। কোনো কনফিগ নেই। শুধু মেমরি।
   image:
     src: /logo.png
     alt: Somtum
@@ -22,7 +22,7 @@ hero:
 features:
   - icon: 🥣
     title: স্বয়ংক্রিয় ক্যাপচার
-    details: সেশন শেষে, Claude Haiku ট্রান্সক্রিপ্ট থেকে টেকসই পর্যবেক্ষণ বের করে — সিদ্ধান্ত, বাগ ফিক্স, শিক্ষা, কমান্ড — এবং একটি স্থানীয় SQLite ডেটাবেসে সংরক্ষণ করে।
+    details: সেশন শেষে, একটি ছোট মডেল (API key বা claude CLI-এর মাধ্যমে Claude Haiku, অথবা codex CLI-এর মাধ্যমে Codex) ট্রান্সক্রিপ্ট থেকে টেকসই পর্যবেক্ষণ বের করে — সিদ্ধান্ত, বাগ ফিক্স, শিক্ষা, কমান্ড — এবং একটি স্থানীয় SQLite ডেটাবেসে সংরক্ষণ করে।
   - icon: ⚡
     title: প্রতিটি প্রম্পটে স্বয়ংক্রিয় ইনজেকশন
     details: UserPromptSubmit হুক BM25 এর মাধ্যমে সবচেয়ে প্রাসঙ্গিক মেমরিগুলি পুনরুদ্ধার করে এবং প্রতিটি বার্তার আগে ইনজেক্ট করে। কোনো ম্যানুয়াল রিকল স্টেপ প্রয়োজন নেই।
@@ -47,7 +47,13 @@ npm install -g somtum
 somtum init --all   # বর্তমান প্রজেক্টে hooks + MCP server ইনস্টল করে
 ```
 
-এটাই। এখন থেকে প্রতিটি Claude Code সেশন ক্যাপচার এবং মনে রাখা হবে।
+Codex ব্যবহার করলে:
+
+```bash
+somtum init --agent codex
+```
+
+এটাই। এখন থেকে প্রতিটি সেশন ক্যাপচার এবং মনে রাখা হবে, আপনি যে এজেন্টই ব্যবহার করুন। Claude Code ও Codex একই প্রজেক্টে একটি মেমরি শেয়ার করে।
 
 ---
 
@@ -70,7 +76,7 @@ somtum init --all   # বর্তমান প্রজেক্টে hooks + 
 ]
 ```
 
-পরবর্তী সেশনে, আপনি যখন জিজ্ঞেস করেন "আমরা কেন pnpm ব্যবহার করছি?" Claude ইতিমধ্যেই জানে। আর পুনরায় ব্যাখ্যা করার প্রয়োজন নেই।
+পরবর্তী সেশনে, আপনি যখন জিজ্ঞেস করেন "আমরা কেন pnpm ব্যবহার করছি?" এজেন্ট ইতিমধ্যেই জানে। আর পুনরায় ব্যাখ্যা করার প্রয়োজন নেই।
 
 ---
 
@@ -81,7 +87,8 @@ somtum init --all   # বর্তমান প্রজেক্টে hooks + 
 ```
 ✓  config          strategy=bm25, k=8
 ✓  db_open         WAL mode, foreign_keys ON
-✓  hooks_installed somtum hooks found in .claude/settings.json
+✓  extraction_backend  claude-cli (auto)
+✓  hooks_installed somtum hooks found in .claude/settings.json, .codex/hooks.json
 ✓  embeddings      disabled (set retrieval.embeddings.enabled=true to enable)
 ```
 
