@@ -119,11 +119,13 @@ function collectSessionFiles(turns: ReturnType<typeof parseTranscript>): string[
 // original behaviour; 3 parallel cuts wall-clock time by ~3× for busy sessions
 // without saturating the Haiku rate limit.
 const SUMMARY_CONCURRENCY = 3;
+// The hook is killed at 90s. Leave headroom for a summary batch already in flight.
+const SUMMARY_BUDGET_MS = 55_000;
 
 async function populateFileSummaries(
   db: DB,
   turns: ReturnType<typeof parseTranscript>,
-  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller },
+  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller; deadline?: number },
 ): Promise<number> {
   const paths = collectSessionFiles(turns);
   if (paths.length === 0) return 0;
@@ -159,6 +161,7 @@ async function populateFileSummaries(
   // still keeping pressure on the Haiku rate limit manageable.
   let generated = 0;
   for (let i = 0; i < work.length; i += SUMMARY_CONCURRENCY) {
+    if (opts.deadline !== undefined && Date.now() > opts.deadline) break;
     const batch = work.slice(i, i + SUMMARY_CONCURRENCY);
     const results = await Promise.allSettled(
       batch.map(({ path, contents }) =>
@@ -253,6 +256,7 @@ export async function runPostSession(
   payload: HookPayload,
   opts: RunOptions = {},
 ): Promise<RunResult> {
+  const startedAt = Date.now();
   const parsed = HookPayloadSchema.parse(payload);
   const cwd = opts.cwd ?? parsed.cwd ?? process.cwd();
   const config = opts.config ?? loadConfig({ cwd });
@@ -364,10 +368,6 @@ export async function runPostSession(
       }
     }
 
-    const summariesGenerated = config.file_gating.enabled
-      ? await populateFileSummaries(db, resolved.turns, { cwd, projectId, config, caller })
-      : 0;
-
     generateIndex({
       projectName,
       projectId,
@@ -380,6 +380,18 @@ export async function runPostSession(
     if (parsed.hook_event_name === 'PreCompact') {
       writeWarmStart(db, projectId);
     }
+
+    // Summaries are optional work: run them last, and only while the hook's
+    // time budget lasts, so they can never cost us the index or warm-start.
+    const summariesGenerated = config.file_gating.enabled
+      ? await populateFileSummaries(db, resolved.turns, {
+          cwd,
+          projectId,
+          config,
+          caller,
+          deadline: startedAt + SUMMARY_BUDGET_MS,
+        })
+      : 0;
 
     return {
       projectId,
