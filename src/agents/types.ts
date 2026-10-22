@@ -10,4 +10,6 @@ export interface AgentAdapter {
   // Cheap sniff of a raw JSONL transcript: does this agent's format match?
   detect(raw: string): boolean;
   parse(raw: string): Turn[];
+  // Locate a session's transcript when the hook payload has no usable path.
+  findTranscript?(sessionId: string): string | null;
 }

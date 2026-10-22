@@ -18,6 +18,7 @@ import { pickBackend, callerFor, NO_BACKEND_MESSAGE } from '../core/llm_backend.
 import { projectDir } from '../config.js';
 import { Bm25Retriever } from '../core/retriever/bm25.js';
 import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
+import { findTranscript } from '../agents/index.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
@@ -39,12 +40,13 @@ export const HookPayloadSchema = z
     cwd: z.string().optional(),
     project_id: z.string().optional(),
     transcript: z.string().optional(),
-    transcript_path: z.string().optional(),
-    // Claude Code includes these; we ignore them here but allow passthrough.
+    // Codex documents this as possibly null; session_id then locates the file.
+    transcript_path: z.string().nullish(),
+    // Agents include these; we ignore them here but allow passthrough.
     hook_event_name: z.string().optional(),
   })
-  .refine((v) => v.transcript !== undefined || v.transcript_path !== undefined, {
-    message: 'Either `transcript` or `transcript_path` is required',
+  .refine((v) => v.transcript !== undefined || v.transcript_path || v.session_id, {
+    message: 'One of `transcript`, `transcript_path` or `session_id` is required',
   });
 
 export type HookPayload = z.infer<typeof HookPayloadSchema>;
@@ -65,14 +67,13 @@ interface ResolvedTranscript {
 }
 
 function resolveTranscript(payload: HookPayload): ResolvedTranscript {
-  const raw =
-    payload.transcript !== undefined
-      ? payload.transcript
-      : payload.transcript_path !== undefined
-        ? readFileSync(payload.transcript_path, 'utf8')
-        : (() => {
-            throw new Error('Unreachable: schema requires one of transcript | transcript_path');
-          })();
+  let raw = payload.transcript;
+  if (raw === undefined) {
+    const path =
+      payload.transcript_path ?? (payload.session_id ? findTranscript(payload.session_id) : null);
+    if (!path) throw new Error(`No transcript found for session ${payload.session_id ?? '?'}`);
+    raw = readFileSync(path, 'utf8');
+  }
 
   const turns = parseTranscript(raw);
   // If the parser found structured turns, render them compactly for the extractor.
