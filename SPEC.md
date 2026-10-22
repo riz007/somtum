@@ -20,7 +20,8 @@ pays for itself**. Everything in this spec serves one of three goals:
    user running `somtum stats` should see numbers Somtum can defend.
 
 Non-goals: cloud sync beyond the existing SSH backend, team/multi-user
-features, support for agents other than Claude Code.
+features. Agent support is in scope: one local memory shared by every
+coding agent the user runs (see §11).
 
 ## 2. Baseline: shipped in v2.3.0
 
@@ -246,3 +247,50 @@ Somtum graduates when all of these hold:
    (bench exists in `test/bench` — extend it to cover D2).
 5. A new user can read the README and correctly predict what Somtum will
    and will not do for them (F).
+
+## 11. Agent adapters
+
+**Why.** Claude Code, Codex and Cursor each ship their own memory, scoped to
+that one agent. A local store that every agent reads and writes is the part
+none of them offer.
+
+**Design.** An agent is a transcript format plus an install target.
+`src/agents/` holds one adapter per agent (`detect`, `parse`, optional
+`findTranscript`); `core/transcript.ts` dispatches to the first adapter whose
+`detect` matches, with Claude Code as the fallback. Hook handlers are shared:
+Codex hooks use the same `hooks.json` shape, event names, stdin payload and
+`hookSpecificOutput.additionalContext` reply as Claude Code. Extraction is
+agent-independent via `extraction.backend` (`anthropic`, which also covers
+Anthropic-compatible providers such as GLM through `ANTHROPIC_BASE_URL` +
+`ANTHROPIC_AUTH_TOKEN`; `claude-cli`; `codex-cli`).
+
+**Shipped.**
+
+| Agent | Capture | Injection | MCP | Install |
+| --- | --- | --- | --- | --- |
+| Claude Code | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (opt-in via `--cache`) | `.mcp.json` | `somtum init` |
+| Codex | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (default) | `.codex/config.toml` | `somtum init --agent codex` |
+
+Fixes found while validating against real transcripts, recorded so they are
+not regressed:
+
+- Tool-call inputs are truncated (300 chars) like tool results. Whole files
+  inside `Write`/`Edit`/`apply_patch` arguments were 66% of extractor input.
+- The transcript is wrapped in `<transcript>` tags and the task restated after
+  it. Without that, a session ending mid-task was continued by the model
+  (fake tool call, parse failure, empty retry) and silently lost.
+- `claude -p` runs with `--system-prompt`, no tools, no MCP, no setting
+  sources: ~37k tokens of Claude Code overhead per call otherwise.
+- File summaries run last under a 55 s budget so the 90 s hook limit can't
+  cost the index or warm-start file.
+
+**Next.**
+
+1. Cursor and Cline: MCP registration and their hook systems; transcripts
+   only where the format is stable enough to parse.
+2. `AGENTS.md` sync: write top memories into the file most agents already
+   read, for agents with neither hooks nor MCP.
+3. Decide whether Claude Code should install `UserPromptSubmit` by default,
+   matching Codex.
+4. The retry after a parse failure has no transcript, so it cannot recover a
+   role-play reply. Either resend the transcript once or log the loss.

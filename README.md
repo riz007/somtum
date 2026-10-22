@@ -1,6 +1,6 @@
 <img src="./assets/logo.png" width="500" alt="Somtum Logo">
 
-**Local-first memory and prompt-cache layer for Claude Code.**
+**Local-first memory and prompt-cache layer for coding agents: Claude Code and Codex.**
 
 [**Docs**](https://riz007.github.io/somtum/) · [**npm**](https://www.npmjs.com/package/somtum)
 
@@ -206,8 +206,13 @@ Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.t
 ## Requirements
 
 - **Node 20+**
-- **Claude Code** — Somtum hooks into Claude Code's `SessionEnd`, `UserPromptSubmit`, and `PreToolUse` events
-- **`ANTHROPIC_API_KEY`** _(optional)_ — if set, Somtum uses the Anthropic API directly for extraction. If not set, Somtum falls back to the `claude` CLI that ships with Claude Code, so **no separate API key is required for Claude Code subscribers**.
+- **Claude Code or Codex** — Somtum hooks into their `SessionEnd`, `PreCompact` and `UserPromptSubmit` events. Both agents share one memory store per project.
+- **An extraction backend**, picked automatically in this order:
+  1. `ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` for Anthropic-compatible providers such as GLM
+  2. the `claude` CLI (Claude Code subscribers need no separate key)
+  3. the `codex` CLI (ChatGPT/Codex subscribers need no separate key)
+
+  Override with `somtum config set extraction.backend anthropic|claude-cli|codex-cli`.
 
 ---
 
@@ -302,6 +307,17 @@ somtum init --all
 #   - MCP server in .mcp.json     (Claude can call recall/remember tools)
 ```
 
+**Using Codex?** Install the Codex hooks and MCP server instead (or as well, if you use both):
+
+```bash
+somtum init --agent codex
+# Installs:
+#   - .codex/hooks.json   SessionEnd + PreCompact capture, UserPromptSubmit injection
+#   - .codex/config.toml  [mcp_servers.somtum]
+```
+
+Codex only loads project-level config for trusted projects. Sessions are read from `~/.codex/sessions` (or `$CODEX_HOME/sessions`).
+
 ### Step 3 — Verify your setup
 
 Run doctor immediately after init to confirm everything is connected:
@@ -360,14 +376,14 @@ Using the `claude` CLI fallback (no API key):
 
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
+2026-04-30T10:15:42.124Z [post_session] extraction backend: claude-cli
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
 Neither backend available:
 
 ```
-2026-04-30T10:15:42.123Z [post_session] ERROR: Neither ANTHROPIC_API_KEY nor the claude CLI is available.
+2026-04-30T10:15:42.123Z [post_session] ERROR: No extraction backend: set ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL), or install the claude or codex CLI.
 ```
 
 **2. Check stats**
@@ -580,6 +596,10 @@ somtum config set file_gating.enabled false
 
 # Limit observations extracted per session (default: 10)
 somtum config set extraction.max_observations_per_session 5
+
+# Pin the extraction backend (default: auto) and the model codex exec uses
+somtum config set extraction.backend codex-cli
+somtum config set extraction.codex_model <model>
 
 # Control automatic memory injection on every prompt (default: on)
 somtum config set injection.enabled false          # turn off auto-inject
