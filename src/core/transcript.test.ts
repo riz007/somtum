@@ -100,6 +100,25 @@ describe('parseTranscript', () => {
     expect(turns[0]?.text.length).toBeLessThan(1200);
     expect(turns[0]?.text).toContain('[truncated]');
   });
+
+  it('truncates oversized tool_use input but keeps the file path', () => {
+    const jsonl = JSON.stringify({
+      message: {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool_use',
+            name: 'Write',
+            input: { file_path: 'src/big.ts', content: 'x'.repeat(5000) },
+          },
+        ],
+      },
+    });
+    const turns = parseTranscript(jsonl);
+    expect(turns[0]?.text.length).toBeLessThan(400);
+    expect(turns[0]?.text).toContain('src/big.ts');
+    expect(turns[0]?.files_touched).toEqual(['src/big.ts']);
+  });
 });
 
 describe('extractPromptResponsePairs', () => {

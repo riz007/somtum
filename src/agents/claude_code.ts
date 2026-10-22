@@ -1,5 +1,5 @@
 import type { Turn } from '../core/transcript.js';
-import { truncateToolResult } from './shared.js';
+import { truncateToolInput, truncateToolResult } from './shared.js';
 import type { AgentAdapter } from './types.js';
 
 interface ClaudeCodeLine {
@@ -65,7 +65,7 @@ function coerceContent(content: unknown): { text: string; files: string[] } {
         ) {
           const b = block as { name?: string; input?: unknown };
           files.push(...extractFilesFromBlock(block));
-          return `[tool_use ${b.name ?? ''} ${JSON.stringify(b.input ?? {})}]`;
+          return `[tool_use ${b.name ?? ''} ${truncateToolInput(JSON.stringify(b.input ?? {}))}]`;
         }
         if (
           typeof block === 'object' &&
