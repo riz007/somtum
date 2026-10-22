@@ -6,19 +6,21 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
 import { projectNameFromCwd } from '../core/project_id.js';
+import { pickBackend, NO_BACKEND_MESSAGE } from '../core/llm_backend.js';
+import { runCodexInit } from './init_codex.js';
 
 const SESSION_END = 'SessionEnd';
 const PRE_COMPACT = 'PreCompact';
 const USER_PROMPT_SUBMIT = 'UserPromptSubmit';
 const PRE_TOOL_USE = 'PreToolUse';
 
-function absoluteBin(): string {
+export function absoluteBin(): string {
   // dist/cli/init.js → dist/cli/index.js (the bin entry)
   const here = dirname(fileURLToPath(import.meta.url));
   return resolve(here, 'index.js');
 }
 
-function somtumOnPath(): boolean {
+export function somtumOnPath(): boolean {
   try {
     execFileSync('which', ['somtum'], { stdio: ['ignore', 'ignore', 'ignore'] });
     return true;
@@ -68,7 +70,7 @@ async function promptContinue(message: string): Promise<void> {
   });
 }
 
-function hookCommand(subcommand: string): string {
+export function hookCommand(subcommand: string): string {
   if (somtumOnPath()) return `somtum ${subcommand}`;
   return `node ${absoluteBin()} ${subcommand}`;
 }
@@ -87,16 +89,16 @@ interface HookMatcher {
   hooks: HookEntry[];
 }
 
-interface ClaudeSettings {
+export interface HookSettings {
   hooks?: Record<string, HookMatcher[]>;
   [key: string]: unknown;
 }
 
-function readSettings(path: string): ClaudeSettings {
+export function readSettings(path: string): HookSettings {
   if (!existsSync(path)) return {};
   const raw = readFileSync(path, 'utf8');
   if (raw.trim() === '') return {};
-  return JSON.parse(raw) as ClaudeSettings;
+  return JSON.parse(raw) as HookSettings;
 }
 
 function hasCommand(matchers: HookMatcher[], command: string): boolean {
@@ -119,8 +121,8 @@ export interface InitResult {
   embeddingsNotice: string | null;
 }
 
-function addHook(
-  settings: ClaudeSettings,
+export function addHook(
+  settings: HookSettings,
   event: string,
   command: string,
   matcher?: string,
@@ -219,6 +221,7 @@ export async function initCommand(options: {
   fileGating?: boolean;
   mcp?: boolean;
   all?: boolean;
+  agent?: string;
 } = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const yes = options.yes ?? options.force ?? false;
@@ -242,6 +245,13 @@ export async function initCommand(options: {
         '',
       ].join('\n'),
     );
+  }
+
+  const agent = options.agent ?? 'claude-code';
+  if (agent === 'codex') return initCodex(cwd, options.force ?? false, options.mcp ?? true);
+  if (agent !== 'claude-code') {
+    process.stderr.write(`somtum: unknown agent "${agent}" (expected: claude-code, codex)\n`);
+    return 1;
   }
 
   const withCache = options.all === true ? true : (options.cache ?? false);
@@ -316,5 +326,22 @@ export async function initCommand(options: {
     );
   }
 
+  return 0;
+}
+
+function initCodex(cwd: string, force: boolean, withMcp: boolean): number {
+  const result = runCodexInit({ cwd, force, withMcp });
+  if (result.hooksInstalled.length === 0) {
+    console.log(`somtum: all hooks already installed in ${result.hooksPath}`);
+  } else {
+    console.log(`somtum: updated ${result.hooksPath}`);
+    for (const h of result.hooksInstalled) console.log(`  + ${h}`);
+  }
+  if (result.configPath) console.log(`somtum: registered MCP server in ${result.configPath}`);
+  console.log('  Codex loads project config only for trusted projects.');
+
+  const backend = pickBackend(loadConfig({ cwd }));
+  if (backend) console.log(`somtum: extraction backend: ${backend}`);
+  else process.stderr.write(`\nWARNING: ${NO_BACKEND_MESSAGE}\n`);
   return 0;
 }

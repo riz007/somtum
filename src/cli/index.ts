@@ -51,9 +51,19 @@ program
   .option('--file-gating', 'Also install the PreToolUse file-gating hook', false)
   .option('--no-mcp', 'Do not register the somtum MCP server in .mcp.json')
   .option('--all', 'Enable cache + file-gating + MCP', false)
+  .option('--agent <id>', 'Agent to install for: claude-code | codex', 'claude-code')
   .action(
-    async (opts: { force: boolean; yes: boolean; cache: boolean; fileGating: boolean; mcp: boolean; all: boolean }) => {
+    async (opts: {
+      force: boolean;
+      yes: boolean;
+      cache: boolean;
+      fileGating: boolean;
+      mcp: boolean;
+      all: boolean;
+      agent: string;
+    }) => {
       const code = await initCommand({
+        agent: opts.agent,
         force: opts.force,
         yes: opts.yes,
         cache: opts.cache,
