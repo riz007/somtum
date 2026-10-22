@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/somtum.svg)](https://www.npmjs.com/package/somtum)
 
-Somtum (Thai: ส้มตำ) is named after the vibrant, shredded green papaya salad. Just like its namesake, Somtum blends durable observations from your Claude Code sessions — decisions, bugfixes, learnings, file summaries — stores them in a local SQLite database, and injects the relevant ones back into context the next time you work on the same project.
+Somtum (Thai: ส้มตำ) is named after the vibrant, shredded green papaya salad. Just like its namesake, Somtum blends durable observations from your Claude Code and Codex sessions — decisions, bugfixes, learnings, file summaries — stores them in a local SQLite database, and injects the relevant ones back into context the next time you work on the same project.
 
 Zero-config: one `somtum init` and every session end is captured automatically. No server, no cloud account, no mandatory tuning.
 
@@ -33,6 +33,8 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
+> **v3.0.0** — Codex support (`somtum init --agent codex`) · selectable extraction backends incl. Codex CLI and GLM · fixes silently lost sessions and oversized extraction calls · [upgrade guide](https://riz007.github.io/somtum/guide/upgrading-v3)
+>
 > **v2.0.0** — Global DB (`~/.somtum/global.db`) · cross-project workspace recall · memory deduplication (`superseded_by`) · `--show-superseded` on `somtum list` · stats instrumentation fix · dashboard dark-mode redesign
 >
 > **v1.5.0** — Multi-page VitePress docs site · `somtum list` · `somtum reset` · `somtum forget --all` · embeddings timeout safety · config crash-resilience · `injection.max_chars` wired up · warm-start race fix · auth-error hints
@@ -43,13 +45,13 @@ Zero-config: one `somtum init` and every session end is captured automatically. 
 
 ## Why Somtum?
 
-LLM agents like Claude Code start every session with a blank slate. That leads to:
+Coding agents like Claude Code and Codex start every session with a blank slate. That leads to:
 
 - **Repetitive context** — re-explaining the same architectural choices every session
-- **Regressions** — Claude suggests a fix you already tried and discarded
+- **Regressions** — the agent suggests a fix you already tried and discarded
 - **Token waste** — reading large files just to "set the scene"
 
-**Somtum gives Claude a long-term memory.** Once a decision is made or a bug is fixed, it's remembered across all future sessions — without bloating your context window.
+**Somtum gives your coding agent a long-term memory.** Once a decision is made or a bug is fixed, it's remembered across all future sessions, in Claude Code and Codex alike, without bloating your context window.
 
 ### What a session looks like with Somtum
 
@@ -69,13 +71,13 @@ Session 2: Claude suggests        Session 2: Claude already knows about
 
 ## How it works
 
-At the end of each Claude Code session, Somtum reads the session transcript and asks Claude Haiku to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite. **On every subsequent prompt**, Somtum automatically retrieves the most relevant memories and injects them into context — no manual recall needed.
+At the end of each Claude Code or Codex session, Somtum reads the session transcript and asks a small model to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite. **On every subsequent prompt**, Somtum automatically retrieves the most relevant memories and injects them into context — no manual recall needed.
 
 ### Memory lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Claude Code Session                      │
+│               Claude Code or Codex session                  │
 │                                                             │
 │       you code · debug · review · make decisions            │
 └──────────────────────────────┬──────────────────────────────┘
@@ -134,13 +136,13 @@ You work a session debugging an auth bug and refactoring a module. At session en
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.ts`, Claude finds these memories and already has the context.
+Next session, when you ask "why are we using pnpm?" or touch `src/auth/refresh.ts`, the agent gets these memories and already has the context.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Claude Code / Agent                    │
+│                 Claude Code / Codex / MCP client            │
 └──────────┬──────────────────────────────┬───────────────────┘
            │ hooks                        │ MCP tools
            ▼                              ▼
@@ -244,70 +246,37 @@ Somtum uses [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), whic
 
 ## Quickstart
 
-### Before you begin — pick your setup
+### Step 1 — Check your extraction backend
 
-**Using Claude Code (subscription)?**
-You do not need an API key. Somtum calls the `claude` CLI that ships with Claude Code.
-Confirm it is installed: `which claude`
-If nothing prints, reinstall Claude Code or add its binary to your PATH.
+At the end of each session Somtum asks a small model to pull out what's worth remembering. It uses the first backend available, so most people need to do nothing:
 
-**Using the Anthropic API directly?**
-Add your key to your shell profile (not just the current terminal tab):
+| You have | Backend used |
+| --- | --- |
+| `ANTHROPIC_API_KEY` in your shell profile | Anthropic API (Haiku) |
+| `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` (GLM or another Anthropic-compatible provider) | that provider |
+| Claude Code installed (`which claude` prints a path) | `claude` CLI, on your subscription |
+| Codex installed (`which codex` prints a path) | `codex` CLI, on your ChatGPT plan |
 
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export ANTHROPIC_API_KEY="sk-ant-..."
-source ~/.zshrc
-```
+> Keys must be in your shell profile, not just exported in an open terminal tab. Hooks inherit the environment of the shell that _started_ the agent.
 
-Both paths work. Most Claude Code users should use Option A.
+### Step 2 — Install in your project
 
----
+Run from the **root of the project you open in your agent**.
 
-### Step 1 — Choose your extraction backend
-
-Somtum needs to call a Claude model at session end to extract observations. Pick one:
-
-**Option A: Claude Code subscription (no extra setup)**
-
-If you already have Claude Code installed, you're done. Somtum calls `claude --print` automatically when no API key is present. Skip to Step 2.
-
-**Option B: Direct Anthropic API key (optional — faster, lets you pick the model)**
-
-Add to `~/.zshrc` (or `~/.bashrc`):
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-Then reload:
-
-```bash
-source ~/.zshrc
-```
-
-> The key must be in your shell profile, not just exported in an open terminal tab. The `SessionEnd` hook inherits the environment of the shell that _started_ Claude Code — not the current terminal.
-
-### Step 2 — Install inside a Claude Code project
-
-Run this from the **root of the project you work on with Claude Code**:
-
-```bash
-somtum init
-```
-
-To enable all features at once (recommended):
+**Claude Code**
 
 ```bash
 somtum init --all
 # Installs:
-#   - SessionEnd capture hook     (memory extraction)
-#   - UserPromptSubmit cache hook (prompt cache lookup)
-#   - PreToolUse file-gating hook (large file summarization)
-#   - MCP server in .mcp.json     (Claude can call recall/remember tools)
+#   - SessionEnd + PreCompact capture hooks  (memory extraction)
+#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
+#   - PreToolUse file-gating hook            (large file summarization)
+#   - MCP server in .mcp.json                (recall/remember tools)
 ```
 
-**Using Codex?** Install the Codex hooks and MCP server instead (or as well, if you use both):
+> Use `--all`. A plain `somtum init` installs only the capture hooks: memories are saved but not injected, and the agent sees them only if it calls the MCP `recall` tool.
+
+**Codex** (or both, on the same project; they share one memory store):
 
 ```bash
 somtum init --agent codex
@@ -328,14 +297,14 @@ somtum doctor
 
 All checks should show `✓`. The two most important are:
 
-- **`api_key`** — confirms Somtum has a way to call Claude for extraction
-- **`hooks_installed`** — confirms the SessionEnd hook is registered
+- **`extraction_backend`** — confirms Somtum has a model to extract memories with
+- **`hooks_installed`** — confirms hooks are registered for Claude Code, Codex, or both
 
 Do not start your first session until all checks pass. Each failing check shows an inline fix command.
 
-### Step 4 — Use Claude Code normally
+### Step 4 — Use your agent normally
 
-Open a Claude Code session **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
+Open Claude Code or Codex **from the same directory** where you ran `somtum init`. Work as you normally would. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
 
 ### Step 5 — Check your memory
 
@@ -357,7 +326,7 @@ If `somtum stats` shows `memories 0` after a session, see [Troubleshooting](#tro
 
 ## Verifying the setup
 
-After your **first** Claude Code session ends:
+After your **first** session ends:
 
 **1. Check the hook log**
 
@@ -372,12 +341,10 @@ A successful run:
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
-Using the `claude` CLI fallback (no API key):
+Each run also logs which backend it used:
 
 ```
-2026-04-30T10:15:42.123Z [post_session] starting
 2026-04-30T10:15:42.124Z [post_session] extraction backend: claude-cli
-2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 superseded=1 cache=2 summaries=1
 ```
 
 Neither backend available:
@@ -512,9 +479,9 @@ Somtum uses hostname-aware syncing — merging observations from multiple machin
 
 ## MCP Server
 
-When you run `somtum init --all`, Somtum registers an MCP server that Claude can call autonomously during a session:
+When you run `somtum init --all` (Claude Code) or `somtum init --agent codex`, Somtum registers an MCP server the agent can call on its own during a session. Any other MCP client can use it too: point it at `somtum mcp` over stdio.
 
-| Tool                | What Claude does with it                                                                                        |
+| Tool                | What the agent does with it                                                                                        |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `recall`            | Searches memories when unsure about a project detail. Merges project + global DB results. Accepts `strategy`    |
 | `get`               | Retrieves full observation bodies by ID. Checks global DB if not found in project DB. Bumps `last_confirmed_at` |
@@ -525,7 +492,7 @@ When you run `somtum init --all`, Somtum registers an MCP server that Claude can
 | `forget`            | Soft-deletes an observation                                                                                      |
 | `stats`             | Reports tokens saved, cache hit rate, false-hit count, corpus size, and `global_memories` count                 |
 
-Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
+Every MCP response includes a `tokens` field so the agent can account for retrieval cost.
 
 ### Memory scope
 
@@ -745,7 +712,8 @@ src/
     store.ts          # MemoryStore — CRUD for observations
     cache.ts          # PromptCache — exact + fuzzy lookup
     retriever/        # bm25, embeddings, hybrid, index, factory
-    extractor.ts      # session transcript → observations (Claude Haiku)
+    extractor.ts      # session transcript → observations
+    llm_backend.ts    # picks the extraction backend
     index_gen.ts      # renders index.md (incremental past 1k obs)
     memory_files.ts   # writes memories/<YYYY-MM>/<ulid>.md
     retrieval_stats.ts
@@ -794,18 +762,18 @@ Check the hook log first:
 cat ~/.somtum/hook.log
 ```
 
-**`claude` CLI not found and no `ANTHROPIC_API_KEY` set**
+**No extraction backend**
 
-- If you use Claude Code: run `which claude` — if nothing prints, reinstall Claude Code or add its binary to your `PATH`.
-- If you prefer the direct API: add `export ANTHROPIC_API_KEY="sk-ant-..."` to `~/.zshrc` and `source ~/.zshrc`. Must be in your profile, not just exported in the current terminal tab.
+- Claude Code users: run `which claude`. Codex users: run `which codex`. If nothing prints, install the CLI or add it to your `PATH`.
+- API users: add `export ANTHROPIC_API_KEY="sk-ant-..."` to `~/.zshrc` and `source ~/.zshrc`. It must be in your profile, not just exported in the current terminal tab.
 
-Run `somtum doctor` — the `api_key` check tells you exactly which backend is available.
+Run `somtum doctor`: the `extraction_backend` check shows which backend will be used.
 
 **Hook not installed in the right directory**
 
-`somtum init` writes the hook to `.claude/settings.json` in the directory where you ran it. If you launch Claude Code from a different directory, it reads a different settings file.
+`somtum init` writes hooks into the directory where you ran it (`.claude/settings.json` or `.codex/hooks.json`). If you launch the agent from a different directory, it reads different settings.
 
-Fix: run `somtum init` from the same directory you use to launch Claude Code.
+Fix: run `somtum init` from the same directory you launch the agent from.
 
 ```bash
 cd ~/my-project
