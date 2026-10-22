@@ -36,9 +36,14 @@ This replaces the globally installed copy with your local `dist/`.
 
 ```
 src/
+  agents/
+    claude_code.ts      # Claude Code transcript parser (fallback format)
+    codex.ts            # Codex rollout parser + session lookup by id
+    index.ts            # adapter registry, format detection
   cli/
     index.ts            # commander CLI entry point
     init.ts             # somtum init — installs hooks + MCP config
+    init_codex.ts       # somtum init --agent codex
     serve.ts            # somtum serve — local dashboard server
     stats.ts            # somtum stats
     doctor.ts           # somtum doctor — health checks
@@ -54,7 +59,8 @@ src/
     store.ts            # MemoryStore — CRUD for observations
     cache.ts            # PromptCache — exact + fuzzy lookup
     retriever/          # bm25, embeddings, hybrid, index, factory
-    extractor.ts        # session transcript → observations (Claude Haiku)
+    extractor.ts        # session transcript → observations
+    llm_backend.ts      # picks the extraction backend (anthropic / claude-cli / codex-cli)
     index_gen.ts        # renders index.md (incremental past 1k obs)
     memory_files.ts     # writes memories/<YYYY-MM>/<ulid>.md
     retrieval_stats.ts
@@ -128,3 +134,13 @@ pnpm changeset          # describe your change
 pnpm changeset version  # bump versions (CI does this)
 pnpm release            # publish to npm (CI does this)
 ```
+
+---
+
+## Adding a new agent
+
+1. Add `src/agents/<agent>.ts` exporting an `AgentAdapter`: `detect(raw)` sniffs the first line of a transcript, `parse(raw)` returns `Turn[]`, and `findTranscript(sessionId)` is optional, for agents whose hooks may omit the transcript path.
+2. Register it in `src/agents/index.ts`, ahead of `claudeCode`, which accepts any input and must stay last.
+3. If the agent's hooks use a different payload or reply shape from Claude Code, map it in `src/cli/hook.ts`. Codex needed no mapping.
+4. Add an installer next to `src/cli/init_codex.ts` and a branch for it in `initCommand`.
+5. Build the parser and its tests from real transcripts, not from documentation, and keep user content out of the fixtures.

@@ -5,7 +5,7 @@ const enNav = [
   { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
   { text: 'Troubleshooting', link: '/troubleshooting' },
   {
-    text: 'v2.2.0',
+    text: 'v3.0.0',
     items: [
       { text: 'Changelog', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -21,6 +21,7 @@ const enSidebar = [
       { text: 'Getting Started', link: '/guide/getting-started' },
       { text: 'How It Works', link: '/guide/how-it-works' },
       { text: 'Limitations', link: '/guide/limitations' },
+      { text: 'Upgrading to v3', link: '/guide/upgrading-v3' },
     ],
   },
   {
@@ -53,7 +54,7 @@ const thNav = [
   { text: 'เอกสารอ้างอิง', link: '/th/reference/cli', activeMatch: '/th/reference/' },
   { text: 'การแก้ปัญหา', link: '/th/troubleshooting' },
   {
-    text: 'v2.2.0',
+    text: 'v3.0.0',
     items: [
       { text: 'บันทึกการเปลี่ยนแปลง', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -101,7 +102,7 @@ const bnNav = [
   { text: 'রেফারেন্স', link: '/bn/reference/cli', activeMatch: '/bn/reference/' },
   { text: 'সমস্যা সমাধান', link: '/bn/troubleshooting' },
   {
-    text: 'v2.2.0',
+    text: 'v3.0.0',
     items: [
       { text: 'পরিবর্তনলগ', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -146,7 +147,7 @@ const bnSidebar = [
 
 export default defineConfig({
   title: 'Somtum',
-  description: 'Local-first memory and prompt-cache layer for Claude Code.',
+  description: 'Local-first memory and prompt-cache layer for coding agents: Claude Code and Codex.',
   base: '/somtum/',
   appearance: 'dark',
 
@@ -157,21 +158,21 @@ export default defineConfig({
     ['link', { rel: 'canonical', href: 'https://riz007.github.io/somtum/' }],
 
     // SEO
-    ['meta', { name: 'keywords', content: 'Claude Code, AI memory, developer tools, local SQLite, prompt cache, Claude, Anthropic, session memory' }],
+    ['meta', { name: 'keywords', content: 'Claude Code, Codex, coding agents, AI memory, developer tools, local SQLite, prompt cache, MCP, session memory' }],
     ['meta', { name: 'author', content: 'Rizwanul Islam Rudra' }],
 
     // Open Graph
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Somtum' }],
-    ['meta', { property: 'og:title', content: 'Somtum — Local-first memory for Claude Code' }],
-    ['meta', { property: 'og:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code session — and injects them back on the next one. No cloud. No config. Just memory.' }],
+    ['meta', { property: 'og:title', content: 'Somtum — Local-first memory for coding agents' }],
+    ['meta', { property: 'og:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code and Codex session — and injects them back on the next one, in either agent. No cloud. No config. Just memory.' }],
     ['meta', { property: 'og:url', content: 'https://riz007.github.io/somtum/' }],
     ['meta', { property: 'og:image', content: 'https://riz007.github.io/somtum/logo.png' }],
 
     // Twitter / X card
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:title', content: 'Somtum — Local-first memory for Claude Code' }],
-    ['meta', { name: 'twitter:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code session — and injects them back on the next one. No cloud. No config. Just memory.' }],
+    ['meta', { name: 'twitter:title', content: 'Somtum — Local-first memory for coding agents' }],
+    ['meta', { name: 'twitter:description', content: 'Automatically captures decisions, bug fixes, and learnings from every Claude Code and Codex session — and injects them back on the next one, in either agent. No cloud. No config. Just memory.' }],
     ['meta', { name: 'twitter:image', content: 'https://riz007.github.io/somtum/logo.png' }],
 
     // Google Analytics

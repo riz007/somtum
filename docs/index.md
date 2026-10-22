@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Somtum"
-  text: "Local-first memory for Claude Code"
-  tagline: Automatically captures decisions, bug fixes, and learnings from every session — and injects them back on the next one. No cloud. No config. Just memory.
+  text: "Local-first memory for coding agents"
+  tagline: Captures decisions, bug fixes, and learnings from every Claude Code and Codex session — and injects them back on the next one, in either agent. No cloud. No config. Just memory.
   image:
     src: /logo.png
     alt: Somtum
@@ -22,16 +22,19 @@ hero:
 features:
   - icon: 🥣
     title: Automatic Capture
-    details: At session end, Claude Haiku extracts durable observations from the transcript — decisions, bug fixes, learnings, commands — and stores them in a local SQLite database.
+    details: At session end, a small model (Claude Haiku via your API key or the claude CLI, or Codex via the codex CLI) extracts durable observations from the transcript — decisions, bug fixes, learnings, commands — and stores them in a local SQLite database.
   - icon: ⚡
     title: Auto-Inject on Every Prompt
     details: The UserPromptSubmit hook retrieves the most relevant memories via BM25 and injects them before every message. No manual recall step needed.
   - icon: 🌶️
     title: Prompt Cache
     details: Exact and fuzzy-matched prompts skip the model entirely. The cache saves API credits and keeps sessions fast.
+  - icon: 🤝
+    title: One Memory, Every Agent
+    details: Claude Code and Codex share the same per-project memory. Fix a bug in one agent and the other already knows tomorrow. Any MCP client can call recall and remember too.
   - icon: 🥕
     title: Local-Only Storage
-    details: All data lives in a local SQLite WAL database at ~/.somtum/. No cloud accounts, no telemetry, no data leaves your machine except to the Anthropic API.
+    details: All data lives in a local SQLite WAL database at ~/.somtum/. No cloud accounts, no telemetry. Transcripts leave your machine only for extraction, through the backend you choose.
   - icon: 🌐
     title: Global Memory
     details: Store personal preferences or workspace conventions once with `scope='global'` — they are injected across every project automatically via ~/.somtum/global.db.
@@ -50,10 +53,11 @@ features:
 
 ```bash
 npm install -g somtum
-somtum init --all   # installs hooks + MCP server in current project
+somtum init --all            # Claude Code: hooks + MCP server in this project
+somtum init --agent codex    # Codex: hooks + MCP server in this project
 ```
 
-That's it. Every Claude Code session from here will be captured and remembered.
+That's it. Every session from here will be captured and remembered, whichever agent you use.
 
 ---
 
@@ -76,7 +80,7 @@ After a debugging session, Somtum extracts observations like these and stores th
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" Claude already knows. No re-explanation needed.
+Next session, when you ask "why are we using pnpm?" the agent already knows. No re-explanation needed.
 
 ---
 
@@ -87,7 +91,8 @@ Run `somtum doctor` after install to verify your setup:
 ```
 ✓  config          strategy=bm25, k=8
 ✓  db_open         WAL mode, foreign_keys ON
-✓  hooks_installed somtum hooks found in .claude/settings.json
+✓  extraction_backend  claude-cli (auto)
+✓  hooks_installed somtum hooks found in .claude/settings.json, .codex/hooks.json
 ✓  embeddings      disabled (set retrieval.embeddings.enabled=true to enable)
 ```
 

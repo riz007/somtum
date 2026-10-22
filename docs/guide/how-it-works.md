@@ -1,12 +1,26 @@
 # How It Works
 
-At the end of each Claude Code session, Somtum reads the session transcript and asks Claude Haiku to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite. **On every subsequent prompt**, Somtum automatically retrieves the most relevant memories and injects them into context.
+At the end of each Claude Code or Codex session, Somtum reads the session transcript and asks a small model to extract the parts worth keeping — decisions, bug fixes, things learned. Those observations are stored locally in SQLite, one store per project, shared by both agents. **On every subsequent prompt**, Somtum retrieves the most relevant memories and injects them into context.
+
+## Supported agents
+
+| Agent | Capture | Auto-inject | MCP tools | Install |
+| --- | --- | --- | --- | --- |
+| Claude Code | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (with `--all` or `--cache`) | `.mcp.json` | `somtum init --all` |
+| Codex | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (default) | `.codex/config.toml` | `somtum init --agent codex` |
+| Any other MCP client | — | — | point it at `somtum mcp` | manual |
+
+Both agents send hooks the same JSON payload and accept the same reply, so one set of hook handlers serves both. Only transcript parsing differs: Claude Code writes `~/.claude/projects/**.jsonl`, Codex writes `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Somtum detects the format automatically.
+
+## Extraction backends
+
+Extraction uses the first available of: the Anthropic API (`ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` for GLM and other compatible providers), the `claude` CLI, or the `codex` CLI. Before sending, Somtum keeps the conversation and trims tool output and tool-call arguments (whole files inside edits, for example) so you don't pay to send file contents the extractor doesn't need. Pin a backend with `extraction.backend`.
 
 ## Memory lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Claude Code Session                      │
+│               Claude Code or Codex session                  │
 │          you code · debug · review · make decisions         │
 └──────────────────────────────┬──────────────────────────────┘
                                │ SessionEnd / PreCompact
@@ -65,13 +79,13 @@ You debug an auth bug and refactor a module. At session end, Somtum extracts som
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts`, Claude finds these memories and already has the context.
+Next session, in either agent, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts`, the agent gets these memories and already has the context.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Claude Code / Agent                     │
+│                 Claude Code / Codex / MCP client            │
 └──────────┬──────────────────────────────┬───────────────────┘
            │ hooks                        │ MCP tools
            ▼                              ▼
@@ -83,6 +97,7 @@ Next session, when you ask "why are we using pnpm?" or open `src/auth/refresh.ts
 │  SessionEnd ────────┼─capture▶│ remember / update        │
 │  PreCompact ────────┼─warmst─▶│ forget                   │
 │  PreToolUse (Read) ─┼─gate───▶│ stats                    │
+│  (Claude Code only) │         │                          │
 │                     │         │ report_false_hit          │
 └──────────┬──────────┘         └────────────┬─────────────┘
            │                                 │

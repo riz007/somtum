@@ -22,6 +22,10 @@ somtum config set file_gating.enabled false
 # Limit observations extracted per session (default: 10)
 somtum config set extraction.max_observations_per_session 5
 
+# Pin the extraction backend (default: auto) and the model codex exec uses
+somtum config set extraction.backend codex-cli
+somtum config set extraction.codex_model <model>
+
 # Control automatic memory injection on every prompt (default: on)
 somtum config set injection.enabled false     # turn off auto-inject
 somtum config set injection.k 5              # inject more memories (default: 3)
@@ -33,7 +37,9 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
 ```jsonc
 {
   "extraction": {
-    "model": "claude-haiku-4-5-20251001",
+    "model": "claude-haiku-4-5-20251001",   // used by the anthropic and claude-cli backends
+    "backend": "auto",                       // auto | anthropic | claude-cli | codex-cli
+    // "codex_model": "<model>",             // codex-cli only; unset uses Codex's default
     "trigger": ["SessionEnd", "PreCompact"],
     "max_observations_per_session": 10
   },

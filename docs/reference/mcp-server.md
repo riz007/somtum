@@ -1,10 +1,10 @@
 # MCP Server
 
-When you run `somtum init --all`, Somtum registers an MCP server that Claude can call autonomously during a session.
+When you run `somtum init --all` (Claude Code) or `somtum init --agent codex`, Somtum registers an MCP server the agent can call on its own during a session. Any other MCP client can use it too: point it at `somtum mcp` over stdio.
 
 ## Available tools
 
-| Tool | What Claude does with it |
+| Tool | What the agent does with it |
 | --- | --- |
 | `recall` | Searches memories when unsure about a project detail. Accepts `strategy` and `scope` overrides. |
 | `get` | Retrieves full observation bodies by ID. Bumps `last_confirmed_at` on each hit. |
@@ -15,7 +15,7 @@ When you run `somtum init --all`, Somtum registers an MCP server that Claude can
 | `forget` | Soft-deletes an observation. |
 | `stats` | Reports tokens saved, cache hit rate, false-hit count, and corpus size. |
 
-Every MCP response includes a `tokens` field so Claude can account for retrieval cost.
+Every MCP response includes a `tokens` field so the agent can account for retrieval cost.
 
 ## Memory scope
 
@@ -47,7 +47,15 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 }
 ```
 
-Restart Claude Code after running `somtum init --all` to pick up the MCP configuration.
+For Codex, `somtum init --agent codex` appends the same server to the project's `.codex/config.toml`:
+
+```toml
+[mcp_servers.somtum]
+command = "somtum"
+args = ["mcp"]
+```
+
+Restart the agent after running `init` to pick up the MCP configuration. Codex reads project config only for trusted projects.
 
 ::: tip Verifying
 Check `.mcp.json` exists in your project root:

@@ -40,7 +40,7 @@ tail -20 ~/.somtum/hook.log
 
 ## Warm-start files
 
-After a `PreCompact` event (context window compaction), Somtum writes a warm-start file containing the most recent context. On the next prompt, this is injected automatically so Claude picks up where it left off. Files expire after 30 minutes.
+After a `PreCompact` event (context window compaction), Somtum writes a warm-start file containing the most recent context. On the next prompt, this is injected automatically so the agent picks up where it left off. Files expire after 30 minutes.
 
 ## Backing up or migrating
 
