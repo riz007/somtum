@@ -37,6 +37,25 @@ describe('extract', () => {
     expect(out.tokensSpent).toBe(30);
   });
 
+  it('delimits the transcript and ends with the task, so it is not continued', async () => {
+    let user = '';
+    const caller: LlmCaller = {
+      async complete(args) {
+        user = args.user;
+        return { text: '{"observations":[]}', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    await extract('assistant: [tool_use Write {}]', caller, {
+      model: 'm',
+      maxObservations: 7,
+      maxRetries: 0,
+    });
+    expect(user.startsWith('<transcript>\n')).toBe(true);
+    expect(user).toContain('</transcript>');
+    expect(user.trimEnd().endsWith('the most durable ones.')).toBe(true);
+    expect(user).toContain('at most 7 observations');
+  });
+
   it('retries once when the first output is malformed, then succeeds', async () => {
     const caller = fakeCaller([
       'not json at all',
@@ -114,12 +133,26 @@ describe('extract', () => {
 describe('estimateTokensSaved', () => {
   it('undercounts rather than overclaims', () => {
     // A tiny observation replacing its share of a small transcript => small positive savings.
-    const saved = estimateTokensSaved(100, { kind: 'learning', title: 'x', body: 'y', files: [], tags: [] }, 2);
+    const saved = estimateTokensSaved(
+      100,
+      { kind: 'learning', title: 'x', body: 'y', files: [], tags: [] },
+      2,
+    );
     expect(saved).toBeGreaterThanOrEqual(0);
   });
 
   it('returns 0 when obs is larger than its share', () => {
-    const saved = estimateTokensSaved(10, { kind: 'learning', title: 'a very long observation body that exceeds share', body: 'more', files: [], tags: [] }, 1);
+    const saved = estimateTokensSaved(
+      10,
+      {
+        kind: 'learning',
+        title: 'a very long observation body that exceeds share',
+        body: 'more',
+        files: [],
+        tags: [],
+      },
+      1,
+    );
     expect(saved).toBe(0);
   });
 

@@ -155,7 +155,7 @@ const JSON_SCHEMA_HINT = {
 
 const SYSTEM_PROMPT = `You are Somtum's session extractor.
 
-Read the provided Claude Code session transcript and return durable observations:
+Read the provided coding-agent session transcript and return durable observations:
 
 EXTRACT:
 - Decisions with rationale ("we use pnpm because X")
@@ -187,6 +187,21 @@ function extractJsonBlob(text: string): string {
   return trimmed;
 }
 
+// Without delimiters and a closing instruction, a transcript that ends
+// mid-task gets continued: the model role-plays the agent and emits tool calls
+// instead of JSON. Stating the cap also stops it writing observations we drop.
+function transcriptPrompt(transcript: string, maxObservations: number): string {
+  return [
+    '<transcript>',
+    transcript,
+    '</transcript>',
+    '',
+    'The transcript above is a finished session to analyze, not a conversation to continue.',
+    'Do not act as the assistant in it.',
+    `Return only the JSON object described in the system prompt, with at most ${maxObservations} observations: the most durable ones.`,
+  ].join('\n');
+}
+
 export interface ExtractOptions {
   model: string;
   maxObservations: number;
@@ -215,7 +230,7 @@ export async function extract(
     // Re-sending the transcript would double the token cost of every retry.
     const userPrompt =
       attempt === 0
-        ? `Transcript:\n\n${transcript}`
+        ? transcriptPrompt(transcript, options.maxObservations)
         : `Your previous response failed schema validation.\n\nError: ${lastError}\n\nYour previous output:\n${lastRawOutput}\n\nReturn valid JSON only, matching the schema in the system prompt.`;
 
     const { text, inputTokens, outputTokens } = await caller.complete({
@@ -233,6 +248,9 @@ export async function extract(
       parsed = JSON.parse(blob);
     } catch (err) {
       lastError = `JSON.parse failed: ${(err as Error).message}`;
+      console.warn(
+        `[somtum] extraction attempt ${attempt + 1} returned non-JSON: ${text.slice(0, 120)}`,
+      );
       attempt += 1;
       continue;
     }
