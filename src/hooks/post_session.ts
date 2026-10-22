@@ -334,7 +334,7 @@ export async function runPostSession(
         },
         { redactPatterns: config.privacy.redact_patterns },
       );
-      // Write the human-readable markdown mirror (SPEC.md §5.2).
+      // Write the human-readable markdown mirror alongside the SQLite row.
       try {
         writeMemoryMarkdown(stored, memDir);
       } catch {
