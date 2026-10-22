@@ -104,7 +104,7 @@ somtum purge --older-than 60d
 
 ## ต้นทุนการสกัดเป็นเรื่องจริง
 
-**ปัญหา:** ทุกครั้งที่ session จบลงจะมีการเรียก Claude Haiku เพื่อสกัดการสังเกต บน Anthropic API นี่คือต้นทุนจริง
+**ปัญหา:** ทุกครั้งที่ session จบลง (และทุกครั้งที่ compaction) จะมีการเรียกสกัดการสังเกตหนึ่งครั้ง ทรานสคริปต์ที่ส่งถูกจำกัดที่ 60k token เซสชันจริงที่ยาววัดได้ 38k–72k input token ต่อการเรียก บน Anthropic API นี่คือต้นทุนจริง ส่วนบน subscription ของ Claude Code หรือ Codex (ไม่มี API key) จะใช้โควตาของแพ็กเกจ
 
 **วิธีแก้ไข:**
 - ถ้ามี Claude Code subscription ให้ยกเลิกการตั้ง `ANTHROPIC_API_KEY` และใช้ `claude` CLI fallback — การสกัดจะใช้ subscription quota แทน API credits

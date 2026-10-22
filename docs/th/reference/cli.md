@@ -9,6 +9,7 @@
 | `somtum init --file-gating` | ติดตั้ง PreToolUse file-gating hook ด้วย |
 | `somtum init --all` | ติดตั้ง hooks ทั้งหมด + MCP server |
 | `somtum init --force` | ติดตั้งใหม่แม้ว่า hooks จะมีอยู่แล้ว |
+| `somtum init --agent codex` | ติดตั้งสำหรับ Codex: capture + auto-inject hooks ใน `.codex/hooks.json` และ MCP server ใน `.codex/config.toml` |
 | `somtum doctor` | ตรวจสอบสุขภาพ DB, migration, hooks, API key, อัตราส่วน breakeven, ความทรงจำที่เก่า |
 
 ## หน่วยความจำ

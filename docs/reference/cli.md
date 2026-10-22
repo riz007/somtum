@@ -4,11 +4,12 @@
 
 | Command | Description |
 | --- | --- |
-| `somtum init` | Install the SessionEnd capture hook |
+| `somtum init` | Install the SessionEnd + PreCompact capture hooks (Claude Code) |
 | `somtum init --cache` | Also install the UserPromptSubmit cache + auto-inject hook |
 | `somtum init --file-gating` | Also install the PreToolUse file-gating hook |
 | `somtum init --all` | Install all hooks + MCP server |
 | `somtum init --force` | Reinstall even if hooks are already present |
+| `somtum init --agent codex` | Install for Codex: capture + auto-inject hooks in `.codex/hooks.json`, MCP server in `.codex/config.toml` |
 | `somtum doctor` | Check DB health, migrations, hooks, API key, breakeven ratio, stale memories |
 
 ## Memory

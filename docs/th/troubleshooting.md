@@ -41,7 +41,7 @@ cat ~/.somtum/hook.log
 - ถ้าคุณใช้ Claude Code: รัน `which claude` — ถ้าไม่มีผลลัพธ์ ให้ติดตั้ง Claude Code ใหม่หรือเพิ่ม binary ไปยัง `PATH` ของคุณ
 - ถ้าคุณต้องการ API โดยตรง: เพิ่ม `export ANTHROPIC_API_KEY="sk-ant-..."` ไปยัง `~/.zshrc` และรัน `source ~/.zshrc` ต้องอยู่ใน profile ไม่ใช่แค่ export ในแท็บเทอร์มินัลปัจจุบัน
 
-รัน `somtum doctor` — การตรวจสอบ `api_key` จะบอกว่า backend ใดพร้อมใช้งาน
+รัน `somtum doctor` — การตรวจสอบ `extraction_backend` จะบอกว่า backend ใดจะถูกใช้ ผู้ใช้ Codex ให้ตรวจสอบด้วย `which codex`
 
 **Hook ไม่ได้ติดตั้งในไดเรกทอรีที่ถูกต้อง**
 
@@ -121,20 +121,20 @@ BM25 ทำงานออฟไลน์ได้อย่างสมบูร
 
 ---
 
-## Claude ไม่มี context จากเซสชันก่อนหน้า
+## agent ไม่มี context จากเซสชันก่อนหน้า
 
 **Auto-inject คือสิ่งแรกที่ต้องตรวจสอบ** ตั้งแต่ v1.3.0 Somtum จะฉีดความทรงจำ top-k เข้าไปใน `UserPromptSubmit` ทุกรายการผ่าน cache hook โดยอัตโนมัติ — ไม่ต้องเรียก recall ด้วยตนเอง
 
 1. ยืนยันว่าติดตั้ง cache hook แล้ว: `somtum doctor` → มองหา `hooks_installed ✓`
-2. ถ้าไม่ได้ติดตั้ง: `somtum init --cache` (หรือ `somtum init --all`)
+2. ถ้าไม่ได้ติดตั้ง: `somtum init --all` (Claude Code) หรือ `somtum init --agent codex`
 3. ยืนยันว่าเปิดใช้งาน injection: `somtum config get injection.enabled` → ควรเป็น `true`
 4. ตรวจสอบว่ามีความทรงจำจริงๆ: `somtum stats` → `memories > 0`
 5. มองหาบรรทัด budget ที่ด้านบนของ context แต่ละ prompt: `[somtum] injected N/M memories (~X tokens)` ถ้าเห็น `0/M` แสดงว่า BM25 ไม่พบการจับคู่ — ลองใช้ prompt ที่มีรายละเอียดมากขึ้นหรือลด `injection.min_relevance_score` เป็น `0`
 
-**การใช้ MCP server** (`somtum init --all`) Claude ยังสามารถเรียก `recall` โดยตรงเมื่อไม่แน่ใจ ถ้าไม่เกิดขึ้น:
+**การใช้ MCP server** agent ยังสามารถเรียก `recall` โดยตรงเมื่อไม่แน่ใจ ถ้าไม่เกิดขึ้น:
 
-1. ยืนยันว่ามี `.mcp.json`: `cat .mcp.json`
-2. รีสตาร์ท Claude Code เพื่อรับ MCP config
+1. ยืนยันว่าลงทะเบียน server แล้ว: `cat .mcp.json` (Claude Code) หรือหา `[mcp_servers.somtum]` ใน `.codex/config.toml` (Codex)
+2. รีสตาร์ท agent เพื่อรับ MCP config
 
 ---
 

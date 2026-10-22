@@ -70,6 +70,7 @@ const thSidebar = [
       { text: 'เริ่มต้นใช้งาน', link: '/th/guide/getting-started' },
       { text: 'วิธีการทำงาน', link: '/th/guide/how-it-works' },
       { text: 'ข้อจำกัด', link: '/th/guide/limitations' },
+      { text: 'อัปเกรดเป็น v3 (English)', link: '/guide/upgrading-v3' },
     ],
   },
   {
@@ -118,6 +119,7 @@ const bnSidebar = [
       { text: 'শুরু করা', link: '/bn/guide/getting-started' },
       { text: 'এটি কীভাবে কাজ করে', link: '/bn/guide/how-it-works' },
       { text: 'সীমাবদ্ধতা', link: '/bn/guide/limitations' },
+      { text: 'v3-এ আপগ্রেড (English)', link: '/guide/upgrading-v3' },
     ],
   },
   {

@@ -9,6 +9,7 @@
 | `somtum init --file-gating` | PreToolUse file-gating হুকও ইনস্টল করে |
 | `somtum init --all` | সমস্ত হুক + MCP server ইনস্টল করে |
 | `somtum init --force` | হুক ইতিমধ্যে থাকলেও পুনরায় ইনস্টল করে |
+| `somtum init --agent codex` | Codex-এর জন্য ইনস্টল করে: `.codex/hooks.json`-এ capture + auto-inject হুক, `.codex/config.toml`-এ MCP server |
 | `somtum doctor` | DB স্বাস্থ্য, মাইগ্রেশন, হুক, API key, ব্রেকইভেন রেশিও, পুরনো মেমরি পরীক্ষা করে |
 
 ## মেমরি

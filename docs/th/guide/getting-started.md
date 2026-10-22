@@ -3,8 +3,12 @@
 ## ข้อกำหนด
 
 - **Node.js 20+**
-- **Claude Code** — Somtum เชื่อมต่อกับ event `SessionEnd`, `UserPromptSubmit` และ `PreToolUse` ของ Claude Code
-- **`ANTHROPIC_API_KEY`** _(ไม่บังคับ)_ — ถ้าตั้งค่าไว้ Somtum จะเรียก Anthropic API โดยตรงเพื่อดึงข้อมูล ถ้าไม่มี จะใช้ `claude` CLI ที่มาพร้อมกับ Claude Code แทน ดังนั้น **ไม่จำเป็นต้องมี API key แยกต่างหากสำหรับผู้สมัครสมาชิก Claude Code**
+- **Claude Code หรือ Codex** — Somtum ใช้ hook `SessionEnd`, `PreCompact` และ `UserPromptSubmit` ของทั้งสอง agent ซึ่งใช้หน่วยความจำร่วมกันในแต่ละโปรเจกต์
+- **extraction backend หนึ่งตัว** (ดูขั้นตอนที่ 1) สมาชิก Claude Code หรือ Codex ไม่จำเป็นต้องมี API key แยก
+
+::: tip อัปเกรดจาก v2?
+บั๊กการบันทึกบางอย่างของ v2 ได้รับการแก้ไขใน v3 ดู [Upgrading to v3](/guide/upgrading-v3) (ภาษาอังกฤษ)
+:::
 
 ## ติดตั้ง
 
@@ -38,11 +42,18 @@ Somtum ใช้ [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3) 
 
 ### ขั้นตอนที่ 1 — เลือก extraction backend
 
-Somtum เรียก Claude model เมื่อสิ้นสุดเซสชันเพื่อดึงข้อสังเกต เลือกอย่างใดอย่างหนึ่ง:
+เมื่อสิ้นสุดเซสชัน Somtum เรียกโมเดลขนาดเล็กเพื่อดึงข้อสังเกต โดยใช้ backend ตัวแรกที่พร้อมใช้งาน ส่วนใหญ่จึงไม่ต้องตั้งค่าอะไร:
 
-**ตัวเลือก A: สมาชิก Claude Code (ไม่ต้องตั้งค่าเพิ่มเติม)**
+| สิ่งที่คุณมี | backend ที่ใช้ |
+| --- | --- |
+| `ANTHROPIC_API_KEY` ใน shell profile | Anthropic API (Haiku) |
+| `ANTHROPIC_AUTH_TOKEN` + `ANTHROPIC_BASE_URL` (GLM หรือผู้ให้บริการที่รองรับ Anthropic API) | ผู้ให้บริการนั้น |
+| ติดตั้ง Claude Code แล้ว (`which claude`) | `claude` CLI ผ่าน subscription ของคุณ |
+| ติดตั้ง Codex แล้ว (`which codex`) | `codex` CLI ผ่านแพ็กเกจ ChatGPT ของคุณ |
 
-ถ้าคุณติดตั้ง Claude Code แล้ว เสร็จแล้ว Somtum จะเรียก `claude --print` โดยอัตโนมัติเมื่อไม่มี API key ข้ามไปขั้นตอนที่ 2
+เลือก backend เอง: `somtum config set extraction.backend codex-cli` (หรือ `anthropic`, `claude-cli`, `auto`)
+
+**ถ้าต้องการใช้ Anthropic API key โดยตรง:**
 
 **ตัวเลือก B: Anthropic API key โดยตรง (ไม่บังคับ — เร็วกว่า ให้คุณเลือกโมเดลได้)**
 
@@ -53,31 +64,42 @@ source ~/.zshrc
 ```
 
 ::: warning
-key ต้องอยู่ใน shell profile ของคุณ ไม่ใช่แค่ export ในแท็บเทอร์มินัลที่เปิดอยู่ hook `SessionEnd` รับสภาพแวดล้อมจาก shell ที่*เริ่ม*ต้น Claude Code
+key ต้องอยู่ใน shell profile ของคุณ ไม่ใช่แค่ export ในแท็บเทอร์มินัลที่เปิดอยู่ hook รับสภาพแวดล้อมจาก shell ที่*เริ่ม*ต้น agent
 :::
 
 ### ขั้นตอนที่ 2 — Initialize ในโปรเจกต์ของคุณ
 
-รันจาก**รากของโปรเจกต์ที่คุณทำงานกับ Claude Code**:
+รันจาก**รากของโปรเจกต์ที่คุณเปิดใน agent**
 
-```bash
-somtum init
-```
-
-เพื่อเปิดใช้งานคุณสมบัติทั้งหมดพร้อมกัน (แนะนำ):
+**Claude Code**
 
 ```bash
 somtum init --all
 # ติดตั้ง:
-#   - SessionEnd capture hook      (การดึงหน่วยความจำ)
-#   - UserPromptSubmit cache hook  (prompt cache + auto-inject)
-#   - PreToolUse file-gating hook  (สรุปไฟล์ขนาดใหญ่)
-#   - MCP server ใน .mcp.json     (Claude สามารถเรียก recall/remember tools ได้)
+#   - SessionEnd + PreCompact capture hooks  (การดึงหน่วยความจำ)
+#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
+#   - PreToolUse file-gating hook            (สรุปไฟล์ขนาดใหญ่)
+#   - MCP server ใน .mcp.json                (recall/remember tools)
 ```
+
+::: tip ใช้ --all
+`somtum init` เฉยๆ ติดตั้งเฉพาะ capture hook หน่วยความจำจะถูกบันทึกแต่จะไม่ถูกฉีดเข้าไปในพรอมต์
+:::
+
+**Codex**
+
+```bash
+somtum init --agent codex
+# ติดตั้ง:
+#   - .codex/hooks.json   SessionEnd + PreCompact capture, UserPromptSubmit auto-inject
+#   - .codex/config.toml  [mcp_servers.somtum]
+```
+
+Codex โหลด config ระดับโปรเจกต์เฉพาะโปรเจกต์ที่ trusted เท่านั้น ถ้าใช้ทั้งสอง agent ในโปรเจกต์เดียวกัน ให้รันทั้งสองคำสั่ง
 
 ### ขั้นตอนที่ 3 — ทำงานตามปกติ
 
-เปิด Claude Code จากไดเรกทอรีเดียวกับที่คุณรัน `somtum init` ทำงานตามปกติ เมื่อเซสชันสิ้นสุด hook จะดึงข้อสังเกตโดยอัตโนมัติในเบื้องหลัง (จำกัดที่ 90 วินาที)
+เปิด Claude Code หรือ Codex จากไดเรกทอรีเดียวกับที่คุณรัน `somtum init` ทำงานตามปกติ เมื่อเซสชันสิ้นสุด hook จะดึงข้อสังเกตโดยอัตโนมัติในเบื้องหลัง (จำกัดที่ 90 วินาที)
 
 ### ขั้นตอนที่ 4 — ตรวจสอบหน่วยความจำของคุณ
 
@@ -107,7 +129,7 @@ somtum doctor
 
 ## การยืนยันการตั้งค่า
 
-หลังจากเซสชัน Claude Code แรกสิ้นสุด:
+หลังจากเซสชันแรกสิ้นสุด:
 
 **1. ตรวจสอบ hook log**
 
@@ -121,10 +143,10 @@ cat ~/.somtum/hook.log
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
 ```
 
-ใช้ `claude` CLI fallback (ไม่มี API key):
+แต่ละครั้งจะบันทึกว่าใช้ backend ใด:
 ```
 2026-04-30T10:15:42.123Z [post_session] starting
-2026-04-30T10:15:42.124Z [post_session] ANTHROPIC_API_KEY not set — will use claude CLI fallback
+2026-04-30T10:15:42.124Z [post_session] extraction backend: claude-cli
 2026-04-30T10:15:44.891Z [post_session] ok — inserted=4 cache=2 summaries=1
 ```
 
@@ -142,4 +164,4 @@ somtum stats
 somtum doctor
 ```
 
-การตรวจสอบทั้งหมดควรแสดง `✓` การตรวจสอบ `api_key` และ `hooks_installed` มักล้มเหลวบ่อยที่สุด
+การตรวจสอบทั้งหมดควรแสดง `✓` การตรวจสอบ `extraction_backend` และ `hooks_installed` มักล้มเหลวบ่อยที่สุด

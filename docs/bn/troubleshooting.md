@@ -41,7 +41,7 @@ cat ~/.somtum/hook.log
 - আপনি Claude Code ব্যবহার করলে: `which claude` রান করুন — কিছু প্রিন্ট না হলে, Claude Code পুনরায় ইনস্টল করুন বা আপনার `PATH`-এ এর বাইনারি যোগ করুন।
 - আপনি সরাসরি API পছন্দ করলে: `~/.zshrc`-এ `export ANTHROPIC_API_KEY="sk-ant-..."` যোগ করুন এবং `source ~/.zshrc` রান করুন। প্রোফাইলে থাকতে হবে, শুধু বর্তমান টার্মিনাল ট্যাবে এক্সপোর্ট করলে হবে না।
 
-`somtum doctor` রান করুন — `api_key` পরীক্ষা আপনাকে বলবে ঠিক কোন ব্যাকএন্ড উপলব্ধ।
+`somtum doctor` রান করুন — `extraction_backend` পরীক্ষা আপনাকে বলবে কোন ব্যাকএন্ড ব্যবহার হবে। Codex ব্যবহারকারীরা `which codex` দিয়ে CLI আছে কিনা দেখুন।
 
 **সঠিক ডিরেক্টরিতে হুক ইনস্টল করা হয়নি**
 
@@ -126,14 +126,14 @@ BM25 সম্পূর্ণরূপে অফলাইনে কাজ কর
 **Auto-inject প্রথম জিনিস যা পরীক্ষা করতে হবে।** v1.3.0 থেকে, Somtum স্বয়ংক্রিয়ভাবে cache হুকের মাধ্যমে প্রতিটি `UserPromptSubmit`-এ top-k মেমরি ইনজেক্ট করে — কোনো ম্যানুয়াল রিকল স্টেপ প্রয়োজন নেই।
 
 1. cache হুক ইনস্টল নিশ্চিত করুন: `somtum doctor` → `hooks_installed ✓` খুঁজুন
-2. ইনস্টল না থাকলে: `somtum init --cache` (বা `somtum init --all`)
+2. ইনস্টল না থাকলে: `somtum init --all` (Claude Code) বা `somtum init --agent codex`
 3. injection সক্ষম নিশ্চিত করুন: `somtum config get injection.enabled` → `true` হওয়া উচিত
 4. মেমরি আসলে আছে কিনা পরীক্ষা করুন: `somtum stats` → `memories > 0`
 5. প্রতিটি প্রম্পট কনটেক্সটের শীর্ষে বাজেট লাইন খুঁজুন: `[somtum] injected N/M memories (~X tokens)`। যদি `0/M` দেখেন, BM25 কোনো ম্যাচ খুঁজে পায়নি — আরও বর্ণনামূলক প্রম্পট চেষ্টা করুন বা `injection.min_relevance_score` কে `0`-এ কমিয়ে দিন।
 
-**MCP server ব্যবহার করে** (`somtum init --all`), Claude অনিশ্চিত হলে সরাসরি `recall` কল করতে পারে। না হলে:
+**MCP server ব্যবহার করে**, এজেন্ট অনিশ্চিত হলে সরাসরি `recall` কল করতে পারে। না হলে:
 
-1. `.mcp.json` আছে কিনা নিশ্চিত করুন: `cat .mcp.json`
+1. সার্ভার নিবন্ধিত আছে কিনা নিশ্চিত করুন: `cat .mcp.json` (Claude Code) অথবা `.codex/config.toml`-এ `[mcp_servers.somtum]` (Codex)
 2. MCP config পিক আপ করতে Claude Code পুনরায় চালু করুন
 
 ---

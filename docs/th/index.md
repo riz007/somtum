@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Somtum"
-  text: "หน่วยความจำแบบโลคัลสำหรับ Claude Code"
-  tagline: บันทึกการตัดสินใจ การแก้บั๊ก และข้อเรียนรู้จากทุกเซสชันโดยอัตโนมัติ — และนำมันกลับมาใช้ในเซสชันถัดไป ไม่ต้องใช้คลาวด์ ไม่ต้องตั้งค่า แค่หน่วยความจำ
+  text: "หน่วยความจำแบบโลคัลสำหรับ coding agent"
+  tagline: บันทึกการตัดสินใจ การแก้บั๊ก และข้อเรียนรู้จากทุกเซสชันของ Claude Code และ Codex โดยอัตโนมัติ — และนำมันกลับมาใช้ในเซสชันถัดไป ไม่ว่าจะใช้ agent ตัวไหน ไม่ต้องใช้คลาวด์ ไม่ต้องตั้งค่า แค่หน่วยความจำ
   image:
     src: /logo.png
     alt: Somtum
@@ -22,7 +22,7 @@ hero:
 features:
   - icon: 🥣
     title: บันทึกอัตโนมัติ
-    details: เมื่อสิ้นสุดเซสชัน Claude Haiku จะดึงข้อสังเกตที่ควรจดจำจากทรานสคริปต์ — การตัดสินใจ การแก้บั๊ก ข้อเรียนรู้ คำสั่ง — และจัดเก็บในฐานข้อมูล SQLite ในเครื่อง
+    details: เมื่อสิ้นสุดเซสชัน โมเดลขนาดเล็ก (Claude Haiku ผ่าน API key หรือ claude CLI หรือ Codex ผ่าน codex CLI) จะดึงข้อสังเกตที่ควรจดจำจากทรานสคริปต์ — การตัดสินใจ การแก้บั๊ก ข้อเรียนรู้ คำสั่ง — และจัดเก็บในฐานข้อมูล SQLite ในเครื่อง
   - icon: ⚡
     title: ฉีดอัตโนมัติในทุกพรอมต์
     details: hook UserPromptSubmit จะดึงความทรงจำที่เกี่ยวข้องมากที่สุดผ่าน BM25 และฉีดเข้าไปก่อนทุกข้อความ ไม่ต้องเรียกคืนข้อมูลด้วยตนเอง
@@ -47,7 +47,13 @@ npm install -g somtum
 somtum init --all   # ติดตั้ง hooks + MCP server ในโปรเจกต์ปัจจุบัน
 ```
 
-เท่านี้เอง ทุกเซสชัน Claude Code จากนี้ไปจะถูกบันทึกและจดจำ
+ถ้าใช้ Codex:
+
+```bash
+somtum init --agent codex
+```
+
+เท่านี้เอง ทุกเซสชันจากนี้ไปจะถูกบันทึกและจดจำ ไม่ว่าจะใช้ agent ตัวไหน Claude Code และ Codex ใช้หน่วยความจำร่วมกันในโปรเจกต์เดียวกัน
 
 ---
 
@@ -70,7 +76,7 @@ somtum init --all   # ติดตั้ง hooks + MCP server ในโปร�
 ]
 ```
 
-ในเซสชันถัดไป เมื่อคุณถามว่า "ทำไมถึงใช้ pnpm?" Claude รู้อยู่แล้ว ไม่ต้องอธิบายซ้ำ
+ในเซสชันถัดไป เมื่อคุณถามว่า "ทำไมถึงใช้ pnpm?" agent รู้อยู่แล้ว ไม่ต้องอธิบายซ้ำ
 
 ---
 
@@ -81,7 +87,8 @@ somtum init --all   # ติดตั้ง hooks + MCP server ในโปร�
 ```
 ✓  config          strategy=bm25, k=8
 ✓  db_open         WAL mode, foreign_keys ON
-✓  hooks_installed somtum hooks found in .claude/settings.json
+✓  extraction_backend  claude-cli (auto)
+✓  hooks_installed somtum hooks found in .claude/settings.json, .codex/hooks.json
 ✓  embeddings      disabled (set retrieval.embeddings.enabled=true to enable)
 ```
 
