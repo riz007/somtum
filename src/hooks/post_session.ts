@@ -3,20 +3,18 @@ import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
 import { loadConfig, GLOBAL_DIR } from '../config.js';
 import { openDb, type DB } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { generateIndex } from '../core/index_gen.js';
 import {
   extract,
-  anthropicCaller,
-  claudeCodeCaller,
   estimateTokensSaved,
   type LlmCaller,
 } from '../core/extractor.js';
 import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
 import { countTokens } from '../core/tokens.js';
+import { pickBackend, callerFor, NO_BACKEND_MESSAGE } from '../core/llm_backend.js';
 import { projectDir } from '../config.js';
 import { Bm25Retriever } from '../core/retriever/bm25.js';
 import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
@@ -291,20 +289,13 @@ export async function runPostSession(
         : rawTranscript;
     const transcriptTokens = countTokens(transcript);
 
-    // Prefer the direct API when a key is present (faster, explicit model choice).
-    // Fall back to the claude CLI so Claude Code subscribers need no separate key.
-    const caller =
-      opts.caller ??
-      (() => {
-        const apiKey = process.env['ANTHROPIC_API_KEY'];
-        if (apiKey && apiKey.trim().length > 0) {
-          // 25 s per API call — the SDK default is 600 s which lets a single
-          // slow Haiku call block the hook process for 10 minutes.
-          return anthropicCaller(new Anthropic({ apiKey, timeout: 25_000 }));
-        }
-        hookLog('[post_session] ANTHROPIC_API_KEY not set — using claude CLI fallback');
-        return claudeCodeCaller();
-      })();
+    let caller = opts.caller;
+    if (!caller) {
+      const backend = pickBackend(config);
+      if (!backend) throw new Error(NO_BACKEND_MESSAGE);
+      hookLog(`[post_session] extraction backend: ${backend}`);
+      caller = callerFor(backend, config);
+    }
 
     const outcome = await extract(transcript, caller, {
       model: config.extraction.model,

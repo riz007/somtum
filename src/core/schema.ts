@@ -117,6 +117,10 @@ export const ConfigSchema = z.object({
   extraction: z
     .object({
       model: z.string().default('claude-haiku-4-5-20251001'),
+      // auto: Anthropic API (key or token) → claude CLI → codex CLI.
+      backend: z.enum(['auto', 'anthropic', 'claude-cli', 'codex-cli']).default('auto'),
+      // Model for the codex-cli backend. Unset uses Codex's configured default.
+      codex_model: z.string().optional(),
       trigger: z.array(z.string()).default(['SessionEnd', 'PreCompact']),
       max_observations_per_session: z.number().int().positive().default(10),
       max_retries: z.number().int().nonnegative().default(1),
