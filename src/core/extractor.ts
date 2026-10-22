@@ -22,10 +22,6 @@ export function claudeCodeCaller(): LlmCaller {
     async complete({ model, system, user }) {
       const { spawn } = await import('node:child_process');
 
-      // Combine system + user since the claude CLI doesn't expose a --system flag.
-      // Claude handles <system>…</system> XML delimiters correctly.
-      const fullPrompt = `<system>\n${system}\n</system>\n\n${user}`;
-
       return new Promise((resolve, reject) => {
         // SOMTUM_IN_HOOK tells any nested somtum hook invocations (triggered when
         // the child claude process fires SessionEnd after completing) to exit
@@ -33,7 +29,21 @@ export function claudeCodeCaller(): LlmCaller {
         // somtum hook post_session → claude -p → ... causing a deadlock.
         // Pass the extraction model through — otherwise the CLI falls back to
         // the user's default model (often Opus), making extraction ~10× pricier.
-        const args = ['-p', '--output-format', 'text'];
+        // The remaining flags strip Claude Code's own system prompt, tool schemas,
+        // MCP servers and CLAUDE.md: ~37k tokens of overhead on every call otherwise.
+        const args = [
+          '-p',
+          '--output-format',
+          'text',
+          '--system-prompt',
+          system,
+          '--tools',
+          '',
+          '--strict-mcp-config',
+          '--setting-sources',
+          '',
+          '--no-session-persistence',
+        ];
         if (model && model.trim().length > 0) args.push('--model', model);
         const child = spawn('claude', args, {
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -77,7 +87,7 @@ export function claudeCodeCaller(): LlmCaller {
           });
         });
 
-        child.stdin!.write(fullPrompt, 'utf8');
+        child.stdin!.write(user, 'utf8');
         child.stdin!.end();
       });
     },
