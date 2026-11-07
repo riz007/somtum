@@ -66,6 +66,7 @@ somtum config set injection.max_chars 3000   # เพิ่มขีดจำก
     "k": 3,                   // จำนวนหน่วยความจำสูงสุดที่ฉีดต่อพรอมต์
     "max_chars": 1500,        // ขีดจำกัดสูงสุดของข้อความที่ฉีด
     "min_relevance_score": 0, // เพิ่มเพื่อฉีดเฉพาะผลที่มีคะแนนสูง (เช่น 1.0)
+    "min_matched_terms": 2,      // ความทรงจำต้องมีคำจากพรอมต์อย่างน้อยเท่านี้ (พรอมต์ 3 คำขึ้นไป)
     "show_budget": true       // แสดงบรรทัด "[somtum] injected N/M memories (~X tokens)"
   },
   "file_gating": {

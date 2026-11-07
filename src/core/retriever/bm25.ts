@@ -21,14 +21,40 @@ const STOPWORDS = new Set(
   ).split(' '),
 );
 
+// Strips common English inflections so "installed" finds "install" and
+// "classes" finds "class". Deliberately light: no stemming of word roots.
+function stem(word: string): string {
+  if (word.length > 5 && word.endsWith('ing')) return word.slice(0, -3);
+  if (word.length > 4 && word.endsWith('ed')) return word.slice(0, -2);
+  if (word.length > 4 && /(ss|x|ch|sh)es$/.test(word)) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+  return word;
+}
+
+// Below this length a prefix match is too loose ("form" would match "format").
+const MIN_PREFIX = 5;
+
+// The distinct content words of a query as match keys: lowercased, stemmed,
+// split the way the FTS5 unicode61 tokenizer splits text.
+export function queryTerms(query: string): string[] {
+  const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u);
+  return [...new Set(words.filter((w) => w.length > 0 && !STOPWORDS.has(w)).map(stem))];
+}
+
+function keyMatches(key: string, word: string): boolean {
+  return key.length >= MIN_PREFIX ? word.startsWith(key) : word === key;
+}
+
+// How many of the `queryTerms` keys occur in `text`.
+export function countMatchedTerms(keys: string[], text: string): number {
+  const words = text.toLowerCase().split(/[^\p{L}\p{N}]+/u);
+  return keys.filter((k) => words.some((w) => keyMatches(k, w))).length;
+}
+
 function escapeFtsQuery(query: string): string {
-  const tokens = query
-    .split(/\s+/)
-    .map((t) => t.replace(/["]/g, '').trim())
-    .filter((t) => t.length > 0)
-    .filter((t) => !STOPWORDS.has(t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')));
-  if (tokens.length === 0) return '""';
-  return tokens.map((t) => `"${t}"`).join(' OR ');
+  const keys = queryTerms(query);
+  if (keys.length === 0) return '""';
+  return keys.map((k) => (k.length >= MIN_PREFIX ? `"${k}"*` : `"${k}"`)).join(' OR ');
 }
 
 interface Bm25Row {

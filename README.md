@@ -45,7 +45,7 @@ Requires Node 20+ and one way to run a small model for extraction. Somtum uses t
 }
 ```
 
-**Recalls.** On each prompt, a local keyword search (SQLite FTS5, no network) picks up to 3 relevant memories and adds them to the agent's context, capped at 1,500 characters. Nothing is added when nothing matches, and a memory that's already in the session's context isn't added again.
+**Recalls.** On each prompt, a local keyword search (SQLite FTS5, no network) picks up to 3 relevant memories and adds them to the agent's context, capped at 1,500 characters. A memory has to share at least two words with a longer prompt ("installed" counts as "install"). Nothing is added when nothing matches, and a memory that's already in the session's context isn't added again.
 
 **Shares.** Claude Code and Codex read and write one memory per project. Any MCP client can use the `recall` and `remember` tools. Memories saved with `scope: "global"` follow you into every project.
 

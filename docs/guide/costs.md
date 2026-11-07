@@ -32,7 +32,7 @@ Tokens are counted over the exact extraction requests, system prompt included, w
 On each prompt, Somtum searches your memories locally (SQLite FTS5, no network) and adds the best matches to the agent's context.
 
 - **Bounded.** At most `injection.k` memories (3) and `injection.max_chars` characters (1,500, about 375 tokens), plus a one-line header saying how much was injected. Turn the header off with `injection.show_budget false`.
-- **Only when relevant.** Common words like "the", "how" or "this" are ignored, so a prompt has to share a real term with a memory to match. No match, nothing added.
+- **Only when relevant.** Common words like "the", "how" or "this" are ignored, and for prompts of three or more words a memory must share at least two of them (`injection.min_matched_terms`). Word endings are normalized, so "installed" matches "install". One shared word is too weak a signal: in a small project nearly every memory mentions the project's main nouns. No match, nothing added.
 - **Once per session.** A memory already injected in a session isn't sent again. After a compaction, which wipes the context, memories can be injected again.
 
 This text goes into your agent's prompt, so your agent's model pays for it at its input price. It's the cost of the memory actually being used, and it's metered as *injected context*.

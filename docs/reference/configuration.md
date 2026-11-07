@@ -76,6 +76,7 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
     "k": 3,                   // max memories injected per prompt
     "max_chars": 1500,        // hard cap on injected text
     "min_relevance_score": 0, // raise (e.g. 1.0) to only inject high-scoring matches
+    "min_matched_terms": 2,      // a memory must share this many prompt words (prompts of 3+ words)
     "show_budget": true       // prepend "[somtum] injected N/M memories (~X tokens)" line
   },
   "file_gating": {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DB } from '../db.js';
 import { MemoryStore } from '../store.js';
-import { Bm25Retriever, _forTestingOnly } from './bm25.js';
+import { Bm25Retriever, _forTestingOnly, queryTerms, countMatchedTerms } from './bm25.js';
 
 let tmp: string;
 let db: DB;
@@ -114,11 +114,11 @@ describe('escapeFtsQuery (internal helper)', () => {
   const { escapeFtsQuery } = _forTestingOnly();
 
   it('quotes each token and joins with OR', () => {
-    expect(escapeFtsQuery('pnpm workspaces')).toBe('"pnpm" OR "workspaces"');
+    expect(escapeFtsQuery('pnpm workspaces')).toBe('"pnpm" OR "workspace"*');
   });
 
-  it('strips embedded quotes', () => {
-    expect(escapeFtsQuery('a"b c')).toBe('"ab" OR "c"');
+  it('treats embedded quotes as separators', () => {
+    expect(escapeFtsQuery('foo"bar baz')).toBe('"foo" OR "bar" OR "baz"');
   });
 
   it('returns "" for empty input', () => {
@@ -127,7 +127,7 @@ describe('escapeFtsQuery (internal helper)', () => {
 
   it('drops stopwords, including ones with trailing punctuation', () => {
     expect(escapeFtsQuery('How do I fix the pnpm install?')).toBe(
-      '"fix" OR "pnpm" OR "install?"',
+      '"fix" OR "pnpm" OR "install"*',
     );
   });
 
@@ -149,3 +149,30 @@ describe('Bm25Retriever stopword behaviour', () => {
     expect(r).toEqual([]);
   });
 });
+
+describe('queryTerms / countMatchedTerms', () => {
+  it('splits like the FTS tokenizer and drops stopwords and duplicates', () => {
+    expect(queryTerms('How do I set up @tailwindcss/vite? Tailwind, tailwind!')).toEqual([
+      'set',
+      'tailwindcss',
+      'vite',
+      'tailwind',
+    ]);
+  });
+
+  it('strips inflections so related forms match', () => {
+    expect(queryTerms('installed classes applying projects')).toEqual([
+      'install',
+      'class',
+      'apply',
+      'project',
+    ]);
+    expect(countMatchedTerms(queryTerms('tailwind installed'), 'npm install tailwindcss')).toBe(2);
+    expect(countMatchedTerms(queryTerms('form'), 'format the date')).toBe(0);
+  });
+
+  it('counts whole-word matches only', () => {
+    expect(countMatchedTerms(['state', 'usereducer'], 'Use useState; never useReducer')).toBe(1);
+  });
+});
+

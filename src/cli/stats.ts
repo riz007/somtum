@@ -72,6 +72,7 @@ export function collectStats(
 }
 
 const n = (v: number): string => v.toLocaleString('en-US');
+const count = (v: number, noun: string): string => `${v} ${noun}${v === 1 ? '' : 's'}`;
 const row = (label: string, count: string, tokens: string, note = ''): string =>
   `  ${label.padEnd(18)} ${count.padStart(10)} ${tokens.padStart(14)}${note ? `   ${note}` : ''}`;
 
@@ -89,17 +90,21 @@ function printHuman(s: StatsSnapshot, sinceLabel: string): void {
   console.log(`Somtum's own token use, metered (${sinceLabel})`);
   const skipped = l.extraction_skipped.events > 0 ? `${l.extraction_skipped.events} skipped` : '';
   console.log(
-    row('extraction', `${l.extraction.events} calls`, `${n(l.extraction.tokens)} tok`, skipped),
+    row('extraction', count(l.extraction.events, 'call'), `${n(l.extraction.tokens)} tok`, skipped),
   );
   if (l.file_summary.events > 0) {
     console.log(
-      row('file summaries', `${l.file_summary.events} calls`, `${n(l.file_summary.tokens)} tok`),
+      row(
+        'file summaries',
+        count(l.file_summary.events, 'call'),
+        `${n(l.file_summary.tokens)} tok`,
+      ),
     );
   }
   console.log(
     row(
       'injected context',
-      `${l.injection.events} prompts`,
+      count(l.injection.events, 'prompt'),
       `${n(l.injection.tokens)} tok`,
       "added to your agent's input",
     ),

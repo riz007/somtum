@@ -66,6 +66,7 @@ somtum config set injection.max_chars 3000   # ইনজেকশন সাই�
     "k": 3,                   // প্রতি প্রম্পটে সর্বোচ্চ মেমরি ইনজেক্ট করা হয়
     "max_chars": 1500,        // ইনজেক্ট করা টেক্সটে হার্ড ক্যাপ
     "min_relevance_score": 0, // শুধু উচ্চ-স্কোরের ম্যাচ ইনজেক্ট করতে বাড়ান (যেমন 1.0)
+    "min_matched_terms": 2,      // প্রম্পটের অন্তত এতগুলো শব্দ মেমরিতে থাকতে হবে (৩+ শব্দের প্রম্পটে)
     "show_budget": true       // "[somtum] injected N/M memories (~X tokens)" লাইন যোগ করে
   },
   "file_gating": {

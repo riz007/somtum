@@ -150,7 +150,7 @@ describe('runPrePrompt', () => {
       tags: [],
     });
     await runPrePrompt(
-      { prompt: 'which test framework does this project use', cwd: tmp },
+      { prompt: 'should this project use vitest or jest for unit tests', cwd: tmp },
       { db, config: ConfigSchema.parse({}), projectId: 'p1' },
     );
     const breakdown = new RetrievalStatsStore(db).getRetrievalBreakdown('p1');
@@ -188,6 +188,53 @@ describe('runPrePrompt', () => {
       { db, config: ConfigSchema.parse({}), projectId: 'p1' },
     );
     expect(fresh.hookSpecificOutput?.additionalContext).toContain('always use pnpm');
+  });
+
+  it('does not inject a memory that shares only one word with a longer prompt', async () => {
+    const store = new MemoryStore(db);
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'decision',
+      title: 'Quantity buttons change the project budget',
+      body: 'Each project has a quantity; total budget is budget times quantity.',
+      files: [],
+      tags: [],
+    });
+    store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'learning',
+      title: 'Course only allows useState',
+      body: 'The syllabus forbids useReducer and useContext in this project.',
+      files: [],
+      tags: [],
+    });
+
+    const r = await runPrePrompt(
+      { prompt: 'can I use useReducer for the project form state?', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    const ctx = r.hookSpecificOutput?.additionalContext ?? '';
+    expect(ctx).toContain('Course only allows useState');
+    expect(ctx).not.toContain('Quantity buttons');
+  });
+
+  it('injects on a single shared word when the prompt is short', async () => {
+    new MemoryStore(db).insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'command',
+      title: 'Tailwind v4 setup',
+      body: 'npm install tailwindcss @tailwindcss/vite, then add the plugin.',
+      files: [],
+      tags: [],
+    });
+    const r = await runPrePrompt(
+      { prompt: 'tailwind broken?', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    expect(r.hookSpecificOutput?.additionalContext).toContain('Tailwind v4 setup');
   });
 
   it('skips memory injection when injection.enabled is false', async () => {

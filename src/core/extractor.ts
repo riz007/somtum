@@ -162,12 +162,17 @@ EXTRACT:
 - Learnings ("library Y's retry logic breaks on Z")
 - Bug fixes with root cause
 - Commands that worked after trial-and-error
-- File summaries for large files read in full
+- Constraints from outside the code: requirements, user preferences, rules
+  the user stated ("only useState, the course hasn't covered Context yet")
 
 REJECT:
+- Descriptions of what the code does or how it is structured (components,
+  validation rules, data flow). The agent can read the code; keep only what
+  the code cannot tell it: why, what failed, and rules from outside the code.
 - Successful reads of unchanged files
 - Code written then immediately discarded
 - Conversational filler
+- Two observations about the same fact: merge them into one.
 
 OUTPUT: a single JSON object matching this schema exactly. No prose, no markdown fences.
 
@@ -198,6 +203,7 @@ function transcriptPrompt(transcript: string, maxObservations: number): string {
     '',
     'The transcript above is a finished session to analyze, not a conversation to continue.',
     'Do not act as the assistant in it.',
+    'Fewer is better than padding. An empty list is a valid answer.',
     `Return only the JSON object described in the system prompt, with at most ${maxObservations} observations: the most durable ones.`,
   ].join('\n');
 }

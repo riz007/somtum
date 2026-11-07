@@ -195,6 +195,9 @@ export const ConfigSchema = z.object({
       max_chars: z.number().int().positive().default(1500),
       // Minimum BM25 relevance score to inject a memory (0 = inject all results).
       min_relevance_score: z.number().min(0).default(0),
+      // Distinct prompt words a memory must contain to be injected, once the
+      // prompt has at least 3 content words (shorter prompts need 1).
+      min_matched_terms: z.number().int().positive().default(2),
       // Prepend a one-line token budget summary to every injection.
       show_budget: z.boolean().default(true),
     })

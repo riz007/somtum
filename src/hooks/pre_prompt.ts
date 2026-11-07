@@ -6,7 +6,7 @@ import { loadConfig, projectDir, globalDbPath, GLOBAL_DIR, GLOBAL_PROJECT_ID } f
 import { openDb, type DB } from '../core/db.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { MemoryStore } from '../core/store.js';
-import { Bm25Retriever } from '../core/retriever/bm25.js';
+import { Bm25Retriever, queryTerms, countMatchedTerms } from '../core/retriever/bm25.js';
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
@@ -270,11 +270,13 @@ async function buildMemoryContext(
   if (!config.injection.enabled) return null;
 
   const { k, max_chars: limit, min_relevance_score: minScore } = config.injection;
+  // Over-fetch so the precision gates below still leave up to k candidates.
+  const pool = k * 4;
 
   const projectRetriever = new Bm25Retriever(db);
   let projectResults: RetrievalResult[];
   try {
-    projectResults = await projectRetriever.search(prompt, { k, projectId });
+    projectResults = await projectRetriever.search(prompt, { k: pool, projectId });
   } catch {
     return null;
   }
@@ -285,7 +287,7 @@ async function buildMemoryContext(
     try {
       const globalRetriever = new Bm25Retriever(globalDb);
       globalResults = await globalRetriever.search(prompt, {
-        k: Math.ceil(k / 2),
+        k: pool,
         projectId: GLOBAL_PROJECT_ID,
       });
     } catch {
@@ -293,12 +295,20 @@ async function buildMemoryContext(
     }
   }
 
-  let results = mergeResults([projectResults, globalResults], k);
+  let results = mergeResults([projectResults, globalResults], pool);
 
   // Filter by relevance threshold — avoids injecting weakly matched memories.
   if (minScore > 0) results = results.filter((r) => r.score >= minScore);
+  // One shared word is too weak a signal: in a small project nearly every
+  // memory mentions "project" or "state". Injecting nothing beats injecting noise.
+  const terms = queryTerms(prompt);
+  const needed = terms.length >= 3 ? config.injection.min_matched_terms : 1;
+  results = results.filter((r) => {
+    const o = r.observation;
+    return countMatchedTerms(terms, `${o.title} ${o.body} ${o.tags.join(' ')}`) >= needed;
+  });
   // Skip memories already injected earlier in this session — they're still in context.
-  results = results.filter((r) => !alreadyInjected.has(r.id));
+  results = results.filter((r) => !alreadyInjected.has(r.id)).slice(0, k);
   if (results.length === 0) return null;
 
   new RetrievalStatsStore(db).incrementRetrieval(projectId, 'bm25');
