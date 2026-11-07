@@ -8,3 +8,4 @@ Inject fewer, better memories, and extract fewer, better ones. Tested on a real 
 - **Word forms match.** Search and the injection check strip common endings and allow prefix matches on longer words, so "installed" finds "install" and "tailwind" finds "tailwindcss".
 - **Extraction keeps what the code can't say.** The extractor no longer records descriptions of how code is structured (the agent can read the code). It now keeps decisions, constraints from outside the code, user preferences, root causes and commands, merges duplicates, and returns fewer observations rather than padding. On the same real session: 10 memories with about half narrating code, became 8 that were all rules or decisions, including two it had previously missed.
 - `somtum stats` says "1 call" instead of "1 calls".
+- Running any `somtum` command (even `--version`) in a directory no longer leaves an empty folder under `~/.somtum/projects`.

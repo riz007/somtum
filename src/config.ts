@@ -72,8 +72,14 @@ export function ensureGlobalDir(): string {
   return GLOBAL_DIR;
 }
 
+// Path only, no side effects: for checks that must not leave an empty
+// project folder behind in every directory a command is run from.
+export function projectPath(projectId: string): string {
+  return join(GLOBAL_DIR, 'projects', projectId);
+}
+
 export function projectDir(projectId: string): string {
-  const dir = join(GLOBAL_DIR, 'projects', projectId);
+  const dir = projectPath(projectId);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }

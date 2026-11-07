@@ -89,3 +89,20 @@ describe('doctor', () => {
     }
   });
 });
+
+describe('read-only commands', () => {
+  it('do not create a project folder in a directory never initialized', async () => {
+    const { checkFirstSession } = await import('./first_session_check.js');
+    const { resolveProjectId } = await import('../core/project_id.js');
+    const { projectPath } = await import('../config.js');
+    const { existsSync } = await import('node:fs');
+    const dir = join(tmpdir(), `somtum-uninit-${ulid()}`);
+    mkdirSync(dir, { recursive: true });
+
+    checkFirstSession({ cwd: dir });
+    runDoctor({ cwd: dir });
+
+    expect(existsSync(projectPath(resolveProjectId(dir)))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

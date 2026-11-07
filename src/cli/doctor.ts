@@ -1,12 +1,12 @@
-import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { openDb, hasFts5, appliedVersions } from '../core/db.js';
-import { MemoryStore } from '../core/store.js';
+import { join } from 'node:path';
+import { GLOBAL_CONFIG_PATH, GLOBAL_DIR, loadConfig, projectPath } from '../config.js';
 import { PromptCache } from '../core/cache.js';
-import { resolveProjectId } from '../core/project_id.js';
-import { pickBackend } from '../core/llm_backend.js';
+import { appliedVersions, hasFts5, openDb } from '../core/db.js';
 import { TokenLedger } from '../core/ledger.js';
-import { loadConfig, projectDir, GLOBAL_DIR, GLOBAL_CONFIG_PATH } from '../config.js';
+import { pickBackend } from '../core/llm_backend.js';
+import { resolveProjectId } from '../core/project_id.js';
+import { MemoryStore } from '../core/store.js';
 
 export interface DoctorResult {
   ok: boolean;
@@ -62,7 +62,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
 
   // 4. DB file accessible
   const projectId = resolveProjectId(cwd);
-  const dbPath = join(projectDir(projectId), 'db.sqlite');
+  const dbPath = join(projectPath(projectId), 'db.sqlite');
   const dbExists = existsSync(dbPath);
   checks.push({
     name: 'db_file',

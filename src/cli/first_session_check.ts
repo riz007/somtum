@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadConfig, projectDir } from '../config.js';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadConfig, projectPath } from '../config.js';
 import { resolveProjectId } from '../core/project_id.js';
 
 interface FirstSessionState {
@@ -26,7 +26,7 @@ export function checkFirstSession(opts: { cwd?: string } = {}): void {
     if (!config.diagnostics.first_session_check) return;
 
     const projectId = resolveProjectId(cwd);
-    const flagPath = join(projectDir(projectId), 'first_session.json');
+    const flagPath = join(projectPath(projectId), 'first_session.json');
 
     if (!existsSync(flagPath)) return;
 
