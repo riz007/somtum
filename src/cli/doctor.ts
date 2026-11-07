@@ -5,6 +5,7 @@ import { MemoryStore } from '../core/store.js';
 import { PromptCache } from '../core/cache.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { pickBackend } from '../core/llm_backend.js';
+import { TokenLedger } from '../core/ledger.js';
 import { loadConfig, projectDir, GLOBAL_DIR, GLOBAL_CONFIG_PATH } from '../config.js';
 
 export interface DoctorResult {
@@ -19,6 +20,9 @@ export interface DoctorCheck {
   /** Actionable fix instructions shown only when ok=false. */
   fix?: string[];
 }
+
+// Too few gated reads says nothing about whether gating pays off.
+const GATE_VERDICT_MIN_EVENTS = 10;
 
 export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
   const cwd = opts.cwd ?? process.cwd();
@@ -102,39 +106,26 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
           : `missing migrations: [${missing.join(', ')}]`,
     });
 
-    // 7. Memory count + tokens saved
+    // 7. Memory count
     const store = new MemoryStore(db);
     const memCount = store.countByProject(projectId);
-    const saved = store.totalTokensSaved(projectId);
-    const spent = store.totalTokensSpent(projectId);
-    checks.push({
-      name: 'memories',
-      ok: true,
-      detail: `${memCount} memories, ${saved} tokens saved, ${spent} tokens spent`,
-    });
+    checks.push({ name: 'memories', ok: true, detail: `${memCount} memories` });
 
-    // 8. Breakeven ratio warning
-    if (spent > 0) {
-      const ratio = saved / spent;
-      const ok = ratio >= 1.5;
+    // 8. Metered token use, and whether file gating is paying for itself
+    const ledger = new TokenLedger(db).summary(projectId);
+    checks.push({
+      name: 'token_overhead',
+      ok: true,
+      detail: `${ledger.overhead_tokens} tokens metered (extraction ${ledger.extraction.tokens}, summaries ${ledger.file_summary.tokens}, injected ${ledger.injection.tokens}); see \`somtum stats\``,
+    });
+    const gate = ledger.file_gate;
+    if (gate.denied.events >= GATE_VERDICT_MIN_EVENTS && gate.net_tokens < 0) {
       checks.push({
-        name: 'breakeven_ratio',
-        ok,
-        detail: `${ratio.toFixed(2)}x${ok ? '' : ' — below 1.5x, extraction cost may exceed savings'}`,
-        ...(ok
-          ? {}
-          : {
-              fix: [
-                'somtum config set retrieval.strategy bm25   # match what is actually running',
-                '# or, to enable real hybrid retrieval:',
-                'somtum config set retrieval.embeddings.enabled true && somtum reindex',
-                '# or reduce injection overhead:',
-                'somtum config set injection.k 2',
-              ],
-            }),
+        name: 'file_gating',
+        ok: false,
+        detail: `costing more than it saves: net ${gate.net_tokens} tokens over ${gate.denied.events} gated reads`,
+        fix: ['somtum config set file_gating.enabled false'],
       });
-    } else {
-      checks.push({ name: 'breakeven_ratio', ok: true, detail: 'n/a (no extraction cost yet)' });
     }
 
     // 9. Stale memories: older than 90 days, never confirmed via retrieval
@@ -204,6 +195,22 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         unreadable.push(rel);
       }
     }
+    const claudeSettings = join(cwd, '.claude', 'settings.json');
+    const preReadInstalled =
+      existsSync(claudeSettings) && readFileSync(claudeSettings, 'utf8').includes('hook pre_read');
+    if (preReadInstalled && !config.file_gating.enabled) {
+      checks.push({
+        name: 'file_gating',
+        ok: false,
+        detail:
+          'PreToolUse hook installed but file_gating.enabled is false (the default since v3.1)',
+        fix: [
+          'somtum config set file_gating.enabled true   # keep using it; check `somtum stats` after a few sessions',
+          '# or remove the PreToolUse somtum entry from .claude/settings.json',
+        ],
+      });
+    }
+
     checks.push({
       name: 'hooks_installed',
       ok: installedIn.length > 0,
@@ -217,7 +224,7 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
         ? {}
         : {
             fix: [
-              'somtum init --all            # Claude Code, from the project root',
+              'somtum init                  # Claude Code, from the project root',
               'somtum init --agent codex    # Codex, from the project root',
             ],
           }),

@@ -6,14 +6,11 @@ Somtum is production-ready, but it has real trade-offs worth knowing before you 
 
 ## Value is front-loaded toward long-lived projects
 
-**The problem:** On a fresh project with fewer than ~20 memories, `somtum stats` will often show a breakeven ratio below 1.5×. The token cost of injection (reading and sending memories to Claude on every prompt) can exceed the tokens saved until the memory store is large enough to pay off.
-
-**What to expect:** The ratio improves naturally over weeks as memories accumulate and get retrieved more frequently. A project you've been working on for a month with 50+ memories will see consistent savings. A project you started yesterday won't.
+**The problem:** On a fresh project, Somtum spends tokens on extraction before it has many memories to hand back, so early on you're mostly paying in. Memory pays off on projects you return to over weeks, not on one you started yesterday.
 
 **What to do:**
-- Don't panic if `somtum doctor` warns about breakeven on a new project — it's expected.
-- Lower `injection.k` to `1` or `2` on early-stage projects to reduce overhead.
-- Run `somtum stats` after a month and compare.
+- Check what it actually cost with `somtum stats` — the numbers are metered, not estimated. See [What Somtum Costs](/guide/costs).
+- Lower `injection.k` to `1` or `2` on early-stage projects, or raise `extraction.min_new_tokens` to extract only bigger chunks.
 
 ---
 
@@ -106,10 +103,9 @@ Consider a monthly pruning pass on long-lived projects.
 
 ## The extraction cost is real
 
-**The problem:** Every session end (and every compaction) triggers one extraction call. The transcript sent is capped at 60k tokens; long real sessions measured 38k–72k tokens per call, short ones far less. On the Anthropic API that is billed per call. Somtum tracks it in `tokens_spent` and shows the breakeven ratio.
+**The problem:** Each session end or compaction can trigger an extraction call of up to 60k tokens. Since v3.1 only turns not yet extracted are sent, and nothing is sent when there are fewer than 500 new tokens, but a long session is still a long transcript.
 
 **What to do:**
 - On a Claude Code or Codex subscription, leave `ANTHROPIC_API_KEY` unset. Extraction then runs through the `claude` or `codex` CLI on your plan's quota rather than API credits.
-- Upgrade from v2: earlier versions sent Claude Code's own ~37k-token system prompt and tool list with every `claude` CLI extraction call, and sent tool-call arguments (whole files) untrimmed. Both are fixed in v3.
-- Reduce `extraction.max_observations_per_session` if you're generating too many low-quality observations per session.
-- Run `somtum stats` regularly to check whether savings are outpacing spend.
+- Raise `extraction.min_new_tokens` or lower `extraction.max_observations_per_session` to extract less.
+- Check `somtum stats` for the metered extraction spend. See [What Somtum Costs](/guide/costs).

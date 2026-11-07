@@ -1,17 +1,32 @@
 import type { DB } from '../db.js';
-import { MemoryStore } from '../store.js';
 import type { Observation } from '../schema.js';
-import type { Retriever, RetrievalResult, SearchOptions } from './types.js';
+import { MemoryStore } from '../store.js';
+import type { RetrievalResult, Retriever, SearchOptions } from './types.js';
 
 // SQLite FTS5 MATCH uses an embedded query grammar; user input with bare
 // punctuation can raise "fts5: syntax error". We quote each token to treat
 // the input as a bag of literal terms (phrase-ish), which is the right
 // behavior for natural-language queries against BM25.
+// Terms are OR-ed, so a single shared function word ("the", "how") would make
+// almost every memory a match and get it injected into an unrelated prompt.
+const STOPWORDS = new Set(
+  (
+    'a about above after again all am an and any are as at be because been before being below ' +
+    'between both but by can could did do does doing done down during each few for from further ' +
+    'get got had has have having he her here hers him his how i if in into is it its itself just ' +
+    'let me more most my no nor not now of off on once only or other our ours out over own please ' +
+    'same she should so some such than thank thanks that the their theirs them then there these ' +
+    'they this those through to too under until up us very was we were what when where which ' +
+    'while who whom why will with would you your yours'
+  ).split(' '),
+);
+
 function escapeFtsQuery(query: string): string {
   const tokens = query
     .split(/\s+/)
     .map((t) => t.replace(/["]/g, '').trim())
-    .filter((t) => t.length > 0);
+    .filter((t) => t.length > 0)
+    .filter((t) => !STOPWORDS.has(t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')));
   if (tokens.length === 0) return '""';
   return tokens.map((t) => `"${t}"`).join(' OR ');
 }

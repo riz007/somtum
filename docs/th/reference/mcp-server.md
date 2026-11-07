@@ -1,6 +1,6 @@
 # เซิร์ฟเวอร์ MCP
 
-เมื่อคุณรัน `somtum init --all` (Claude Code) หรือ `somtum init --agent codex` Somtum จะลงทะเบียน MCP server ที่ agent สามารถเรียกได้เองระหว่างเซสชัน MCP client อื่นๆ ก็ใช้ได้ผ่าน `somtum mcp` (stdio)
+เมื่อคุณรัน `somtum init` (Claude Code) หรือ `somtum init --agent codex` Somtum จะลงทะเบียน MCP server ที่ agent สามารถเรียกได้เองระหว่างเซสชัน MCP client อื่นๆ ก็ใช้ได้ผ่าน `somtum mcp` (stdio)
 
 ## เครื่องมือที่มี
 
@@ -34,7 +34,7 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 
 ## การตั้งค่า
 
-`somtum init --all` เขียน `.mcp.json` ไปยัง root ของโปรเจกต์:
+`somtum init` เขียน `.mcp.json` ไปยัง root ของโปรเจกต์:
 
 ```json
 {

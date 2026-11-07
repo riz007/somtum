@@ -1,30 +1,18 @@
 # সমস্যা সমাধান
 
-## `somtum doctor` ১.৫x-এর নিচে `breakeven_ratio` রিপোর্ট করে
+## Somtum প্রত্যাশার চেয়ে বেশি টোকেন খরচ করছে
 
-এই সতর্কতার মানে হল somtum আরও টোকেন ব্যয় করছে (মেমরি ইনজেক্ট করছে) সাশ্রয় করার চেয়ে।
-
-**ছোট প্রজেক্টের জন্য স্বাভাবিক।** ~২০-এরও কম মেমরি এবং বিরল রিকল কল সহ, ইনজেকশনের ওভারহেড সুবিধার চেয়ে বেশি। মেমরি স্টোর বাড়ার সাথে স্বাভাবিকভাবে অনুপাত উন্নত হয়।
-
-**hybrid/embeddings মিসম্যাচ পরীক্ষা করুন।** যদি `doctor` `strategy=hybrid` কিন্তু `embeddings: disabled` দেখায়, somtum চুপচাপ BM25-এ ফলব্যাক করছে hybrid ওভারহেড পে করার সময়:
-
-```
-✓  config     strategy=hybrid, k=8
-✓  embeddings disabled
-```
-
-ঠিক করুন: যা আসলে চলছে তার সাথে কৌশল সারিবদ্ধ করুন।
+পরিমাপ করা সংখ্যা দিয়ে শুরু করুন:
 
 ```bash
-# বিকল্প ১ — BM25 ব্যবহার করুন (অফলাইন, কোনো API key প্রয়োজন নেই)
-somtum config set retrieval.strategy bm25
-
-# বিকল্প ২ — পূর্ণ হাইব্রিড সক্ষম করুন (একটি ৩০ MB ONNX মডেল ডাউনলোড করে, ANTHROPIC_API_KEY প্রয়োজন)
-somtum config set retrieval.embeddings.enabled true
-somtum reindex
+somtum stats --since 7d
 ```
 
-`config` এবং `embeddings` উভয় লাইন সামঞ্জস্যপূর্ণ কিনা নিশ্চিত করতে `somtum doctor` আবার রান করুন।
+- **এক্সট্র্যাকশন বেশি।** `extraction.min_new_tokens` বাড়ান যাতে শুধু বড় অংশ এক্সট্র্যাক্ট হয়, এবং `claude` বা `codex` CLI ব্যাকএন্ড ব্যবহার করুন যাতে API ক্রেডিটের বদলে আপনার সাবস্ক্রিপশনের কোটা ব্যবহার হয়।
+- **ইনজেক্ট করা কনটেক্সট বেশি।** `injection.k` বা `injection.max_chars` কমান।
+- **file gating নেট নেগেটিভ।** বন্ধ করুন: `somtum config set file_gating.enabled false` (১০টি gated read-এর পরে `somtum doctor` নিজেই সতর্ক করে)।
+
+দেখুন [What Somtum Costs (English)](/guide/costs)।
 
 ---
 
@@ -126,7 +114,7 @@ BM25 সম্পূর্ণরূপে অফলাইনে কাজ কর
 **Auto-inject প্রথম জিনিস যা পরীক্ষা করতে হবে।** v1.3.0 থেকে, Somtum স্বয়ংক্রিয়ভাবে cache হুকের মাধ্যমে প্রতিটি `UserPromptSubmit`-এ top-k মেমরি ইনজেক্ট করে — কোনো ম্যানুয়াল রিকল স্টেপ প্রয়োজন নেই।
 
 1. cache হুক ইনস্টল নিশ্চিত করুন: `somtum doctor` → `hooks_installed ✓` খুঁজুন
-2. ইনস্টল না থাকলে: `somtum init --all` (Claude Code) বা `somtum init --agent codex`
+2. ইনস্টল না থাকলে: `somtum init` (Claude Code) বা `somtum init --agent codex`
 3. injection সক্ষম নিশ্চিত করুন: `somtum config get injection.enabled` → `true` হওয়া উচিত
 4. মেমরি আসলে আছে কিনা পরীক্ষা করুন: `somtum stats` → `memories > 0`
 5. প্রতিটি প্রম্পট কনটেক্সটের শীর্ষে বাজেট লাইন খুঁজুন: `[somtum] injected N/M memories (~X tokens)`। যদি `0/M` দেখেন, BM25 কোনো ম্যাচ খুঁজে পায়নি — আরও বর্ণনামূলক প্রম্পট চেষ্টা করুন বা `injection.min_relevance_score` কে `0`-এ কমিয়ে দিন।

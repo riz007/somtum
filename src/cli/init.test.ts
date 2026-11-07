@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runInit } from './init.js';
+import { runInit, initCommand } from './init.js';
+import { existsSync } from 'node:fs';
+import { projectDir } from '../config.js';
+import { resolveProjectId } from '../core/project_id.js';
+import { loadConfig } from '../config.js';
 
 let tmp: string;
 
@@ -52,8 +56,15 @@ describe('runInit', () => {
     const settings = JSON.parse(readFileSync(r.settingsPath, 'utf8')) as {
       hooks: { PreToolUse?: { matcher: string; hooks: { command: string }[] }[] };
     };
-    expect(settings.hooks.PreToolUse?.[0]?.matcher).toBe('Read|Edit');
-    expect(r.hooksInstalled).toContain('PreToolUse(Read|Edit)');
+    expect(settings.hooks.PreToolUse?.[0]?.matcher).toBe('Read');
+    expect(r.hooksInstalled).toContain('PreToolUse(Read)');
+  });
+
+  it('turns file gating on in project config only when its hook is installed', () => {
+    runInit({ cwd: tmp });
+    expect(loadConfig({ cwd: tmp }).file_gating.enabled).toBe(false);
+    runInit({ cwd: tmp, withFileGating: true });
+    expect(loadConfig({ cwd: tmp }).file_gating.enabled).toBe(true);
   });
 
   it('is idempotent on re-run', () => {
@@ -102,5 +113,18 @@ describe('runInit', () => {
     expect(settings.permissions.allow).toContain('Bash(ls)');
     expect(settings.hooks.PreToolUse).toHaveLength(1);
     expect(settings.hooks.SessionEnd).toHaveLength(1);
+  });
+});
+
+describe('initCommand', () => {
+  it('creates the project database so doctor passes before the first session', async () => {
+    const log = console.log;
+    console.log = () => {};
+    try {
+      await initCommand({ cwd: tmp, yes: true });
+    } finally {
+      console.log = log;
+    }
+    expect(existsSync(join(projectDir(resolveProjectId(tmp)), 'db.sqlite'))).toBe(true);
   });
 });

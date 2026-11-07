@@ -4,13 +4,13 @@
 
 | কমান্ড | বিবরণ |
 | --- | --- |
-| `somtum init` | SessionEnd capture হুক ইনস্টল করে |
-| `somtum init --cache` | UserPromptSubmit cache + auto-inject হুকও ইনস্টল করে |
-| `somtum init --file-gating` | PreToolUse file-gating হুকও ইনস্টল করে |
-| `somtum init --all` | সমস্ত হুক + MCP server ইনস্টল করে |
+| `somtum init` | Claude Code: ক্যাপচার হুক (SessionEnd, PreCompact), রিকল হুক (UserPromptSubmit), MCP server এবং প্রজেক্ট ডেটাবেস |
+| `somtum init --no-cache` | শুধু ক্যাপচার: মেমরি সংরক্ষিত হয় কিন্তু প্রম্পটে ইনজেক্ট হয় না |
+| `somtum init --file-gating` | ঐচ্ছিক PreToolUse file-gating হুক ইনস্টল করে এবং এই প্রজেক্টে চালু করে |
+| `somtum init --all` | file gating সহ সবকিছু |
 | `somtum init --force` | হুক ইতিমধ্যে থাকলেও পুনরায় ইনস্টল করে |
 | `somtum init --agent codex` | Codex-এর জন্য ইনস্টল করে: `.codex/hooks.json`-এ capture + auto-inject হুক, `.codex/config.toml`-এ MCP server |
-| `somtum doctor` | DB স্বাস্থ্য, মাইগ্রেশন, হুক, API key, ব্রেকইভেন রেশিও, পুরনো মেমরি পরীক্ষা করে |
+| `somtum doctor` | সেটআপ পরীক্ষা: ব্যাকএন্ড, হুক, ডেটাবেস, মাইগ্রেশন, পুরনো মেমরি এবং file gating লাভজনক কিনা |
 
 ## মেমরি
 
@@ -38,7 +38,8 @@
 
 | কমান্ড | বিবরণ |
 | --- | --- |
-| `somtum stats` | সাশ্রয় করা টোকেন, ক্যাশ হিট রেট, রিট্রিভাল ব্রেকডাউন |
+| `somtum stats` | পরিমাপ করা টোকেন ব্যবহার (এক্সট্র্যাকশন, ইনজেক্ট করা কনটেক্সট, file gating), মেমরি সংখ্যা এবং ক্যাশ পরিসংখ্যান |
+| `somtum stats --since 7d` | পরিমাপ করা সংখ্যা শেষ N দিনে সীমিত করে |
 | `somtum stats --json` | মেশিন-রিডেবল JSON আউটপুট |
 | `somtum serve` | ব্রাউজারে ভিজ্যুয়াল ড্যাশবোর্ড খুলুন |
 | `somtum serve --port <n>` | কাস্টম পোর্ট ব্যবহার করুন (ডিফল্ট: 3000) |

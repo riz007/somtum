@@ -44,13 +44,14 @@ if (!isInternal) {
 
 program
   .command('init')
-  .description('Install the SessionEnd capture hook (and optional extras) in the current project')
+  .description('Install capture + recall hooks and the MCP server in the current project')
   .option('-f, --force', 'Reinstall even if the hook is already present', false)
   .option('-y, --yes', 'Skip interactive prompts (for scripted installs)', false)
-  .option('--cache', 'Also install the UserPromptSubmit cache hook', false)
-  .option('--file-gating', 'Also install the PreToolUse file-gating hook', false)
+  .option('--cache', 'Install the UserPromptSubmit recall hook (default)', true)
+  .option('--no-cache', 'Capture only: do not inject memories into prompts')
+  .option('--file-gating', 'Also install the PreToolUse file-gating hook (opt-in)', false)
   .option('--no-mcp', 'Do not register the somtum MCP server in .mcp.json')
-  .option('--all', 'Enable cache + file-gating + MCP', false)
+  .option('--all', 'Everything, including file gating', false)
   .option('--agent <id>', 'Agent to install for: claude-code | codex', 'claude-code')
   .action(
     async (opts: {
@@ -107,10 +108,14 @@ program
 
 program
   .command('stats')
-  .description('Cumulative tokens saved, memory counts, cache size (estimated)')
+  .description("Metered token use (what Somtum spent and saved), memory counts, cache")
   .option('--json', 'Emit JSON')
-  .action((opts: { json?: boolean }) => {
-    const code = statsCommand({ json: opts.json ?? false });
+  .option('--since <days>', 'Limit metered numbers to a window, e.g. 7d')
+  .action((opts: { json?: boolean; since?: string }) => {
+    const code = statsCommand({
+      json: opts.json ?? false,
+      ...(opts.since !== undefined ? { since: opts.since } : {}),
+    });
     process.exit(code);
   });
 

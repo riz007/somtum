@@ -4,8 +4,9 @@ import { createInterface } from 'node:readline';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../config.js';
-import { projectNameFromCwd } from '../core/project_id.js';
+import { loadConfig, projectDir, PROJECT_CONFIG_RELATIVE } from '../config.js';
+import { openDb } from '../core/db.js';
+import { projectNameFromCwd, resolveProjectId } from '../core/project_id.js';
 import { pickBackend, NO_BACKEND_MESSAGE } from '../core/llm_backend.js';
 import { runCodexInit } from './init_codex.js';
 
@@ -129,6 +130,24 @@ export function addHook(
   return true;
 }
 
+// File gating is off by default; installing its hook is the opt-in.
+function enableFileGating(cwd: string): void {
+  const path = join(cwd, PROJECT_CONFIG_RELATIVE);
+  let existing: Record<string, unknown> = {};
+  if (existsSync(path)) {
+    try {
+      existing = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+  }
+  const gating = (existing['file_gating'] ?? {}) as Record<string, unknown>;
+  if (gating['enabled'] === true) return;
+  existing['file_gating'] = { ...gating, enabled: true };
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
+}
+
 export function runInit(options: InitOptions = {}): InitResult {
   const cwd = options.cwd ?? process.cwd();
   const claudeDir = join(cwd, '.claude');
@@ -162,7 +181,8 @@ export function runInit(options: InitOptions = {}): InitResult {
     if (addHook(settings, USER_PROMPT_SUBMIT, PRE_PROMPT_CMD())) added.push('UserPromptSubmit');
   }
   if (options.withFileGating) {
-    if (addHook(settings, PRE_TOOL_USE, PRE_READ_CMD(), 'Read|Edit')) added.push('PreToolUse(Read|Edit)');
+    if (addHook(settings, PRE_TOOL_USE, PRE_READ_CMD(), 'Read')) added.push('PreToolUse(Read)');
+    enableFileGating(cwd);
   }
 
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
@@ -239,13 +259,15 @@ export async function initCommand(options: {
   }
 
   const agent = options.agent ?? 'claude-code';
-  if (agent === 'codex') return initCodex(cwd, options.force ?? false, options.mcp ?? true);
-  if (agent !== 'claude-code') {
+  if (agent !== 'claude-code' && agent !== 'codex') {
     process.stderr.write(`somtum: unknown agent "${agent}" (expected: claude-code, codex)\n`);
     return 1;
   }
+  // Create the project database now so `somtum doctor` passes before the first session.
+  openDb({ path: join(projectDir(resolveProjectId(cwd)), 'db.sqlite') }).close();
+  if (agent === 'codex') return initCodex(cwd, options.force ?? false, options.mcp ?? true);
 
-  const withCache = options.all === true ? true : (options.cache ?? false);
+  const withCache = options.all === true ? true : (options.cache ?? true);
   const withFileGating = options.all === true ? true : (options.fileGating ?? false);
   const withMcp = options.all === true ? true : (options.mcp ?? true);
 

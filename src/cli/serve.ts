@@ -14,6 +14,7 @@ import { openDb } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { PromptCache } from '../core/cache.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
+import { TokenLedger } from '../core/ledger.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { projectDir, loadConfig } from '../config.js';
 import { makeRetriever } from '../core/retriever/factory.js';
@@ -97,6 +98,7 @@ export async function runServe(options: ServeOptions = {}): Promise<void> {
         ...rsStats.getCacheHitSummary(projectId),
         entry_count: cache.count(),
       },
+      ledger: new TokenLedger(db).summary(projectId),
     })),
   );
 

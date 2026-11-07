@@ -1,6 +1,6 @@
 # MCP সার্ভার
 
-আপনি `somtum init --all` (Claude Code) বা `somtum init --agent codex` রান করলে, Somtum একটি MCP সার্ভার নিবন্ধন করে যা এজেন্ট সেশন চলাকালীন নিজে থেকে কল করতে পারে। অন্য যেকোনো MCP ক্লায়েন্টও `somtum mcp` (stdio) ব্যবহার করতে পারে।
+আপনি `somtum init` (Claude Code) বা `somtum init --agent codex` রান করলে, Somtum একটি MCP সার্ভার নিবন্ধন করে যা এজেন্ট সেশন চলাকালীন নিজে থেকে কল করতে পারে। অন্য যেকোনো MCP ক্লায়েন্টও `somtum mcp` (stdio) ব্যবহার করতে পারে।
 
 ## উপলব্ধ টুল
 
@@ -34,7 +34,7 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 
 ## সেটআপ
 
-`somtum init --all` আপনার প্রজেক্ট রুটে `.mcp.json` লেখে:
+`somtum init` আপনার প্রজেক্ট রুটে `.mcp.json` লেখে:
 
 ```json
 {

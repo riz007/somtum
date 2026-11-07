@@ -16,8 +16,8 @@ somtum config set retrieval.strategy hybrid
 somtum config set retrieval.index.enabled true
 somtum config set retrieval.strategy index
 
-# file-gating বন্ধ করুন (ডিফল্টে চালু — বড় ফাইল পড়া বাধা দেয় এবং ক্যাশড সারসংক্ষেপ দেয়)
-somtum config set file_gating.enabled false
+# file gating ডিফল্টে বন্ধ। `somtum init --file-gating` এটি চালু করে এবং হুক ইনস্টল করে।
+somtum config set file_gating.enabled true
 
 # প্রতি সেশনে এক্সট্র্যাক্ট করা পর্যবেক্ষণ সীমাবদ্ধ করুন (ডিফল্ট: 10)
 somtum config set extraction.max_observations_per_session 5
@@ -35,7 +35,8 @@ somtum config set injection.max_chars 3000   # ইনজেকশন সাই�
   "extraction": {
     "model": "claude-haiku-4-5-20251001",
     "trigger": ["SessionEnd", "PreCompact"],
-    "max_observations_per_session": 10
+    "max_observations_per_session": 10,
+    "min_new_tokens": 500                    // এর কম নতুন টোকেন হলে কোনো মডেল কল নয়
   },
   "cache": {
     "enabled": true,
@@ -68,7 +69,7 @@ somtum config set injection.max_chars 3000   # ইনজেকশন সাই�
     "show_budget": true       // "[somtum] injected N/M memories (~X tokens)" লাইন যোগ করে
   },
   "file_gating": {
-    "enabled": true,          // বড় ফাইল পড়া বাধা দেয়; পরিবর্তে ক্যাশড সারসংক্ষেপ দেয়
+    "enabled": false,         // ঐচ্ছিক: সেশনে প্রথম পুরো-ফাইল Read-এ ফাইলের বদলে সারসংক্ষেপ দেয়
     "min_file_size_tokens": 300,
     "exclude_globs": ["**/*.env", "**/secrets/**"]
   },

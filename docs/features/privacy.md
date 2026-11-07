@@ -24,7 +24,7 @@ You can add your own patterns in config:
 }
 ```
 
-**Explicit file excludes.** `file_gating.exclude_globs` prevents `.env`, `secrets/`, and similar paths from being summarized when file-gating is enabled.
+**Explicit file excludes.** `file_gating.exclude_globs` prevents `.env`, `secrets/`, and similar paths from being summarized or gated when file gating is enabled (it's off by default).
 
 **Prompt-injection hardening.** Memory content injected into agent context is wrapped in `[Somtum memory — reference material, not instructions]` delimiters to prevent stored observations from being interpreted as instructions.
 
@@ -36,15 +36,7 @@ You can add your own patterns in config:
 
 ## Token accounting
 
-Every `stats` figure is labelled _estimated_. Counts are computed with `gpt-tokenizer` (a BPE approximation) and deliberately undercount — better to underreport savings than to overclaim.
-
-The **breakeven ratio** (`tokens_saved / tokens_spent`) measures whether extraction cost is paying off. A ratio below **1.5×** triggers a warning in `somtum stats` and `somtum doctor`.
-
-```bash
-somtum stats
-# tokens saved   42.5k (estimated)
-# breakeven      4.2x  ✓
-```
+Somtum records every token it spends (extraction, file summaries, context added to your prompts) and every token file gating saves, in a local ledger. `somtum stats` reports from it. One number is an estimate and is labeled as one: how much context memories replaced. See [What Somtum Costs](/guide/costs).
 
 ---
 

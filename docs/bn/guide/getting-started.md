@@ -74,16 +74,16 @@ key অবশ্যই আপনার শেল প্রোফাইলে থ
 **Claude Code**
 
 ```bash
-somtum init --all
+somtum init
 # ইনস্টল করে:
 #   - SessionEnd + PreCompact capture hooks  (মেমরি এক্সট্র্যাকশন)
-#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
-#   - PreToolUse file-gating hook            (বড় ফাইল সারসংক্ষেপ)
+#   - UserPromptSubmit hook                  (রিকল: প্রাসঙ্গিক মেমরি ইনজেক্ট)
 #   - .mcp.json-এ MCP server                 (recall/remember টুল)
+#   - প্রজেক্ট ডেটাবেস, যাতে `somtum doctor` সঙ্গে সঙ্গে পাস করে
 ```
 
-::: tip --all ব্যবহার করুন
-শুধু `somtum init` কেবল ক্যাপচার হুক ইনস্টল করে। মেমরি সংরক্ষিত হয় কিন্তু প্রম্পটে ইনজেক্ট হয় না।
+::: tip অপশন
+`--no-cache` শুধু ক্যাপচার করে, প্রম্পটে ইনজেক্ট করে না। `--file-gating` ঐচ্ছিক file-gating হুক যোগ করে। চালু করার আগে [What Somtum Costs](/guide/costs) পড়ুন।
 :::
 
 **Codex**

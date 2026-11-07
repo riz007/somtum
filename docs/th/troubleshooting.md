@@ -1,30 +1,18 @@
 # การแก้ปัญหา
 
-## `somtum doctor` รายงาน `breakeven_ratio` ต่ำกว่า 1.5x
+## Somtum ใช้โทเคนมากกว่าที่คาด
 
-คำเตือนนี้หมายความว่า somtum ใช้โทเคนมากกว่า (การฉีดความทรงจำ) มากกว่าที่ประหยัดได้
-
-**ปกติสำหรับโปรเจกต์ขนาดเล็ก** ด้วยความทรงจำน้อยกว่า ~20 รายการและการเรียก recall ที่ไม่บ่อย overhead ของการฉีดมากกว่าประโยชน์ อัตราส่วนจะดีขึ้นเองเมื่อ memory store เติบโต
-
-**ตรวจสอบความไม่ตรงกันระหว่าง hybrid/embeddings** ถ้า `doctor` แสดง `strategy=hybrid` แต่ `embeddings: disabled` somtum จะเปลี่ยนไปใช้ BM25 โดยอัตโนมัติขณะที่จ่าย hybrid overhead:
-
-```
-✓  config     strategy=hybrid, k=8
-✓  embeddings disabled
-```
-
-แก้ไข: จัดกลยุทธ์ให้ตรงกับสิ่งที่รันจริง
+เริ่มจากตัวเลขที่วัดจริง:
 
 ```bash
-# ตัวเลือก 1 — ใช้ BM25 (ออฟไลน์ ไม่ต้องการ API key)
-somtum config set retrieval.strategy bm25
-
-# ตัวเลือก 2 — เปิดใช้งาน hybrid เต็มรูปแบบ (ดาวน์โหลดโมเดล ONNX 30 MB ต้องการ ANTHROPIC_API_KEY)
-somtum config set retrieval.embeddings.enabled true
-somtum reindex
+somtum stats --since 7d
 ```
 
-รัน `somtum doctor` อีกครั้งเพื่อยืนยันว่าทั้ง `config` และ `embeddings` สอดคล้องกัน
+- **การสกัดสูง** เพิ่ม `extraction.min_new_tokens` เพื่อสกัดเฉพาะส่วนที่ใหญ่ขึ้น และใช้ backend `claude` หรือ `codex` CLI เพื่อใช้โควตาของแพ็กเกจแทนเครดิต API
+- **บริบทที่ฉีดเข้าไปสูง** ลด `injection.k` หรือ `injection.max_chars`
+- **file gating ติดลบ** ปิดด้วย `somtum config set file_gating.enabled false` (`somtum doctor` จะเตือนเองหลังจาก gate ไป 10 ครั้ง)
+
+ดู [What Somtum Costs (English)](/guide/costs)
 
 ---
 
@@ -126,7 +114,7 @@ BM25 ทำงานออฟไลน์ได้อย่างสมบูร
 **Auto-inject คือสิ่งแรกที่ต้องตรวจสอบ** ตั้งแต่ v1.3.0 Somtum จะฉีดความทรงจำ top-k เข้าไปใน `UserPromptSubmit` ทุกรายการผ่าน cache hook โดยอัตโนมัติ — ไม่ต้องเรียก recall ด้วยตนเอง
 
 1. ยืนยันว่าติดตั้ง cache hook แล้ว: `somtum doctor` → มองหา `hooks_installed ✓`
-2. ถ้าไม่ได้ติดตั้ง: `somtum init --all` (Claude Code) หรือ `somtum init --agent codex`
+2. ถ้าไม่ได้ติดตั้ง: `somtum init` (Claude Code) หรือ `somtum init --agent codex`
 3. ยืนยันว่าเปิดใช้งาน injection: `somtum config get injection.enabled` → ควรเป็น `true`
 4. ตรวจสอบว่ามีความทรงจำจริงๆ: `somtum stats` → `memories > 0`
 5. มองหาบรรทัด budget ที่ด้านบนของ context แต่ละ prompt: `[somtum] injected N/M memories (~X tokens)` ถ้าเห็น `0/M` แสดงว่า BM25 ไม่พบการจับคู่ — ลองใช้ prompt ที่มีรายละเอียดมากขึ้นหรือลด `injection.min_relevance_score` เป็น `0`

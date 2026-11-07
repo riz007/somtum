@@ -124,6 +124,9 @@ export const ConfigSchema = z.object({
       trigger: z.array(z.string()).default(['SessionEnd', 'PreCompact']),
       max_observations_per_session: z.number().int().positive().default(10),
       max_retries: z.number().int().nonnegative().default(1),
+      // Skip the extraction call when the not-yet-extracted part of a session is
+      // smaller than this. The turns are kept and sent with the next extraction.
+      min_new_tokens: z.number().int().nonnegative().default(500),
     })
     .default({}),
   cache: z
@@ -157,7 +160,9 @@ export const ConfigSchema = z.object({
     .default({}),
   file_gating: z
     .object({
-      enabled: z.boolean().default(true),
+      // Opt-in: summaries cost extraction tokens and only pay off when the
+      // PreToolUse hook is installed (`somtum init --file-gating` sets this).
+      enabled: z.boolean().default(false),
       min_file_size_tokens: z.number().int().positive().default(300),
       exclude_globs: z.array(z.string()).default(['**/*.env', '**/secrets/**']),
     })

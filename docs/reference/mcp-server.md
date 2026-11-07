@@ -1,6 +1,6 @@
 # MCP Server
 
-When you run `somtum init --all` (Claude Code) or `somtum init --agent codex`, Somtum registers an MCP server the agent can call on its own during a session. Any other MCP client can use it too: point it at `somtum mcp` over stdio.
+When you run `somtum init` (Claude Code) or `somtum init --agent codex`, Somtum registers an MCP server the agent can call on its own during a session. Any other MCP client can use it too: point it at `somtum mcp` over stdio.
 
 ## Available tools
 
@@ -13,7 +13,7 @@ When you run `somtum init --all` (Claude Code) or `somtum init --agent codex`, S
 | `cache_lookup` | Checks the prompt cache directly. |
 | `report_false_hit` | Reports that a cached response didn't answer the question (tunes fuzzy threshold data). |
 | `forget` | Soft-deletes an observation. |
-| `stats` | Reports tokens saved, cache hit rate, false-hit count, and corpus size. |
+| `stats` | Reports metered token use (`ledger`), memory counts, cache hit rate, and the estimated tokens saved. |
 
 Every MCP response includes a `tokens` field so the agent can account for retrieval cost.
 
@@ -34,7 +34,7 @@ remember("Always use pnpm for Node projects", body="...", scope="workspace")
 
 ## Setup
 
-`somtum init --all` writes `.mcp.json` to your project root:
+`somtum init` writes `.mcp.json` to your project root:
 
 ```json
 {

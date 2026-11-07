@@ -12,6 +12,8 @@ import { resolveProjectId } from '../core/project_id.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
 import { getEmbedder, isEmbedderReady } from '../core/embeddings.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
+import { TokenLedger } from '../core/ledger.js';
+import { countTokens } from '../core/tokens.js';
 import type { Config, CacheEntry } from '../core/schema.js';
 import type { RetrievalResult } from '../core/retriever/types.js';
 
@@ -56,6 +58,14 @@ const MAX_INJECTED_CHARS = 6000;
 function clampContext(text: string, limit = MAX_INJECTED_CHARS): string {
   if (text.length <= limit) return text;
   return `${text.slice(0, limit)}\n… [truncated]`;
+}
+
+function formatAge(ms: number): string {
+  const min = Math.max(1, Math.round(ms / 60_000));
+  if (min < 60) return `${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.round(h / 24)} days`;
 }
 
 function embedderWithTimeout<T>(p: Promise<T>, label: string): Promise<T> {
@@ -421,8 +431,9 @@ export async function runPrePrompt(
           ? `[somtum-cache: fuzzy match sim=${similarity.toFixed(3)}]`
           : `[somtum-cache]`;
       const context = clampContext(
-        `${header} A previous response addressed a matching prompt:\n---\n${cacheHit.response}\n---\nUse it if still applicable; otherwise answer fresh.`,
+        `${header} A response from ${formatAge(Date.now() - cacheHit.created_at)} ago to a matching prompt — verify it still applies before reusing it:\n---\n${cacheHit.response}\n---`,
       );
+      new TokenLedger(db).record(projectId, 'injection', countTokens(context), parsed.session_id ?? null);
       const out: PrePromptOutput = {
         ok: true,
         hit: true,
@@ -478,6 +489,7 @@ export async function runPrePrompt(
         const budget = `[somtum] injected ${memResult.injectedCount}/${memResult.totalCount} memories (~${approxTokens} tokens) | ${gating}`;
         additionalContext = `${budget}\n${combined}`;
       }
+      new TokenLedger(db).record(projectId, 'injection', countTokens(additionalContext), sessionId ?? null);
 
       return {
         ok: true,

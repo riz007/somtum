@@ -59,7 +59,9 @@ export async function hookCommand(name: string): Promise<number> {
       try {
         const payload = HookPayloadSchema.parse(parsed);
         const r = await raceTimeout(runPostSession(payload), timeoutMs, 'post_session');
-        hookLog(`[post_session] ok — inserted=${r.inserted} cache=${r.cacheEntriesAdded}`);
+        hookLog(
+          `[post_session] ok — extraction=${r.extraction} inserted=${r.inserted} spent=${r.tokensSpent} cache=${r.cacheEntriesAdded}`,
+        );
         console.log(
           JSON.stringify({
             ok: true,

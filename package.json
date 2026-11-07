@@ -1,7 +1,7 @@
 {
   "name": "somtum",
   "version": "3.0.0",
-  "description": "Local-first memory and prompt-cache layer for coding agents: Claude Code and Codex",
+  "description": "Long-term memory for Claude Code and Codex that meters every token it spends",
   "type": "module",
   "license": "MIT",
   "author": {
@@ -27,7 +27,7 @@
     "sqlite",
     "cli",
     "embeddings",
-    "artifical-intelligence",
+    "artificial-intelligence",
     "local-first",
     "anthropic",
     "agentic-ai",
@@ -40,6 +40,8 @@
     "agentic-coding",
     "long-term-memory",
     "context-management",
+    "token-usage",
+    "llm-cost",
     "knowledge-graph",
     "semantic-search",
     "vector-database",

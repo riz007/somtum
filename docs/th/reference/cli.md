@@ -4,13 +4,13 @@
 
 | คำสั่ง | คำอธิบาย |
 | --- | --- |
-| `somtum init` | ติดตั้ง SessionEnd capture hook |
-| `somtum init --cache` | ติดตั้ง UserPromptSubmit cache + auto-inject hook ด้วย |
-| `somtum init --file-gating` | ติดตั้ง PreToolUse file-gating hook ด้วย |
-| `somtum init --all` | ติดตั้ง hooks ทั้งหมด + MCP server |
+| `somtum init` | Claude Code: capture hooks (SessionEnd, PreCompact), recall hook (UserPromptSubmit), MCP server และฐานข้อมูลของโปรเจกต์ |
+| `somtum init --no-cache` | บันทึกอย่างเดียว: เก็บความทรงจำแต่ไม่ฉีดเข้าพรอมต์ |
+| `somtum init --file-gating` | ติดตั้ง PreToolUse file-gating hook (ต้องเปิดเอง) และเปิดใช้สำหรับโปรเจกต์นี้ |
+| `somtum init --all` | ทุกอย่าง รวมถึง file gating |
 | `somtum init --force` | ติดตั้งใหม่แม้ว่า hooks จะมีอยู่แล้ว |
 | `somtum init --agent codex` | ติดตั้งสำหรับ Codex: capture + auto-inject hooks ใน `.codex/hooks.json` และ MCP server ใน `.codex/config.toml` |
-| `somtum doctor` | ตรวจสอบสุขภาพ DB, migration, hooks, API key, อัตราส่วน breakeven, ความทรงจำที่เก่า |
+| `somtum doctor` | ตรวจสอบการตั้งค่า: backend, hooks, ฐานข้อมูล, migration, ความทรงจำที่เก่า และ file gating คุ้มค่าหรือไม่ |
 
 ## หน่วยความจำ
 
@@ -38,7 +38,8 @@
 
 | คำสั่ง | คำอธิบาย |
 | --- | --- |
-| `somtum stats` | โทเคนที่ประหยัด อัตราการโดน cache ข้อมูลการดึงข้อมูล |
+| `somtum stats` | การใช้โทเคนที่วัดจริง (การสกัด บริบทที่ฉีด file gating) จำนวนความทรงจำ และสถิติแคช |
+| `somtum stats --since 7d` | จำกัดตัวเลขที่วัดจริงไว้ที่ N วันล่าสุด |
 | `somtum stats --json` | ผลลัพธ์ JSON แบบ machine-readable |
 | `somtum serve` | เปิดแดชบอร์ดแบบวิชวลในเบราว์เซอร์ |
 | `somtum serve --port <n>` | ใช้พอร์ตที่กำหนดเอง (ค่าเริ่มต้น: 3000) |

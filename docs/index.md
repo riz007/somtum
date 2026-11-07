@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Somtum"
-  text: "Local-first memory for coding agents"
-  tagline: Captures decisions, bug fixes, and learnings from every Claude Code and Codex session — and injects them back on the next one, in either agent. No cloud. No config. Just memory.
+  text: "Memory for coding agents, with a meter on it"
+  tagline: Claude Code and Codex forget everything when a session ends. Somtum keeps the decisions, root causes and hard-won commands in a local database, hands the relevant ones back on later prompts, and records every token it spends doing it.
   image:
     src: /logo.png
     alt: Somtum
@@ -13,115 +13,93 @@ hero:
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: How It Works
-      link: /guide/how-it-works
+      text: What It Costs
+      link: /guide/costs
     - theme: alt
       text: GitHub
       link: https://github.com/riz007/somtum
 
 features:
   - icon: 🥣
-    title: Automatic Capture
-    details: At session end, a small model (Claude Haiku via your API key or the claude CLI, or Codex via the codex CLI) extracts durable observations from the transcript — decisions, bug fixes, learnings, commands — and stores them in a local SQLite database.
+    title: Captures what's worth keeping
+    details: When a session ends or compacts, a small model you already have (the claude or codex CLI, or an API key) turns the new part of the conversation into short records — decisions, bug fixes, learnings, commands.
   - icon: ⚡
-    title: Auto-Inject on Every Prompt
-    details: The UserPromptSubmit hook retrieves the most relevant memories via BM25 and injects them before every message. No manual recall step needed.
-  - icon: 🌶️
-    title: Prompt Cache
-    details: Exact and fuzzy-matched prompts skip the model entirely. The cache saves API credits and keeps sessions fast.
+    title: Recalls it on the next prompt
+    details: A local keyword search picks up to 3 relevant memories, capped at 1,500 characters. Nothing is added when nothing matches, and a memory already in context isn't sent again.
+  - icon: 🧾
+    title: Meters every token
+    details: Extraction, injected context and file gating each write to a local ledger. <code>somtum stats</code> shows what Somtum spent, and what it saved where that can be measured.
   - icon: 🤝
-    title: One Memory, Every Agent
-    details: Claude Code and Codex share the same per-project memory. Fix a bug in one agent and the other already knows tomorrow. Any MCP client can call recall and remember too.
+    title: One memory, every agent
+    details: Claude Code and Codex share one memory per project. Fix a bug in one, and the other knows tomorrow. Any MCP client can call recall and remember too.
   - icon: 🥕
-    title: Local-Only Storage
-    details: All data lives in a local SQLite WAL database at ~/.somtum/. No cloud accounts, no telemetry. Transcripts leave your machine only for extraction, through the backend you choose.
-  - icon: 🌐
-    title: Global Memory
-    details: Store personal preferences or workspace conventions once with `scope='global'` — they are injected across every project automatically via ~/.somtum/global.db.
-  - icon: 🔁
-    title: Memory Deduplication
-    details: After each session, near-duplicate observations are detected by title similarity and the older one is marked superseded. Your memory stays clean without manual pruning.
-  - icon: 📊
-    title: Visual Dashboard
-    details: Run `somtum serve` to open a browser dashboard — searchable memory browser, knowledge graph, analytics, and a forget button. GitHub dark theme, readable at any zoom.
-  - icon: 🔄
-    title: Multi-Device Sync
-    details: Synchronize memories across machines with SSH. Hostname-aware merging ensures no data loss across sessions from different machines.
+    title: Local by default
+    details: Memories live in SQLite under ~/.somtum. No account, no telemetry. Data leaves your machine only in model calls through the backend you chose.
+  - icon: 🧹
+    title: Stays tidy
+    details: Near-duplicate memories are superseded automatically, secrets are redacted before storage, and stale memories are flagged by <code>somtum doctor</code>.
 ---
 
-## Install in 30 seconds
+## Install
 
 ```bash
 npm install -g somtum
-somtum init --all            # Claude Code: hooks + MCP server in this project
-somtum init --agent codex    # Codex: hooks + MCP server in this project
+cd your-project            # where you launch your agent
+somtum init                # Claude Code
+somtum init --agent codex  # Codex — run both if you use both
+somtum doctor
 ```
 
-That's it. Every session from here will be captured and remembered, whichever agent you use.
+On a fresh project, `doctor` should look like this:
+
+```
+✓  config                 strategy=bm25, k=8
+✓  db_file                ~/.somtum/projects/669486bb9c9fde29/db.sqlite
+✓  migrations             applied: [1, 2, 3, 4, 5, 6]
+✓  memories               0 memories
+✓  token_overhead         0 tokens metered (extraction 0, summaries 0, injected 0); see `somtum stats`
+✓  extraction_backend     claude-cli (auto)
+✓  hooks_installed        somtum hooks found in .claude/settings.json
+```
+
+Then work as usual. Memories appear after your first substantial session ends or compacts.
 
 ---
 
 ## What gets remembered
 
-After a debugging session, Somtum extracts observations like these and stores them locally:
-
 ```json
 [
   {
     "kind": "bugfix",
-    "title": "JWT refresh loop — Unix timestamps are seconds, not ms",
-    "body": "Checked token.exp < Date.now() instead of token.exp < Date.now() / 1000."
+    "title": "JWT refresh loop: exp is in seconds, not ms",
+    "body": "Compared token.exp against Date.now(); must divide by 1000."
   },
   {
     "kind": "decision",
-    "title": "Use pnpm workspaces — npm hoisting breaks shared types",
+    "title": "Use pnpm workspaces: npm hoisting breaks shared types",
     "body": "Switched from npm because hoisting put shared type packages in the wrong scope."
   }
 ]
 ```
 
-Next session, when you ask "why are we using pnpm?" the agent already knows. No re-explanation needed.
+Next session, ask "why are we on pnpm?" and the agent already knows.
 
 ---
 
-## Health check
+## What it costs
 
-Run `somtum doctor` after install to verify your setup:
+| Cost | Bound |
+| --- | --- |
+| Extraction at session end or compaction | Only turns not yet extracted. No call under 500 new tokens. |
+| Memories added to a prompt | At most 3 memories and 1,500 characters, only on a match, once per session |
+| File summaries | None unless you turn on file gating |
 
 ```
-✓  config          strategy=bm25, k=8
-✓  db_open         WAL mode, foreign_keys ON
-✓  extraction_backend  claude-cli (auto)
-✓  hooks_installed somtum hooks found in .claude/settings.json, .codex/hooks.json
-✓  embeddings      disabled (set retrieval.embeddings.enabled=true to enable)
+Somtum's own token use, metered (all time)
+  extraction            4 calls     54,785 tok   1 skipped
+  injected context   14 prompts      4,060 tok   added to your agent's input
+  total                             58,845 tok
 ```
 
-::: warning Hybrid strategy requires embeddings
-If `doctor` reports `strategy=hybrid` but `embeddings: disabled`, somtum silently falls back to BM25 while paying hybrid overhead. Fix it with one command:
-
-```bash
-somtum config set retrieval.strategy bm25   # match what's actually running
-```
-
-Or enable full hybrid (requires `ANTHROPIC_API_KEY`):
-
-```bash
-somtum config set retrieval.embeddings.enabled true
-```
-
-See [Configuration → Retrieval strategy](/reference/configuration#retrieval-strategy-comparison) for details.
-:::
-
----
-
-## Token efficiency
-
-`somtum stats` shows whether memory is paying for itself:
-
-| Metric | Good sign | What to check |
-| --- | --- | --- |
-| `breakeven` ≥ 1.5x | Saving more than you spend | Expected after ~20+ memories |
-| `cache hits` > 0 | Repeated queries are cached | Confirm `cache.enabled = true` |
-| `retrieval calls` accumulating | Memories being actively recalled | Check `injection.enabled = true` |
-
-A fresh project (< 10 memories) will often show a net negative — this is normal and improves with use.
+On three real sessions that each compacted once, extracting only new turns cut extraction tokens by 35–47% compared with v3.0. Somtum can't measure how much re-explaining a memory saved you, and `stats` says so rather than guessing quietly. [Read the full cost model →](/guide/costs)

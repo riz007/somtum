@@ -1,28 +1,15 @@
-import { readFileSync, appendFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { createHash } from 'node:crypto';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-import { loadConfig, GLOBAL_DIR } from '../config.js';
-import { openDb, type DB } from '../core/db.js';
-import { MemoryStore } from '../core/store.js';
-import { generateIndex } from '../core/index_gen.js';
-import {
-  extract,
-  estimateTokensSaved,
-  type LlmCaller,
-} from '../core/extractor.js';
-import { resolveProjectId, projectNameFromCwd } from '../core/project_id.js';
-import { countTokens } from '../core/tokens.js';
-import { pickBackend, callerFor, NO_BACKEND_MESSAGE } from '../core/llm_backend.js';
-import { projectDir } from '../config.js';
-import { Bm25Retriever } from '../core/retriever/bm25.js';
-import { parseTranscript, renderTurns, extractPromptResponsePairs } from '../core/transcript.js';
 import { findTranscript } from '../agents/index.js';
-import { PromptCache, hashPrompt } from '../core/cache.js';
-import { fingerprintFiles } from '../core/fingerprint.js';
+import { GLOBAL_DIR, loadConfig, projectDir } from '../config.js';
+import { hashPrompt, PromptCache } from '../core/cache.js';
+import { openDb, type DB } from '../core/db.js';
+import { deduplicateObservations } from '../core/dedup.js';
 import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
-import { embedMissing } from '../core/reindex.js';
+import { estimateTokensSaved, extract, type LlmCaller } from '../core/extractor.js';
 import {
   FileFingerprintStore,
   matchesAnyGlob,
@@ -30,9 +17,19 @@ import {
   summarizeFile,
   summaryHash,
 } from '../core/file_summary.js';
-import { writeMemoryMarkdown, memoriesDir } from '../core/memory_files.js';
-import { deduplicateObservations } from '../core/dedup.js';
+import { fingerprintFiles } from '../core/fingerprint.js';
+import { generateIndex } from '../core/index_gen.js';
+import { TokenLedger } from '../core/ledger.js';
+import { callerFor, NO_BACKEND_MESSAGE, pickBackend } from '../core/llm_backend.js';
+import { memoriesDir, writeMemoryMarkdown } from '../core/memory_files.js';
+import { projectNameFromCwd, resolveProjectId } from '../core/project_id.js';
+import { embedMissing } from '../core/reindex.js';
+import { Bm25Retriever } from '../core/retriever/bm25.js';
 import type { Config } from '../core/schema.js';
+import { SessionProgressStore } from '../core/session_progress.js';
+import { MemoryStore } from '../core/store.js';
+import { countTokens } from '../core/tokens.js';
+import { extractPromptResponsePairs, parseTranscript, renderTurns } from '../core/transcript.js';
 
 export const HookPayloadSchema = z
   .object({
@@ -124,7 +121,15 @@ const SUMMARY_BUDGET_MS = 55_000;
 async function populateFileSummaries(
   db: DB,
   turns: ReturnType<typeof parseTranscript>,
-  opts: { cwd: string; projectId: string; config: Config; caller: LlmCaller; deadline?: number },
+  opts: {
+    cwd: string;
+    projectId: string;
+    sessionId: string;
+    config: Config;
+    caller: LlmCaller;
+    ledger: TokenLedger;
+    deadline?: number;
+  },
 ): Promise<number> {
   const paths = collectSessionFiles(turns);
   if (paths.length === 0) return 0;
@@ -182,6 +187,12 @@ async function populateFileSummaries(
           summary: result.value.summary,
           summary_hash: summaryHash(result.value.summary),
         });
+        opts.ledger.record(
+          opts.projectId,
+          'file_summary',
+          result.value.tokensSpent,
+          opts.sessionId,
+        );
         generated += 1;
       } else {
         console.error(
@@ -241,6 +252,9 @@ export interface RunOptions {
 
 export interface RunResult {
   projectId: string;
+  // full: whole transcript sent; incremental: only turns since the last
+  // extraction; skipped: too little new material, no model call made.
+  extraction: 'full' | 'incremental' | 'skipped';
   inserted: number;
   superseded: number;
   tokensSpent: number;
@@ -269,40 +283,68 @@ export async function runPostSession(
   const indexPath = opts.indexPath ?? join(dir ?? '.', 'index.md');
 
   const db = opts.db ?? openDb({ path: dbPath });
+  let callerForSummaries: LlmCaller | undefined = opts.caller;
   try {
     const store = new MemoryStore(db);
 
     const resolved = resolveTranscript(parsed);
+    const ledger = new TokenLedger(db);
+    const progress = new SessionProgressStore(db);
+
+    // Only the turns not yet extracted for this session are sent: a session
+    // that compacts and then ends is extracted once, not twice.
+    const resumeAt = progress.resumeIndex(sessionId, resolved.turns);
+    const pending = resolved.turns.slice(resumeAt);
+    const pendingText = resolved.turns.length > 0 ? renderTurns(pending) : resolved.text;
+
     // Cap transcript size to stay within model context limits.
     // At ~4 chars/token, 60k tokens ≈ 240 KB of text. Anything beyond that
     // risks a context-limit error in Haiku; we take the tail (most recent turns).
     const MAX_TRANSCRIPT_TOKENS = 60_000;
-    const rawTranscript = resolved.text;
     const transcript =
-      countTokens(rawTranscript) > MAX_TRANSCRIPT_TOKENS
+      countTokens(pendingText) > MAX_TRANSCRIPT_TOKENS
         ? (() => {
             const charBudget = MAX_TRANSCRIPT_TOKENS * 4;
             hookLog(
-              `[post_session] WARN: transcript truncated to last ~${charBudget} chars (was ${rawTranscript.length})`,
+              `[post_session] WARN: transcript truncated to last ~${charBudget} chars (was ${pendingText.length})`,
             );
-            return rawTranscript.slice(-charBudget);
+            return pendingText.slice(-charBudget);
           })()
-        : rawTranscript;
+        : pendingText;
     const transcriptTokens = countTokens(transcript);
 
-    let caller = opts.caller;
-    if (!caller) {
-      const backend = pickBackend(config);
-      if (!backend) throw new Error(NO_BACKEND_MESSAGE);
-      hookLog(`[post_session] extraction backend: ${backend}`);
-      caller = callerFor(backend, config);
-    }
+    let extraction: RunResult['extraction'] = resumeAt > 0 ? 'incremental' : 'full';
+    let outcome: Awaited<ReturnType<typeof extract>> = {
+      observations: [],
+      tokensSpent: 0,
+      retries: 0,
+    };
 
-    const outcome = await extract(transcript, caller, {
-      model: config.extraction.model,
-      maxObservations: config.extraction.max_observations_per_session,
-      maxRetries: config.extraction.max_retries,
-    });
+    if (transcriptTokens === 0 || transcriptTokens < config.extraction.min_new_tokens) {
+      // Too little new material to be worth a model call. The cursor is not
+      // advanced, so these turns ride along with the next extraction.
+      extraction = 'skipped';
+      ledger.record(projectId, 'extraction_skipped', transcriptTokens, sessionId);
+    } else {
+      let caller = opts.caller;
+      if (!caller) {
+        const backend = pickBackend(config);
+        if (!backend) throw new Error(NO_BACKEND_MESSAGE);
+        hookLog(`[post_session] extraction backend: ${backend}`);
+        caller = callerFor(backend, config);
+      }
+      callerForSummaries = caller;
+
+      outcome = await extract(transcript, caller, {
+        model: config.extraction.model,
+        maxObservations: config.extraction.max_observations_per_session,
+        maxRetries: config.extraction.max_retries,
+      });
+      ledger.record(projectId, 'extraction', outcome.tokensSpent, sessionId);
+
+      const gaveUp = outcome.retries > config.extraction.max_retries;
+      if (!gaveUp) progress.markExtracted(sessionId, projectId, resolved.turns);
+    }
 
     const total = outcome.observations.length;
     // Divide extraction cost across observations so per-observation tokens_spent adds up.
@@ -346,7 +388,11 @@ export async function runPostSession(
     const tokensSavedTotal = store.totalTokensSaved(projectId);
 
     const cacheEntriesAdded = config.cache.enabled
-      ? populateCache(db, resolved.turns, { cwd, model: config.extraction.model, cache: config.cache })
+      ? populateCache(db, resolved.turns, {
+          cwd,
+          model: config.extraction.model,
+          cache: config.cache,
+        })
       : 0;
 
     let embeddingsAdded = 0;
@@ -375,18 +421,26 @@ export async function runPostSession(
 
     // Summaries are optional work: run them last, and only while the hook's
     // time budget lasts, so they can never cost us the index or warm-start.
-    const summariesGenerated = config.file_gating.enabled
-      ? await populateFileSummaries(db, resolved.turns, {
-          cwd,
-          projectId,
-          config,
-          caller,
-          deadline: startedAt + SUMMARY_BUDGET_MS,
-        })
-      : 0;
+    if (config.file_gating.enabled && !callerForSummaries) {
+      const backend = pickBackend(config);
+      if (backend) callerForSummaries = callerFor(backend, config);
+    }
+    const summariesGenerated =
+      config.file_gating.enabled && callerForSummaries
+        ? await populateFileSummaries(db, resolved.turns, {
+            cwd,
+            projectId,
+            sessionId,
+            config,
+            caller: callerForSummaries,
+            ledger,
+            deadline: startedAt + SUMMARY_BUDGET_MS,
+          })
+        : 0;
 
     return {
       projectId,
+      extraction,
       inserted,
       superseded: dedupResult.superseded,
       tokensSpent: outcome.tokensSpent,
@@ -449,7 +503,7 @@ export async function main(): Promise<void> {
     const payload = HookPayloadSchema.parse(JSON.parse(raw));
     const result = await runPostSession(payload);
     hookLog(
-      `[post_session] ok — inserted=${result.inserted} superseded=${result.superseded} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
+      `[post_session] ok — extraction=${result.extraction} inserted=${result.inserted} superseded=${result.superseded} cache=${result.cacheEntriesAdded} summaries=${result.summariesGenerated}`,
     );
     writeFirstSessionFlag(result.projectId, result.inserted);
     // Hooks communicate via stdout; keep output structured.

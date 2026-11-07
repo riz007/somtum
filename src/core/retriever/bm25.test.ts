@@ -124,4 +124,28 @@ describe('escapeFtsQuery (internal helper)', () => {
   it('returns "" for empty input', () => {
     expect(escapeFtsQuery('')).toBe('""');
   });
+
+  it('drops stopwords, including ones with trailing punctuation', () => {
+    expect(escapeFtsQuery('How do I fix the pnpm install?')).toBe(
+      '"fix" OR "pnpm" OR "install?"',
+    );
+  });
+
+  it('returns "" when only stopwords remain', () => {
+    expect(escapeFtsQuery('what is this?')).toBe('""');
+  });
+});
+
+describe('Bm25Retriever stopword behaviour', () => {
+  it('does not match a memory on a shared function word alone', async () => {
+    store.insert({
+      project_id: 'p1',
+      session_id: 's',
+      kind: 'decision',
+      title: 'Use pnpm',
+      body: 'This is the package manager for the repo.',
+    });
+    const r = await retriever.search('what is the weather like', { k: 8, projectId: 'p1' });
+    expect(r).toEqual([]);
+  });
 });

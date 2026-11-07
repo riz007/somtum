@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { openDb, type DB } from '../core/db.js';
 import { ConfigSchema } from '../core/schema.js';
 import { FileFingerprintStore, statFile, summaryHash } from '../core/file_summary.js';
+import { TokenLedger } from '../core/ledger.js';
 import { runPreRead } from './pre_read.js';
 
 let tmp: string;
@@ -19,6 +20,25 @@ afterEach(() => {
   db.close();
   rmSync(tmp, { recursive: true, force: true });
 });
+
+let sidCounter = 0;
+const SID = () => `sess-${process.pid}-${++sidCounter}`;
+
+function seedSummary(): string {
+  const p = join(tmp, 'big.ts');
+  writeFileSync(p, 'export const x = 1;\n'.repeat(100));
+  const stat = statFile(p, { cwd: tmp })!;
+  new FileFingerprintStore(db).upsert({
+    project_id: 'p1',
+    path: p,
+    content_hash: stat.contentHash,
+    mtime: stat.mtime,
+    tokens: stat.tokens,
+    summary: 'exports a numeric constant x',
+    summary_hash: summaryHash('exports a numeric constant x'),
+  });
+  return p;
+}
 
 function gatingOn(overrides: Record<string, unknown> = {}) {
   return ConfigSchema.parse({
@@ -51,7 +71,7 @@ describe('runPreRead', () => {
 
   it('passes through when there is no file_path', () => {
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: {}, cwd: tmp },
+      { tool_name: 'Read', tool_input: {}, cwd: tmp, session_id: SID() },
       { db, config: gatingOn(), projectId: 'p1' },
     );
     expect(r.reason).toBe('no-path');
@@ -61,7 +81,7 @@ describe('runPreRead', () => {
     const p = join(tmp, 'secrets.env');
     writeFileSync(p, 'API_KEY=deadbeef deadbeef deadbeef deadbeef');
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp },
+      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: SID() },
       { db, config: gatingOn(), projectId: 'p1' },
     );
     expect(r.reason).toBe('excluded');
@@ -69,7 +89,7 @@ describe('runPreRead', () => {
 
   it('passes through missing files', () => {
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: { file_path: join(tmp, 'gone.ts') }, cwd: tmp },
+      { tool_name: 'Read', tool_input: { file_path: join(tmp, 'gone.ts') }, cwd: tmp, session_id: SID() },
       { db, config: gatingOn(), projectId: 'p1' },
     );
     expect(r.reason).toBe('file-missing');
@@ -79,7 +99,7 @@ describe('runPreRead', () => {
     const p = join(tmp, 'tiny.ts');
     writeFileSync(p, 'x');
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp },
+      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: SID() },
       { db, config: gatingOn({ min_file_size_tokens: 10_000 }), projectId: 'p1' },
     );
     expect(r.reason).toBe('below-threshold');
@@ -89,7 +109,7 @@ describe('runPreRead', () => {
     const p = join(tmp, 'big.ts');
     writeFileSync(p, 'export const x = 1;\n'.repeat(100));
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp },
+      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: SID() },
       { db, config: gatingOn(), projectId: 'p1' },
     );
     expect(r.reason).toBe('no-summary');
@@ -108,32 +128,71 @@ describe('runPreRead', () => {
       summary_hash: summaryHash('obsolete'),
     });
     const r = runPreRead(
-      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp },
+      { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: SID() },
       { db, config: gatingOn(), projectId: 'p1' },
     );
     expect(r.reason).toBe('stale-summary');
   });
 
-  it('injects additionalContext when a fresh summary exists', () => {
-    const p = join(tmp, 'big.ts');
-    writeFileSync(p, 'export const x = 1;\n'.repeat(100));
-    const stat = statFile(p, { cwd: tmp })!;
-    new FileFingerprintStore(db).upsert({
-      project_id: 'p1',
-      path: p,
-      content_hash: stat.contentHash,
-      mtime: stat.mtime,
-      tokens: stat.tokens,
-      summary: 'exports a numeric constant x',
-      summary_hash: summaryHash('exports a numeric constant x'),
-    });
+  it('passes Edit through untouched', () => {
+    const r = runPreRead(
+      { tool_name: 'Edit', tool_input: { file_path: 'x.ts' }, cwd: tmp, session_id: SID() },
+      { db, config: gatingOn(), projectId: 'p1' },
+    );
+    expect(r.reason).toBe('wrong-tool');
+  });
+
+  it('passes targeted reads (offset/limit) through', () => {
+    const p = seedSummary();
+    const r = runPreRead(
+      { tool_name: 'Read', tool_input: { file_path: p, offset: 10, limit: 20 }, cwd: tmp, session_id: SID() },
+      { db, config: gatingOn(), projectId: 'p1' },
+    );
+    expect(r.reason).toBe('targeted-read');
+  });
+
+  it('passes through without a session id', () => {
+    const p = seedSummary();
     const r = runPreRead(
       { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp },
       { db, config: gatingOn(), projectId: 'p1' },
     );
-    expect(r.gated).toBe(true);
-    expect(r.hookSpecificOutput?.hookEventName).toBe('PreToolUse');
-    expect(r.hookSpecificOutput?.additionalContext).toContain('exports a numeric constant x');
-    expect(r.hookSpecificOutput?.additionalContext).toContain(p);
+    expect(r.reason).toBe('no-session');
+  });
+
+  it('answers the first read with the summary, lets the second through, and meters both', () => {
+    const p = seedSummary();
+    const sid = SID();
+    const read = () =>
+      runPreRead(
+        { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: sid },
+        { db, config: gatingOn(), projectId: 'p1' },
+      );
+
+    const first = read();
+    expect(first.gated).toBe(true);
+    expect(first.hookSpecificOutput?.permissionDecision).toBe('deny');
+    expect(first.hookSpecificOutput?.permissionDecisionReason).toContain('exports a numeric constant x');
+    expect(first.hookSpecificOutput?.permissionDecisionReason).toContain('call Read on this file again');
+
+    expect(read().reason).toBe('reread');
+    expect(read().reason).toBe('reread');
+
+    const gate = new TokenLedger(db).summary('p1').file_gate;
+    expect(gate.denied.events).toBe(1);
+    expect(gate.summary.events).toBe(1);
+    expect(gate.reread.events).toBe(1);
+    expect(gate.net_tokens).toBeLessThan(0);
+  });
+
+  it('offers the summary again in a new session', () => {
+    const p = seedSummary();
+    const read = (sid: string) =>
+      runPreRead(
+        { tool_name: 'Read', tool_input: { file_path: p }, cwd: tmp, session_id: sid },
+        { db, config: gatingOn(), projectId: 'p1' },
+      );
+    expect(read('session-a').gated).toBe(true);
+    expect(read('session-b').gated).toBe(true);
   });
 });

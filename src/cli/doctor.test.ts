@@ -67,4 +67,25 @@ describe('doctor', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('flags a file-gating hook that config has switched off', () => {
+    const dir = projectDir('test-proj');
+    mkdirSync(dir, { recursive: true });
+    openDb({ path: join(dir, 'db.sqlite') }).close();
+    mkdirSync(join(tempDir, '.claude'));
+    writeFileSync(
+      join(tempDir, '.claude', 'settings.json'),
+      JSON.stringify({
+        hooks: { PreToolUse: [{ matcher: 'Read', hooks: [{ command: 'somtum hook pre_read' }] }] },
+      }),
+    );
+
+    try {
+      const check = runDoctor({ cwd: tempDir }).checks.find((c) => c.name === 'file_gating');
+      expect(check?.ok).toBe(false);
+      expect(check?.fix?.[0]).toContain('file_gating.enabled true');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

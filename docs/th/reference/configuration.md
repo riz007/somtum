@@ -16,8 +16,8 @@ somtum config set retrieval.strategy hybrid
 somtum config set retrieval.index.enabled true
 somtum config set retrieval.strategy index
 
-# ปิด file-gating (เปิดอยู่โดยค่าเริ่มต้น — สกัดกั้นการอ่านไฟล์ขนาดใหญ่และส่งสรุปที่แคชไว้)
-somtum config set file_gating.enabled false
+# file gating ปิดอยู่โดยค่าเริ่มต้น `somtum init --file-gating` จะเปิดและติดตั้ง hook ให้
+somtum config set file_gating.enabled true
 
 # จำกัดข้อสังเกตที่ดึงต่อเซสชัน (ค่าเริ่มต้น: 10)
 somtum config set extraction.max_observations_per_session 5
@@ -35,7 +35,8 @@ somtum config set injection.max_chars 3000   # เพิ่มขีดจำก
   "extraction": {
     "model": "claude-haiku-4-5-20251001",
     "trigger": ["SessionEnd", "PreCompact"],
-    "max_observations_per_session": 10
+    "max_observations_per_session": 10,
+    "min_new_tokens": 500                    // ไม่เรียกโมเดลถ้ามีโทเคนใหม่น้อยกว่านี้
   },
   "cache": {
     "enabled": true,
@@ -68,7 +69,7 @@ somtum config set injection.max_chars 3000   # เพิ่มขีดจำก
     "show_budget": true       // แสดงบรรทัด "[somtum] injected N/M memories (~X tokens)"
   },
   "file_gating": {
-    "enabled": true,          // สกัดกั้นการอ่านไฟล์ขนาดใหญ่; ส่งสรุปที่แคชไว้แทน
+    "enabled": false,         // ต้องเปิดเอง: การ Read ทั้งไฟล์ครั้งแรกในเซสชันจะได้สรุปแทน
     "min_file_size_tokens": 300,
     "exclude_globs": ["**/*.env", "**/secrets/**"]
   },

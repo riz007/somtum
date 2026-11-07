@@ -66,17 +66,15 @@ Run from the **root of the project you open in your agent**.
 **Claude Code**
 
 ```bash
-somtum init --all
+somtum init
 # Installs:
 #   - SessionEnd + PreCompact capture hooks  (memory extraction)
-#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
-#   - PreToolUse file-gating hook            (large file summarization)
+#   - UserPromptSubmit hook                  (recall: inject relevant memories)
 #   - MCP server in .mcp.json                (recall/remember tools)
+#   - the project database, so `somtum doctor` passes right away
 ```
 
-::: tip Use --all
-A plain `somtum init` installs only the capture hooks. Memories are then saved but not injected into your prompts, and the agent sees them only if it calls the MCP `recall` tool.
-:::
+Options: `--no-cache` captures without injecting (the agent then sees memories only through the MCP `recall` tool). `--file-gating` adds the opt-in file-gating hook. See [What Somtum Costs](/guide/costs#file-summaries-and-file-gating-opt-in-claude-code) before turning it on.
 
 **Codex**
 

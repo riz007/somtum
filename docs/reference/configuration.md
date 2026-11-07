@@ -16,8 +16,12 @@ somtum config set retrieval.strategy hybrid
 somtum config set retrieval.index.enabled true
 somtum config set retrieval.strategy index
 
-# Disable file-gating (on by default — intercepts large file reads and serves cached summary)
-somtum config set file_gating.enabled false
+# File gating is off by default. `somtum init --file-gating` turns it on and installs its hook.
+# It answers the first whole-file Read of a summarized file with the summary instead.
+somtum config set file_gating.enabled true
+
+# Skip extraction when a session has fewer new tokens than this (default: 500)
+somtum config set extraction.min_new_tokens 1500
 
 # Limit observations extracted per session (default: 10)
 somtum config set extraction.max_observations_per_session 5
@@ -41,7 +45,8 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
     "backend": "auto",                       // auto | anthropic | claude-cli | codex-cli
     // "codex_model": "<model>",             // codex-cli only; unset uses Codex's default
     "trigger": ["SessionEnd", "PreCompact"],
-    "max_observations_per_session": 10
+    "max_observations_per_session": 10,
+    "min_new_tokens": 500                    // no extraction call below this many new tokens
   },
   "cache": {
     "enabled": true,
@@ -74,7 +79,7 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
     "show_budget": true       // prepend "[somtum] injected N/M memories (~X tokens)" line
   },
   "file_gating": {
-    "enabled": true,          // intercepts large file reads; serves cached summary instead
+    "enabled": false,         // opt-in: first whole-file Read per session gets the summary instead
     "min_file_size_tokens": 300,
     "exclude_globs": ["**/*.env", "**/secrets/**"]
   },

@@ -8,6 +8,7 @@ import { Bm25Retriever } from '../core/retriever/bm25.js';
 import { runPostSession } from './post_session.js';
 import { ConfigSchema } from '../core/schema.js';
 import type { LlmCaller } from '../core/extractor.js';
+import { TokenLedger } from '../core/ledger.js';
 
 let tmp: string;
 let db: DB;
@@ -64,7 +65,7 @@ function fakeCaller(): LlmCaller {
 
 describe('runPostSession — integration: transcript → extractor → store → search', () => {
   it('captures observations, redacts secrets, and a BM25 search finds them', async () => {
-    const config = ConfigSchema.parse({});
+    const config = ConfigSchema.parse({ extraction: { min_new_tokens: 0 } });
     const indexPath = join(tmp, 'index.md');
 
     const result = await runPostSession(
@@ -134,3 +135,97 @@ describe('runPostSession — integration: transcript → extractor → store →
     ).rejects.toThrow();
   });
 });
+
+function jsonlTurns(pairs: Array<[string, string]>): string {
+  return pairs
+    .flatMap(([u, a]) => [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: u } }),
+      JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: a }] } }),
+    ])
+    .join('\n');
+}
+
+function countingCaller(): LlmCaller & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    async complete({ user }) {
+      calls.push(user);
+      return { text: JSON.stringify({ observations: [] }), inputTokens: 1000, outputTokens: 20 };
+    },
+  };
+}
+
+describe('runPostSession — incremental extraction and metering', () => {
+  const noFloor = ConfigSchema.parse({ extraction: { min_new_tokens: 0 } });
+  const base: Array<[string, string]> = [
+    ['Set up the auth module with refresh tokens', 'Added refresh rotation in src/auth.ts'],
+    ['Why did the JWT loop happen?', 'exp is in seconds; we compared against milliseconds'],
+  ];
+  const run = (transcript: string, caller: LlmCaller, config = noFloor, event = 'SessionEnd') =>
+    runPostSession(
+      { transcript, session_id: 'sess-inc', project_id: 'proj', cwd: tmp, hook_event_name: event },
+      { cwd: tmp, config, caller, db, indexPath: join(tmp, 'index.md'), projectName: 'fixture' },
+    );
+
+  it('does not call the model again for a transcript it already extracted', async () => {
+    const caller = countingCaller();
+    const first = await run(jsonlTurns(base), caller, noFloor, 'PreCompact');
+    const second = await run(jsonlTurns(base), caller);
+    expect(first.extraction).toBe('full');
+    expect(second.extraction).toBe('skipped');
+    expect(caller.calls).toHaveLength(1);
+  });
+
+  it('sends only the turns added since the last extraction', async () => {
+    const caller = countingCaller();
+    await run(jsonlTurns(base), caller, noFloor, 'PreCompact');
+    const more: Array<[string, string]> = [...base, ['Rename the helper to rotateToken', 'Renamed in src/auth.ts']];
+    const r = await run(jsonlTurns(more), caller);
+    expect(r.extraction).toBe('incremental');
+    expect(caller.calls).toHaveLength(2);
+    expect(caller.calls[1]).toContain('rotateToken');
+    expect(caller.calls[1]).not.toContain('JWT loop');
+  });
+
+  it('falls back to a full extraction when the transcript was rewritten', async () => {
+    const caller = countingCaller();
+    await run(jsonlTurns(base), caller, noFloor, 'PreCompact');
+    const rewritten: Array<[string, string]> = [['A different first prompt', 'ok'], base[1]!, ['and more', 'sure']];
+    const r = await run(jsonlTurns(rewritten), caller);
+    expect(r.extraction).toBe('full');
+    expect(caller.calls[1]).toContain('A different first prompt');
+  });
+
+  it('skips tiny sessions without advancing the cursor, so nothing is lost', async () => {
+    const caller = countingCaller();
+    const floor = ConfigSchema.parse({ extraction: { min_new_tokens: 10_000 } });
+    const r = await run(jsonlTurns(base), caller, floor, 'PreCompact');
+    expect(r.extraction).toBe('skipped');
+    expect(caller.calls).toHaveLength(0);
+
+    await run(jsonlTurns(base), caller);
+    expect(caller.calls).toHaveLength(1);
+    expect(caller.calls[0]).toContain('JWT loop');
+
+    const ledger = new TokenLedger(db).summary('proj');
+    expect(ledger.extraction_skipped.events).toBe(1);
+  });
+
+  it('meters extraction spend even when nothing is extracted', async () => {
+    const caller = countingCaller();
+    const r = await run(jsonlTurns(base), caller);
+    expect(r.inserted).toBe(0);
+    const ledger = new TokenLedger(db).summary('proj');
+    expect(ledger.extraction).toEqual({ events: 1, tokens: 1020 });
+    expect(ledger.overhead_tokens).toBe(1020);
+  });
+
+  it('does not summarize files when file gating is off (the default)', async () => {
+    const caller = countingCaller();
+    const r = await run(jsonlTurns(base), caller);
+    expect(r.summariesGenerated).toBe(0);
+    expect(new TokenLedger(db).summary('proj').file_summary.events).toBe(0);
+  });
+});
+

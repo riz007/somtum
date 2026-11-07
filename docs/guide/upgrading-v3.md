@@ -1,11 +1,27 @@
 # Upgrading to v3
 
-v3 adds Codex support and fixes several capture problems in v2. If you used v2, read the first section to see whether they affected you.
+v3 adds Codex support and fixes several capture problems in v2. 3.1 makes Somtum's token use metered and bounded. If you're coming from 3.0, read the first section; from v2, read both.
 
 ```bash
 npm install -g somtum@latest
 somtum doctor
 ```
+
+## From 3.0 to 3.1
+
+3.1 is about cost: Somtum now meters every token it spends and stops spending where it can't pay off.
+
+| Change | What you'll notice | Action |
+| --- | --- | --- |
+| Extraction sends only turns not yet extracted, and skips deltas under 500 tokens | Sessions that compact before ending cost 35–47% less to extract (measured on three real sessions) | None |
+| `somtum stats` reports metered numbers from a token ledger; `--since 7d` for a window | The `breakeven` line is gone. It divided an estimate by an undercount. The JSON fields are unchanged, and the metered numbers are under `ledger` | None |
+| File gating is off by default | No file summaries are generated at session end. In 3.0 they were generated even in projects that never installed the gating hook | If you use file gating, `somtum doctor` will flag it. Run `somtum init --file-gating --force` |
+| File gating answers the first whole-file Read with the summary *instead* of the file | In 3.0 the summary was added *on top of* the full read, so gating could only cost tokens. Now a second Read goes through, and both outcomes are metered | Check the *File gating* block in `somtum stats` after a few sessions |
+| `somtum init` installs the recall hook by default (matching Codex) and creates the project database | `somtum doctor` passes immediately after init. `--all` is no longer needed; `--no-cache` gives capture only | Projects set up with a plain 3.0 `somtum init`: run `somtum init` again to add recall |
+| Common words are ignored when matching memories to a prompt | Fewer irrelevant memories injected | None |
+| Cached answers are labeled with their age | — | None |
+
+See [What Somtum Costs](/guide/costs) for the full cost model.
 
 ## What was wrong in v2
 

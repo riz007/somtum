@@ -74,16 +74,16 @@ key ต้องอยู่ใน shell profile ของคุณ ไม่ใ
 **Claude Code**
 
 ```bash
-somtum init --all
+somtum init
 # ติดตั้ง:
 #   - SessionEnd + PreCompact capture hooks  (การดึงหน่วยความจำ)
-#   - UserPromptSubmit hook                  (auto-inject + prompt cache)
-#   - PreToolUse file-gating hook            (สรุปไฟล์ขนาดใหญ่)
+#   - UserPromptSubmit hook                  (recall: ฉีดความทรงจำที่เกี่ยวข้อง)
 #   - MCP server ใน .mcp.json                (recall/remember tools)
+#   - ฐานข้อมูลของโปรเจกต์ เพื่อให้ `somtum doctor` ผ่านทันที
 ```
 
-::: tip ใช้ --all
-`somtum init` เฉยๆ ติดตั้งเฉพาะ capture hook หน่วยความจำจะถูกบันทึกแต่จะไม่ถูกฉีดเข้าไปในพรอมต์
+::: tip ตัวเลือก
+`--no-cache` บันทึกอย่างเดียวโดยไม่ฉีดเข้าพรอมต์ `--file-gating` เพิ่ม hook ของ file gating (ต้องเปิดเอง) อ่าน [What Somtum Costs](/guide/costs) ก่อนเปิดใช้
 :::
 
 **Codex**
@@ -123,7 +123,7 @@ somtum serve
 somtum doctor
 ```
 
-คำสั่งนี้จะตรวจสอบ API key, สุขภาพ DB, การติดตั้ง hook, การ migrate, cache และอัตราส่วน breakeven — พร้อมคำแนะนำในการแก้ไขสำหรับแต่ละการตรวจสอบที่ล้มเหลว
+คำสั่งนี้จะตรวจสอบ API key, สุขภาพ DB, การติดตั้ง hook, การ migrate, cache และการใช้โทเคน — พร้อมคำแนะนำในการแก้ไขสำหรับแต่ละการตรวจสอบที่ล้มเหลว
 
 ---
 

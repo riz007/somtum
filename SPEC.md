@@ -1,6 +1,6 @@
 # Somtum Product-Hardening Spec
 
-Status: draft · Owner: @riz007 · Applies from: v2.3.0
+Status: living document · Owner: @riz007 · Applies from: v2.3.0 · Updated for 3.1.0
 
 > Historical note: a few code comments reference sections of an earlier design
 > spec (e.g. "SPEC.md §5.2" for memory markdown mirrors) that was never checked
@@ -18,6 +18,24 @@ pays for itself**. Everything in this spec serves one of three goals:
    save; keep the per-prompt hot path in single-digit milliseconds.
 3. **Proof** — report *measured* impact, not modeled estimates. A skeptical
    user running `somtum stats` should see numbers Somtum can defend.
+
+### The cost rule
+
+Somtum spends tokens to save tokens, so it must never multiply a user's bill.
+Every change is held to four invariants:
+
+1. **Bounded.** Every token Somtum spends or adds to a prompt has a hard cap.
+2. **Metered.** Every spend is written to the token ledger (`token_ledger`,
+   `src/core/ledger.ts`) at the point it happens. No ledger row, no feature.
+3. **Skipped when it can't pay.** Work below a useful size (tiny extraction
+   deltas, irrelevant prompts) makes no model call and injects nothing.
+4. **Opt-in unless it pays by default.** A feature whose payoff depends on
+   usage patterns (file gating) ships off, and is metered on both sides so
+   `somtum doctor` can tell the user to turn it off.
+
+Public claims follow the same rule: README, docs and launch copy may only
+quote metered numbers, and must label the one heuristic (`tokens_saved`) as an
+estimate.
 
 Non-goals: cloud sync beyond the existing SSH backend, team/multi-user
 features. Agent support is in scope: one local memory shared by every
@@ -46,6 +64,13 @@ Invariants established by the baseline — **do not regress**:
 - Tests never touch the developer's real `~/.somtum`.
 
 ## 3. Workstream A — Incremental extraction (highest priority)
+
+> **Status: shipped in 3.1.** `session_progress` guards on a hash of the whole
+> extracted prefix rather than only the last turn: a rewrite that keeps the
+> last turn in place would otherwise resume at the wrong point. Deltas under
+> `extraction.min_new_tokens` (500) make no call and don't advance the cursor.
+> Measured on three real sessions compacting once at 60%: 35–47% fewer
+> extraction tokens.
 
 **Problem.** `runPostSession` fires on both `SessionEnd` and `PreCompact` and
 each run sends up to 60k tokens of transcript to Haiku with no memory of what
@@ -93,6 +118,12 @@ largest efficiency defect in the product.
 
 ## 4. Workstream B — Measured impact, not modeled estimates
 
+> **Status: B2 and B3 shipped in 3.1** as an event ledger (`token_ledger`:
+> extraction, extraction_skipped, file_summary, injection, file_gate_*),
+> `somtum stats` (with `--since`), the MCP `stats` tool and `/api/stats/full`.
+> `doctor` dropped the heuristic breakeven check for a metered overhead line.
+> **B1 (memory false hits) and B4 (shadow mode) are open.**
+
 **Problem.** `tokens_saved` (`estimateTokensSaved`) is
 `transcriptTokens / N − observationTokens` — an assumption presented as
 savings. Retrieval stats count *activity* (BM25 calls, cache hits), not
@@ -120,6 +151,12 @@ detector. Somtum asserts value; it should measure it.
    `tokens_saved` but label it in output as `estimated (heuristic)` — never
    present it as a measurement. README "Token Accounting" section updated to
    match.
+
+4. **Shadow mode (control run).** `injection.mode: "shadow"` retrieves and
+   meters what *would* have been injected without injecting it. A user can run
+   a week in shadow and a week live and compare their own agent's spend from
+   their agent's usage reporting. This is the only way to show Somtum's net
+   effect on a real bill: the value of a memory never appears in a transcript.
 
 **Acceptance.**
 
@@ -164,6 +201,10 @@ collision with divergent bodies no longer supersedes; a 6-month-unconfirmed
 memory ranks below an equal-scoring fresh one.
 
 ## 6. Workstream D — Cache: reposition and bound
+
+> **Status: D1 (docs) and D3 (dated framing) shipped in 3.1.** The docs no
+> longer claim a cache hit "skips the model": it adds the earlier answer to
+> the prompt. **D2 (bounded fuzzy scan) is open.**
 
 **Problem.** Exact-hash prompt repeats are rare in real coding; the fuzzy
 path is off by default; a stale cached response injected as "a previous
@@ -212,6 +253,10 @@ produces an index and warm-start; `hook.log` never exceeds 5 MB after a run.
 
 ## 8. Workstream F — Positioning and proof surface
 
+> **Status: README, docs home page and "What Somtum Costs" page shipped in
+> 3.1**, memory-first and quoting only metered numbers. `stats --weekly` is
+> superseded by `stats --since 7d`. The shareable report is §12.
+
 - README: retitle from "memory and prompt-cache layer" to memory-first
   framing; move cache to a secondary section; replace the "Token Accounting"
   claims with the measured-vs-estimated split from Workstream B.
@@ -225,10 +270,12 @@ produces an index and warm-start; `hook.log` never exceeds 5 MB after a run.
 
 | Release | Contents | Rationale |
 | --- | --- | --- |
-| v2.4.0 | Workstream A + B(2,3) ledger/stats | Biggest cost fix first; honest numbers unblock F |
-| v2.5.0 | Workstream B(1) memory false-hits + C | Quality loop needs the ledger in place |
-| v2.6.0 | Workstream D + E | Independent; can ship earlier if A/B slip |
-| v2.7.0 | Workstream F | Last — it advertises what A–E made true |
+| 3.1.0 | A, B2–B3, D1, D3, F docs; file gating redesign; stopwords; `init` installs recall and creates the DB | Shipped. Stops Somtum multiplying cost and makes it measurable |
+| 3.2.0 | B4 shadow mode, B1 memory false hits | Shadow mode is the proof users can check against their own bill |
+| 3.3.0 | C (rank fusion, body-aware dedup, decay), D2 | Retrieval quality once impact is measurable |
+| 3.4.0 | E, §12.2 `somtum report` | Hardening, then the shareable report built on real data |
+
+Launch (§12.3) waits for 3.2: launch copy needs shadow-mode numbers.
 
 Each workstream ships behind existing config where behavior changes
 (`injection.*`, `cache.*`) and gets a changeset. Migrations are additive
@@ -238,8 +285,8 @@ only; no destructive schema changes without a `somtum rebuild` path.
 
 Somtum graduates when all of these hold:
 
-1. Processing the same session twice costs one extraction, not two (A).
-2. `somtum stats` contains zero numbers Somtum cannot defend as measured,
+1. ✅ Processing the same session twice costs one extraction, not two (A).
+2. ✅ `somtum stats` contains zero numbers Somtum cannot defend as measured,
    and clearly labels the one heuristic it keeps (B).
 3. A memory that misleads the model twice stops being injected without the
    user editing anything (B1).
@@ -290,7 +337,59 @@ not regressed:
    only where the format is stable enough to parse.
 2. `AGENTS.md` sync: write top memories into the file most agents already
    read, for agents with neither hooks nor MCP.
-3. Decide whether Claude Code should install `UserPromptSubmit` by default,
-   matching Codex.
+3. ✅ Decided in 3.1: `somtum init` installs `UserPromptSubmit` by default,
+   matching Codex. `--no-cache` gives capture only.
 4. The retry after a parse failure has no transcript, so it cannot recover a
    role-play reply. Either resend the transcript once or log the loss.
+
+## 12. Growth plan, evaluated
+
+The growth proposal (README demo, shareable session snapshots, launch on HN,
+Reddit and Discord) is right that Somtum needs a visible proof surface. It is
+held to the cost rule (§1): a launch that quotes numbers Somtum can't back up
+costs more credibility than it earns. Each item below is accepted, rejected or
+deferred.
+
+### 12.1 Product requirements
+
+| Proposal | Decision | Why / constraint |
+| --- | --- | --- |
+| Hybrid search (FTS5/BM25 + optional local embeddings) | Already shipped | Embeddings stay off by default: a 30 MB download and per-prompt CPU for a recall gain that only matters on paraphrased queries |
+| Smart context pruning, token-weighted injection | Shipped in 3.1 | `injection.k`, `max_chars`, stopwords, once-per-session, all metered |
+| Shell rc hooks (`.zshrc`/`.bashrc`) to watch sessions | **Rejected** | Agents have first-class hook systems. A shell hook can't see inside an agent session, slows every shell start, and fails silently |
+| "Intercept input streams before they hit the API" | **Rejected as worded** | `UserPromptSubmit` already adds context per prompt. Proxying API traffic would handle credentials, and naive injection breaks the agent's prompt cache, which can cost more than memory saves |
+| IDE sync extensions (Cursor, VS Code) | Deferred | MCP already reaches Cursor. Revisit with §11 Next #1 |
+| `somtum share --session <id>` | Accepted as `somtum report` (§12.2) | Metered numbers only; never "money saved" from the heuristic |
+
+### 12.2 `somtum report`
+
+A local, shareable summary of what Somtum did over a window.
+
+- `somtum report --since 7d [--format md|html]` writes to stdout or a file.
+  Nothing is uploaded; sharing is the user's action.
+- Contents: metered ledger totals, memories captured (titles only, redacted),
+  injections, file-gating net, and shadow-mode comparison when available.
+- Every number carries its kind (metered or estimated), as in `somtum stats`.
+- Redaction reuses `privacy.redact_patterns`, plus project paths reduced to
+  repo-relative form.
+- Acceptance: a report generated from a seeded ledger matches `stats --json`
+  exactly; a seeded secret in a memory title does not appear in the output.
+
+### 12.3 Launch
+
+- **README demo.** Record with a `vhs` tape checked into `assets/`, so it is
+  reproducible. It shows a real session: the `[somtum] injected N/M memories`
+  line, then `somtum stats`. No staged "cache hit fixed my deploy" scene unless
+  it happened.
+- **Copy.** Lead with the problem and the meter, not with savings. "How I
+  stopped wasting $50/week" is rejected unless a shadow-mode run shows it. The
+  working title is "What my coding agent's memory actually costs", built from
+  the author's own `stats --since 30d`.
+- **Order.** README and docs (shipped in 3.1), then Show HN once 3.2 has
+  shadow-mode data, then r/ClaudeAI, r/LocalLLaMA and the Anthropic Discord
+  with the same numbers.
+- **Precedent.** The best-received Claude Code cost write-ups grouped real
+  usage by call source, offered a pass-through control mode, and listed their
+  own limits. Shadow mode (B4) and "What Somtum can't see" in the cost docs are
+  Somtum's versions of those.
+

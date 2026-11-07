@@ -6,7 +6,7 @@ At the end of each Claude Code or Codex session, Somtum reads the session transc
 
 | Agent | Capture | Auto-inject | MCP tools | Install |
 | --- | --- | --- | --- | --- |
-| Claude Code | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (with `--all` or `--cache`) | `.mcp.json` | `somtum init --all` |
+| Claude Code | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (default; `--no-cache` to skip) | `.mcp.json` | `somtum init` |
 | Codex | `SessionEnd`, `PreCompact` | `UserPromptSubmit` (default) | `.codex/config.toml` | `somtum init --agent codex` |
 | Any other MCP client | — | — | point it at `somtum mcp` | manual |
 

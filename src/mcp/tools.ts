@@ -6,6 +6,7 @@ import { PromptCache, hashPrompt } from '../core/cache.js';
 import { makeRetriever, strategyAvailable } from '../core/retriever/factory.js';
 import { RetrievalStrategy, ObservationKind, ObservationScope } from '../core/schema.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
+import { TokenLedger } from '../core/ledger.js';
 import { countTokens } from '../core/tokens.js';
 import { GLOBAL_PROJECT_ID } from '../config.js';
 import type { RetrievalResult } from '../core/retriever/types.js';
@@ -305,6 +306,7 @@ export function stats(ctx: ToolContext): object {
     cache_misses: cacheHits.miss_count,
     cache_hit_rate: cacheHits.hit_rate,
     retrieval_by_strategy: retrievalBreakdown,
+    ledger: new TokenLedger(ctx.db).summary(ctx.projectId),
     tokens_saved_estimated: saved,
     tokens_spent_estimated: spent,
     net_estimated: saved - spent,

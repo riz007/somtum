@@ -4,13 +4,14 @@
 
 | Command | Description |
 | --- | --- |
-| `somtum init` | Install the SessionEnd + PreCompact capture hooks (Claude Code) |
-| `somtum init --cache` | Also install the UserPromptSubmit cache + auto-inject hook |
-| `somtum init --file-gating` | Also install the PreToolUse file-gating hook |
-| `somtum init --all` | Install all hooks + MCP server |
+| `somtum init` | Claude Code: capture hooks (SessionEnd, PreCompact), recall hook (UserPromptSubmit), MCP server, project database |
+| `somtum init --no-cache` | Capture only: memories are saved but not injected into prompts |
+| `somtum init --no-mcp` | Skip registering the MCP server in `.mcp.json` |
+| `somtum init --file-gating` | Also install the opt-in PreToolUse file-gating hook and turn it on for this project |
+| `somtum init --all` | Everything, including file gating |
 | `somtum init --force` | Reinstall even if hooks are already present |
 | `somtum init --agent codex` | Install for Codex: capture + auto-inject hooks in `.codex/hooks.json`, MCP server in `.codex/config.toml` |
-| `somtum doctor` | Check DB health, migrations, hooks, API key, breakeven ratio, stale memories |
+| `somtum doctor` | Check setup: backend, hooks, database, migrations, stale memories, and whether file gating pays off |
 
 ## Memory
 
@@ -38,8 +39,9 @@
 
 | Command | Description |
 | --- | --- |
-| `somtum stats` | Tokens saved, cache hit rate, retrieval breakdown |
-| `somtum stats --json` | Machine-readable JSON output |
+| `somtum stats` | Metered token use (extraction, injected context, file gating), memory counts, cache stats. See [What Somtum Costs](/guide/costs) |
+| `somtum stats --since 7d` | Limit the metered numbers to the last N days |
+| `somtum stats --json` | Machine-readable JSON output; metered numbers are under `ledger` |
 | `somtum serve` | Open the visual dashboard in the browser |
 | `somtum serve --port <n>` | Use a custom port (default: 3000) |
 | `somtum serve --no-open` | Start server without opening the browser |

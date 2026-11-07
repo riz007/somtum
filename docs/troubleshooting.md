@@ -1,30 +1,24 @@
 # Troubleshooting
 
-## `somtum doctor` reports `breakeven_ratio` below 1.5x
+## Somtum is spending more tokens than expected
 
-This warning means somtum is spending more tokens (injecting memories) than it's saving.
-
-**Normal for small projects.** With fewer than ~20 memories and rare recall calls, the overhead of injection outweighs the benefit. The ratio improves naturally as the memory store grows.
-
-**Check for the hybrid/embeddings mismatch.** If `doctor` shows `strategy=hybrid` but `embeddings: disabled`, somtum is silently falling back to BM25 while paying hybrid overhead:
-
-```
-✓  config     strategy=hybrid, k=8
-✓  embeddings disabled
-```
-
-Fix: align the strategy with what's actually running.
+Start with the metered numbers:
 
 ```bash
-# Option 1 — use BM25 (offline, no API key needed)
-somtum config set retrieval.strategy bm25
-
-# Option 2 — enable full hybrid (downloads a 30 MB ONNX model, needs ANTHROPIC_API_KEY)
-somtum config set retrieval.embeddings.enabled true
-somtum reindex
+somtum stats --since 7d
 ```
 
-Run `somtum doctor` again to confirm both `config` and `embeddings` lines are consistent.
+- **Extraction is high.** Long sessions produce long transcripts. Raise `extraction.min_new_tokens` to extract only bigger chunks, and use the `claude` or `codex` CLI backend so extraction runs on your subscription instead of API credits.
+- **Injected context is high.** Lower `injection.k` or `injection.max_chars`, or set `injection.show_budget false`.
+- **File summaries are high, or file gating shows a negative net.** Turn it off: `somtum config set file_gating.enabled false`. `somtum doctor` flags this automatically after 10 gated reads.
+
+Also check that `doctor` doesn't show `strategy=hybrid` with `embeddings: disabled`. That combination silently falls back to BM25 while paying for the hybrid rerank call:
+
+```bash
+somtum config set retrieval.strategy bm25
+```
+
+See [What Somtum Costs](/guide/costs) for how each number is measured.
 
 ---
 
@@ -54,7 +48,7 @@ Fix: run `somtum init` from the same directory you launch the agent from.
 
 ```bash
 cd ~/my-project
-somtum init --all            # Claude Code
+somtum init                  # Claude Code
 somtum init --agent codex    # Codex
 claude   # or: codex — launched from ~/my-project
 ```
@@ -136,13 +130,13 @@ BM25 works fully offline and is fast at any corpus size.
 
 ## The agent doesn't have context from previous sessions
 
-**Auto-inject is the first thing to check.** Since v1.3.0, Somtum automatically injects top-k memories into every `UserPromptSubmit` via the cache hook — no manual recall step needed.
+**Auto-inject is the first thing to check.** Somtum injects relevant memories on `UserPromptSubmit` — no manual recall step needed.
 
-1. Confirm the cache hook is installed: `somtum doctor` → look for `hooks_installed ✓`
-2. If not installed: `somtum init --all` (Claude Code) or `somtum init --agent codex`
+1. Confirm the recall hook is installed: `somtum doctor` → look for `hooks_installed ✓`
+2. If not installed: `somtum init` (Claude Code) or `somtum init --agent codex`. Projects set up with v3.0's plain `somtum init` have capture hooks only; run it again to add recall.
 3. Confirm injection is enabled: `somtum config get injection.enabled` → should be `true`
 4. Check that memories actually exist: `somtum stats` → `memories > 0`
-5. Look for the budget line at the top of each prompt context: `[somtum] injected N/M memories (~X tokens)`. If you see `0/M`, BM25 found no matches — try a more descriptive prompt or lower `injection.min_relevance_score` to `0`.
+5. Look for the budget line at the top of each prompt context: `[somtum] injected N/M memories (~X tokens)`. If there's no budget line, nothing matched: common words like "how" or "this" don't count, so a prompt has to share a real term with a memory. A memory is also not injected again later in the same session.
 
 **Using the MCP server**, the agent can also call `recall` directly when uncertain. If it's not happening:
 
