@@ -13,6 +13,8 @@ import { ensureEmbedderConfigured } from '../core/embeddings_bootstrap.js';
 import { getEmbedder, isEmbedderReady } from '../core/embeddings.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { TokenLedger } from '../core/ledger.js';
+import { BranchView } from '../core/git_context.js';
+import { scopeToBranch, newestOfDuplicates } from '../core/recall_filter.js';
 import { countTokens } from '../core/tokens.js';
 import type { Config, CacheEntry } from '../core/schema.js';
 import type { RetrievalResult } from '../core/retriever/types.js';
@@ -266,6 +268,7 @@ async function buildMemoryContext(
   prompt: string,
   config: Config,
   alreadyInjected: ReadonlySet<string>,
+  cwd: string,
 ): Promise<MemoryContextResult | null> {
   if (!config.injection.enabled) return null;
 
@@ -299,6 +302,8 @@ async function buildMemoryContext(
 
   // Filter by relevance threshold — avoids injecting weakly matched memories.
   if (minScore > 0) results = results.filter((r) => r.score >= minScore);
+  const view = results.some((r) => r.observation.git_branch) ? BranchView.load(cwd) : null;
+  results = newestOfDuplicates(scopeToBranch(results, cwd, view));
   // One shared word is too weak a signal: in a small project nearly every
   // memory mentions "project" or "state". Injecting nothing beats injecting noise.
   const terms = queryTerms(prompt);
@@ -325,8 +330,14 @@ async function buildMemoryContext(
     store.countByProject(projectId) +
     (globalStore ? globalStore.countByProject(GLOBAL_PROJECT_ID) : 0);
 
+  const now = Date.now();
   const lines = results
-    .map((r) => `[${r.observation.kind}] ${r.observation.title}\n${r.observation.body}`)
+    .map((r) => {
+      const o = r.observation;
+      const otherBranch = o.git_branch && view && o.git_branch !== view.current;
+      const label = `${o.kind} · ${formatAge(now - o.created_at)} ago${otherBranch ? ` · from ${o.git_branch}` : ''}`;
+      return `[${label}] ${o.title}\n${o.body}`;
+    })
     .join('\n---\n');
 
   const context = clampContext(
@@ -480,6 +491,7 @@ export async function runPrePrompt(
       prompt,
       config,
       alreadyInjected,
+      cwd,
     );
     if (memResult) parts.push(memResult.context);
 
@@ -491,15 +503,22 @@ export async function runPrePrompt(
     if (parts.length > 0) {
       const combined = clampContext(parts.join('\n\n'), config.injection.max_chars);
 
-      // Token budget line: gives users visibility into injection cost.
+      // The header reports the tokens of everything injected, itself included,
+      // and is the same number the ledger records for `somtum stats`.
       let additionalContext = combined;
+      let tokens = countTokens(combined);
       if (memResult && config.injection.show_budget) {
-        const approxTokens = Math.ceil(memResult.injectedChars / 4);
         const gating = config.file_gating.enabled ? 'file-gating: on' : 'file-gating: off';
-        const budget = `[somtum] injected ${memResult.injectedCount}/${memResult.totalCount} memories (~${approxTokens} tokens) | ${gating}`;
-        additionalContext = `${budget}\n${combined}`;
+        const header = (t: number) =>
+          `[somtum] injected ${memResult.injectedCount}/${memResult.totalCount} memories, ~${t} tokens | ${gating}`;
+        for (let i = 0; i < 4; i += 1) {
+          const measured = countTokens(`${header(tokens)}\n${combined}`);
+          if (measured === tokens) break;
+          tokens = measured;
+        }
+        additionalContext = `${header(tokens)}\n${combined}`;
       }
-      new TokenLedger(db).record(projectId, 'injection', countTokens(additionalContext), sessionId ?? null);
+      new TokenLedger(db).record(projectId, 'injection', tokens, sessionId ?? null);
 
       return {
         ok: true,

@@ -393,3 +393,39 @@ A local, shareable summary of what Somtum did over a window.
   own limits. Shadow mode (B4) and "What Somtum can't see" in the cost docs are
   Somtum's versions of those.
 
+## 13. Branch-aware memory and backfill (3.2)
+
+**Why.** A user asked what happens when two branches make conflicting
+decisions. Through 3.1 the answer was: both are stored, both can be injected,
+and a throwaway branch could supersede `main`'s decision if the titles were
+close enough.
+
+**Shipped.**
+
+- `observations.git_branch`, `git_commit`, `git_before_first_commit`
+  (migration 007). `src/core/git_context.ts` captures them and decides
+  visibility; `src/core/recall_filter.ts` applies it to prompt injection, MCP
+  `recall` and the warm-start file.
+- Visibility: hidden only when the source branch exists, isn't the current or
+  default branch, and isn't merged into HEAD. Deleted branches and branches
+  whose upstream is gone count as merged: git can't detect squash merges, and
+  a deleted branch was usually merged. Captures before a branch's first commit
+  stay hidden until the branch is deleted, because git reports such a branch as
+  merged from the start.
+- Supersession is limited to the same branch (or branch-less memories from the
+  default branch) and compares `created_at`. Conflicts between branches are
+  settled at recall: newest of near-duplicates wins.
+- `somtum backfill` for the cold-start problem: discovery of past Claude Code
+  and Codex sessions, cost preview via the same `planExtraction` the hook uses.
+
+**Known limits.** An abandoned branch that is deleted without
+`somtum forget --branch` is indistinguishable from a merged one. A session that
+switched branches is attributed to the branch it ended on.
+
+**Next.**
+
+1. `retrieval.rerank_model` is unused: hybrid is reciprocal rank fusion with no
+   model call. Remove the key or implement the rerank.
+2. Projects without a git remote are keyed by path, so a symlinked path is a
+   different project. Fixing it changes existing project IDs and needs a
+   migration path.

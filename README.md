@@ -23,7 +23,13 @@ somtum init --agent codex # Codex (run both if you use both)
 somtum doctor             # every line should show ✓
 ```
 
-Then use your agent as usual. Memories appear after your first substantial session ends or compacts:
+Already have past sessions in this project? Learn from them now instead of waiting for the next one. It shows the sessions and the token cost before spending anything:
+
+```bash
+somtum backfill           # the 5 most recent Claude Code and Codex sessions here
+```
+
+Then use your agent as usual. New memories are captured each time a session ends or compacts:
 
 ```bash
 somtum list               # what was remembered
@@ -47,6 +53,8 @@ Requires Node 20+ and one way to run a small model for extraction. Somtum uses t
 
 **Recalls.** On each prompt, a local keyword search (SQLite FTS5, no network) picks up to 3 relevant memories and adds them to the agent's context, capped at 1,500 characters. A memory has to share at least two words with a longer prompt ("installed" counts as "install"). Nothing is added when nothing matches, and a memory that's already in the session's context isn't added again.
 
+**Follows your branches.** Each memory records the git branch it came from. A decision made on a branch you haven't merged stays on that branch, so two branches that decide differently don't feed each other contradictions. Once a branch is merged, or its pull request lands and the branch is deleted, its memories reach everyone. When two memories cover the same decision, only the newer one is sent, labeled with its age and the branch it came from.
+
 **Shares.** Claude Code and Codex read and write one memory per project. Any MCP client can use the `recall` and `remember` tools. Memories saved with `scope: "global"` follow you into every project.
 
 Everything is stored under `~/.somtum/`. Data leaves your machine only in model calls through the backend you chose: extraction, plus file summaries if you turn on file gating.
@@ -60,6 +68,7 @@ Somtum spends tokens in two places: on extraction, and on the context it adds to
 | Extraction | Session end or compaction | Only turns not yet extracted, at most 60k tokens. No call when fewer than 500 new tokens. | `extraction.min_new_tokens`, `extraction.max_observations_per_session` |
 | Injected memories | A prompt that matches stored memories | Up to 3 memories, 1,500 characters (about 375 tokens). A memory already in context is not re-sent. | `injection.k`, `injection.max_chars`, `injection.enabled` |
 | File summaries | Only if you enable file gating | One small-model call per large file that changed | `file_gating.enabled` (off by default) |
+| Backfill | Only when you run `somtum backfill` | Shows each session's token cost and asks before sending. Sessions already extracted are skipped. | `--limit`, `--dry-run` |
 
 `somtum stats` reads the ledger. This is real output:
 
@@ -105,7 +114,9 @@ Claude Code only.
 | `somtum doctor` | Checks setup: backend, hooks, database, and whether file gating pays off |
 | `somtum stats` | Metered token use, memory counts, cache stats |
 | `somtum list` / `somtum search <query>` | Browse or search memories |
+| `somtum backfill` | Learn from recent past sessions of this project (shows the cost first) |
 | `somtum show <id>` / `somtum edit <id>` / `somtum forget <id>` | Read, fix or delete one memory |
+| `somtum forget --branch <name>` | Drop the memories of an abandoned branch |
 | `somtum serve` | Local dashboard: memory browser, graph, analytics |
 | `somtum suggest-claude-md` | Suggest `CLAUDE.md` additions from your memories |
 | `somtum export` / `somtum import` | Move memories as JSON, JSONL or Markdown |
@@ -129,7 +140,24 @@ Full list: [CLI reference](https://riz007.github.io/somtum/reference/cli). Setti
 
 Details, including retrieval strategies, deduplication and warm starts after compaction: [How it works](https://riz007.github.io/somtum/guide/how-it-works).
 
-## Upgrading from 3.0
+## Semantic search (optional)
+
+Recall uses keyword search, which is fast and offline but can't connect "global state" with "Context API". For meaning-based search in `somtum search` and the MCP `recall` tool, install the embedding library once and turn it on:
+
+```bash
+npm install -g @xenova/transformers
+somtum config set retrieval.embeddings.enabled true
+somtum reindex             # downloads a ~30 MB model on first run
+somtum search "why did we change test runners" --strategy hybrid
+```
+
+The library isn't installed with Somtum: most people never need it, and it pulls in about 250 MB of native code.
+
+## Upgrading
+
+From 3.1: memories now record their git branch (older memories stay visible everywhere), `somtum backfill` and `somtum forget --branch` are new, and semantic search needs the separate install above. If `somtum doctor` flags `embeddings`, run the command it shows. [Full upgrade notes](https://riz007.github.io/somtum/guide/upgrading-v3).
+
+From 3.0:
 
 - `somtum init` now installs the recall hook by default, matching Codex. `--all` is no longer needed; use `--no-cache` for capture only.
 - File gating is now **off by default**. In 3.0 it was on, and it generated file summaries at every session end even in projects that never installed its hook. If you used it, `somtum doctor` will say so: run `somtum init --file-gating --force` to turn it back on and update the hook to match `Read` only.

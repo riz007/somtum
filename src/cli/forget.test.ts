@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
-import { runForget, forgetAllCommand } from './forget.js';
+import { runForget, forgetAllCommand, runForgetBranch } from './forget.js';
 
 const PROJECT_ID = 'forget-test-project';
 
@@ -74,5 +74,23 @@ describe('forgetAllCommand', () => {
     }
     const result = JSON.parse(output[0]!) as { deleted: number };
     expect(result.deleted).toBe(2);
+  });
+});
+
+describe('runForgetBranch', () => {
+  it('soft-deletes only the memories captured on that branch', () => {
+    const db = openDb({ path: dbPath });
+    const store = new MemoryStore(db);
+    const keep = store.insert({ project_id: PROJECT_ID, session_id: 's1', kind: 'decision', title: 'on main', body: 'b', git_branch: 'main' });
+    const drop = store.insert({ project_id: PROJECT_ID, session_id: 's2', kind: 'decision', title: 'on experiment', body: 'b', git_branch: 'experiment' });
+    db.close();
+
+    expect(runForgetBranch({ branch: 'experiment', dbPath, projectId: PROJECT_ID })).toBe(1);
+
+    const db2 = openDb({ path: dbPath });
+    const store2 = new MemoryStore(db2);
+    expect(store2.get(keep.id)?.deleted_at).toBeNull();
+    expect(store2.get(drop.id)?.deleted_at).not.toBeNull();
+    db2.close();
   });
 });

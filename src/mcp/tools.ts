@@ -4,6 +4,8 @@ import type { Config } from '../core/schema.js';
 import { MemoryStore } from '../core/store.js';
 import { PromptCache, hashPrompt } from '../core/cache.js';
 import { makeRetriever, strategyAvailable } from '../core/retriever/factory.js';
+import { captureGit } from '../core/git_context.js';
+import { scopeToBranch, newestOfDuplicates } from '../core/recall_filter.js';
 import { RetrievalStrategy, ObservationKind, ObservationScope } from '../core/schema.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
 import { TokenLedger } from '../core/ledger.js';
@@ -64,6 +66,8 @@ export interface ToolContext {
   projectId: string;
   // Open connection to ~/.somtum/global.db for cross-project recall (M9).
   globalDb?: DB;
+  // Project working directory, for branch-aware recall.
+  cwd?: string;
 }
 
 // Merge results from multiple DBs: dedup by id, sort by score descending, take top k.
@@ -89,7 +93,10 @@ export async function recall(
   const k = input.k ?? ctx.config.retrieval.k;
   const retriever = makeRetriever(strategy, ctx.db, ctx.config);
   const fallback = !strategyAvailable(strategy, ctx.config);
-  const projectResults = await retriever.search(input.query, { k, projectId: ctx.projectId });
+  const projectResults = await retriever.search(input.query, {
+    k: k * 2,
+    projectId: ctx.projectId,
+  });
 
   // M9: also search global.db so cross-project memories are surfaced.
   let globalResults: RetrievalResult[] = [];
@@ -105,7 +112,9 @@ export async function recall(
     }
   }
 
-  const results = mergeResults([projectResults, globalResults], k);
+  const merged = mergeResults([projectResults, globalResults], k * 2);
+  const scoped = ctx.cwd ? scopeToBranch(merged, ctx.cwd) : merged;
+  const results = newestOfDuplicates(scoped).slice(0, k);
 
   // Log which strategy was actually used.
   const statsStore = new RetrievalStatsStore(ctx.db);
@@ -191,10 +200,15 @@ export function remember(ctx: ToolContext, input: z.infer<typeof RememberInput>)
   const targetProjectId = isGlobal ? GLOBAL_PROJECT_ID : ctx.projectId;
 
   const store = new MemoryStore(targetDb);
+  // Global memories follow you across projects, so they carry no branch.
+  const git = !isGlobal && ctx.cwd ? captureGit(ctx.cwd) : null;
   const obs = store.insert(
     {
       project_id: targetProjectId,
       session_id: 'manual',
+      git_branch: git?.branch ?? null,
+      git_commit: git?.commit ?? null,
+      git_before_first_commit: git?.beforeFirstCommit ?? false,
       kind: input.kind,
       title: input.title,
       body: input.body,

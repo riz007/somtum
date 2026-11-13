@@ -9,6 +9,9 @@
 | `somtum init --no-mcp` | Skip registering the MCP server in `.mcp.json` |
 | `somtum init --file-gating` | Also install the opt-in PreToolUse file-gating hook and turn it on for this project |
 | `somtum init --all` | Everything, including file gating |
+| `somtum backfill` | Extract memories from the 5 most recent past Claude Code and Codex sessions of this project. Shows each session's token cost and asks first |
+| `somtum backfill --dry-run` | Show the sessions and the cost estimate, extract nothing |
+| `somtum backfill --limit 10 --agent codex --yes` | More sessions, one agent, no prompt |
 | `somtum init --force` | Reinstall even if hooks are already present |
 | `somtum init --agent codex` | Install for Codex: capture + auto-inject hooks in `.codex/hooks.json`, MCP server in `.codex/config.toml` |
 | `somtum doctor` | Check setup: backend, hooks, database, migrations, stale memories, and whether file gating pays off |
@@ -27,6 +30,7 @@
 | `somtum show <id>` | Print the full body of an observation |
 | `somtum remember` | Manually store an observation |
 | `somtum forget <id>` | Soft-delete an observation by id |
+| `somtum forget --branch <name>` | Soft-delete the memories captured on a git branch, e.g. an abandoned experiment |
 | `somtum forget --all` | Soft-delete **all** observations in the current project |
 | `somtum edit <id>` | Open an observation body in `$EDITOR` |
 | `somtum rebuild` | Regenerate `index.md` from all observations |

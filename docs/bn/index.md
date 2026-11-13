@@ -102,6 +102,7 @@ somtum config set retrieval.strategy bm25   # যা আসলে চলছে �
 অথবা পূর্ণ হাইব্রিড সক্ষম করুন (`ANTHROPIC_API_KEY` প্রয়োজন):
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 ```
 

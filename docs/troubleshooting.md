@@ -12,7 +12,7 @@ somtum stats --since 7d
 - **Injected context is high.** Lower `injection.k` or `injection.max_chars`, or set `injection.show_budget false`.
 - **File summaries are high, or file gating shows a negative net.** Turn it off: `somtum config set file_gating.enabled false`. `somtum doctor` flags this automatically after 10 gated reads.
 
-Also check that `doctor` doesn't show `strategy=hybrid` with `embeddings: disabled`. That combination silently falls back to BM25 while paying for the hybrid rerank call:
+Also check `doctor` for an `embeddings` problem: `strategy=hybrid` needs embeddings enabled and `@xenova/transformers` installed, and falls back to BM25 without them. To stay on BM25:
 
 ```bash
 somtum config set retrieval.strategy bm25

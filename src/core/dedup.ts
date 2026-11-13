@@ -4,7 +4,7 @@ import type { ObservationKind } from './schema.js';
 
 // Jaccard similarity on content words (len > 2, lowercased).
 // Returns 0..1 where 1 = identical word-sets.
-function titleSimilarity(a: string, b: string): number {
+export function titleSimilarity(a: string, b: string): number {
   const tokenize = (s: string): Set<string> =>
     new Set(
       s
@@ -21,7 +21,7 @@ function titleSimilarity(a: string, b: string): number {
 }
 
 // Minimum title Jaccard to consider two observations near-duplicates.
-const TITLE_SIM_THRESHOLD = 0.6;
+export const TITLE_SIM_THRESHOLD = 0.6;
 
 export interface DedupResult {
   superseded: number;
@@ -36,10 +36,24 @@ export interface DedupResult {
  * Conservative: only marks the OLDER observation superseded — never the new one.
  * Only compares title similarity; body content is not checked to stay fast.
  */
+// A branch may only supersede its own memories. Otherwise an experiment that is
+// later thrown away could hide a decision that still stands on the default
+// branch. Memories without a branch (older or non-git) are only superseded from
+// the default branch. Conflicts between branches are settled at recall instead.
+function maySupersede(
+  newer: { git_branch: string | null },
+  older: { git_branch: string | null },
+  defaultBranch: string | null,
+): boolean {
+  if (older.git_branch === newer.git_branch) return true;
+  return older.git_branch === null && newer.git_branch === defaultBranch;
+}
+
 export function deduplicateObservations(
   db: DB,
   projectId: string,
   newIds: string[],
+  opts: { defaultBranch?: string | null } = {},
 ): DedupResult {
   if (newIds.length === 0) return { superseded: 0, pairs: [] };
 
@@ -59,11 +73,13 @@ export function deduplicateObservations(
       const sim = titleSimilarity(newObs.title, candidate.title);
       if (sim < TITLE_SIM_THRESHOLD) continue;
 
-      // Mark the older one as superseded by the newer one.
-      // The caller passes only newly-inserted ids, so newId is always the newer version.
-      // Always supersede the candidate (from a prior session) with the new observation.
-      store.markSuperseded(candidate.id, newId);
-      pairs.push({ oldId: candidate.id, newId, similarity: sim });
+      // The older of the two is superseded. Usually that's the candidate, but a
+      // backfilled past session can be older than what is already stored.
+      const [older, newer] =
+        candidate.created_at <= newObs.created_at ? [candidate, newObs] : [newObs, candidate];
+      if (!maySupersede(newer, older, opts.defaultBranch ?? null)) continue;
+      store.markSuperseded(older.id, newer.id);
+      pairs.push({ oldId: older.id, newId: newer.id, similarity: sim });
       break; // one supersession per new observation is enough
     }
   }

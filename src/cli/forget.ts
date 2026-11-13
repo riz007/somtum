@@ -24,6 +24,43 @@ export function runForget(opts: {
   }
 }
 
+// Soft-deletes the memories captured on one branch, e.g. an abandoned
+// experiment whose decisions should not resurface once the branch is deleted.
+export function runForgetBranch(opts: {
+  branch: string;
+  cwd?: string;
+  dbPath?: string;
+  projectId?: string;
+}): number {
+  const cwd = opts.cwd ?? process.cwd();
+  const projectId = opts.projectId ?? resolveProjectId(cwd);
+  const dbPath = opts.dbPath ?? join(projectDir(projectId), 'db.sqlite');
+  const db = openDb({ path: dbPath });
+  try {
+    const store = new MemoryStore(db);
+    let count = 0;
+    for (const o of store.listByProject(projectId, { includeSuperseded: true })) {
+      if (o.git_branch === opts.branch && store.softDelete(o.id)) count += 1;
+    }
+    return count;
+  } finally {
+    db.close();
+  }
+}
+
+export function forgetBranchCommand(
+  branch: string,
+  options: { json?: boolean; cwd?: string } = {},
+): number {
+  const count = runForgetBranch({ branch, cwd: options.cwd ?? process.cwd() });
+  if (options.json) {
+    console.log(JSON.stringify({ branch, deleted: count }));
+  } else {
+    console.log(`forgotten: ${count} observation${count === 1 ? '' : 's'} from branch ${branch}`);
+  }
+  return 0;
+}
+
 export async function forgetAllCommand(opts: {
   cwd?: string;
   json?: boolean;

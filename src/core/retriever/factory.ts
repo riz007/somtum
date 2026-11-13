@@ -7,7 +7,12 @@ import { EmbeddingsRetriever } from './embeddings.js';
 import { HybridRetriever } from './hybrid.js';
 import { LlmIndexRetriever } from './llm_index.js';
 import { anthropicCaller } from '../extractor.js';
-import { isEmbedderReady } from '../embeddings.js';
+import { ensureEmbedderConfigured } from '../embeddings_bootstrap.js';
+import { embeddingsPackageInstalled } from '../embeddings_xenova.js';
+
+function embeddingsUsable(config: Config): boolean {
+  return config.retrieval.embeddings.enabled && embeddingsPackageInstalled();
+}
 
 // Returns a retriever by strategy name. Falls back to BM25 when the requested
 // strategy's prerequisites are missing (e.g. embeddings disabled in config or
@@ -18,10 +23,12 @@ export function makeRetriever(strategy: RetrievalStrategy, db: DB, config: Confi
     case 'bm25':
       return new Bm25Retriever(db);
     case 'embeddings':
-      if (!config.retrieval.embeddings.enabled) return new Bm25Retriever(db);
+      if (!embeddingsUsable(config)) return new Bm25Retriever(db);
+      ensureEmbedderConfigured(config);
       return new EmbeddingsRetriever(db);
     case 'hybrid':
-      if (!config.retrieval.embeddings.enabled) return new Bm25Retriever(db);
+      if (!embeddingsUsable(config)) return new Bm25Retriever(db);
+      ensureEmbedderConfigured(config);
       return new HybridRetriever(db);
     case 'index': {
       if (!config.retrieval.index.enabled) return new Bm25Retriever(db);
@@ -41,8 +48,7 @@ export function makeRetriever(strategy: RetrievalStrategy, db: DB, config: Confi
 export function strategyAvailable(strategy: RetrievalStrategy, config?: Config): boolean {
   if (strategy === 'bm25') return true;
   if (strategy === 'embeddings' || strategy === 'hybrid') {
-    if (!config?.retrieval.embeddings.enabled) return false;
-    return isEmbedderReady() || true;
+    return config !== undefined && embeddingsUsable(config);
   }
   if (strategy === 'index') {
     return Boolean(config?.retrieval.index.enabled && process.env['ANTHROPIC_API_KEY']);

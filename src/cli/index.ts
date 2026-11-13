@@ -8,7 +8,8 @@ import { showCommand } from './show.js';
 import { hookCommand } from './hook.js';
 import { reindexCommand } from './reindex.js';
 import { rebuildCommand } from './rebuild.js';
-import { forgetCommand, forgetAllCommand } from './forget.js';
+import { forgetCommand, forgetAllCommand, forgetBranchCommand } from './forget.js';
+import { backfillCommand } from './backfill.js';
 import { listCommand } from './list.js';
 import { resetCommand } from './reset.js';
 import { editCommand } from './edit.js';
@@ -153,19 +154,40 @@ program
 
 program
   .command('forget [id]')
-  .description('Soft-delete an observation by id, or use --all to soft-delete everything')
+  .description('Soft-delete an observation by id, a branch\'s memories with --branch, or everything with --all')
   .option('--all', 'Soft-delete all observations in the current project', false)
+  .option('--branch <name>', 'Soft-delete the observations captured on a git branch')
   .option('--json', 'Emit JSON')
-  .action((id: string | undefined, opts: { all?: boolean; json?: boolean }) => {
+  .action((id: string | undefined, opts: { all?: boolean; branch?: string; json?: boolean }) => {
     if (opts.all) {
       void forgetAllCommand(opts).then((code) => process.exit(code));
       return;
     }
+    if (opts.branch) {
+      process.exit(forgetBranchCommand(opts.branch, opts));
+    }
     if (!id) {
-      console.error('somtum: provide an <id> or use --all');
+      console.error('somtum: provide an <id>, --branch <name>, or --all');
       process.exit(1);
     }
     const code = forgetCommand(id, opts);
+    process.exit(code);
+  });
+
+program
+  .command('backfill')
+  .description('Extract memories from recent past sessions of this project (shows the token cost first)')
+  .option('-n, --limit <n>', 'How many of the most recent sessions to consider', '5')
+  .option('--agent <id>', 'claude-code | codex | all', 'all')
+  .option('-y, --yes', 'Skip the confirmation prompt', false)
+  .option('--dry-run', 'Show the sessions and cost estimate, extract nothing', false)
+  .action(async (opts: { limit: string; agent: string; yes: boolean; dryRun: boolean }) => {
+    const limit = Number.parseInt(opts.limit, 10);
+    if (!Number.isFinite(limit) || limit < 1) {
+      console.error('somtum: --limit must be a positive number');
+      process.exit(1);
+    }
+    const code = await backfillCommand({ limit, agent: opts.agent, yes: opts.yes, dryRun: opts.dryRun });
     process.exit(code);
   });
 

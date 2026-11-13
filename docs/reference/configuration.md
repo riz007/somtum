@@ -6,10 +6,11 @@ Global config lives at `~/.somtum/config.json`. Per-project config at `.somtum/c
 
 ```bash
 # Enable semantic (embedding-based) search — downloads a 30 MB model once
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 
-# Switch to hybrid retrieval (BM25 + embeddings + rerank) for best recall
+# Switch to hybrid retrieval (BM25 + embeddings, fused) for best recall
 somtum config set retrieval.strategy hybrid
 
 # Use LLM-based retrieval (no embeddings required, costs one Haiku call per query)
@@ -61,7 +62,7 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
     "rerank_model": "claude-haiku-4-5-20251001",
     "bm25": { "enabled": true },
     "embeddings": {
-      "enabled": false,          // set true to download the 30 MB ONNX model
+      "enabled": false,          // needs `npm install -g @xenova/transformers` first
       "model": "Xenova/bge-small-en-v1.5"
     },
     "index": {
@@ -109,7 +110,7 @@ somtum config set injection.max_chars 3000   # raise injection size cap (default
 | **`bm25`** | Keyword search (SQLite FTS5, no dependencies) | Exact terms, offline setups | Near-zero |
 | **`embeddings`** | Semantic similarity, local 30 MB ONNX model | "What did we decide about auth?" | ~5 ms at 10k memories |
 | **`index`** | Haiku picks relevant IDs from a compact catalog | Paraphrased or fuzzy queries | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings, re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+| **`hybrid`** | BM25 + embeddings, merged by reciprocal rank fusion | General case (best recall) | BM25 + embeddings, no model call |
 
 ::: warning Hybrid requires embeddings
 Setting `retrieval.strategy = "hybrid"` without enabling embeddings causes a silent fallback to BM25 while paying hybrid overhead. `somtum doctor` will surface this as `strategy=hybrid` / `embeddings: disabled`.
@@ -117,6 +118,7 @@ Setting `retrieval.strategy = "hybrid"` without enabling embeddings causes a sil
 Always enable embeddings first when using hybrid:
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex   # downloads ~30 MB ONNX model once
 somtum config set retrieval.strategy hybrid

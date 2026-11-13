@@ -20,9 +20,10 @@ Somtum พร้อมใช้งานในระดับ production แต�
 
 **วิธีแก้ไข:**
 
-เปิดใช้งาน hybrid retrieval (BM25 + embeddings + Haiku rerank):
+เปิดใช้งาน hybrid retrieval (BM25 + embeddings, reciprocal rank fusion):
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex   # ดาวน์โหลดโมเดล ONNX ~30 MB ครั้งเดียว
 somtum config set retrieval.strategy hybrid

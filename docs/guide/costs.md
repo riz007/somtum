@@ -50,6 +50,10 @@ File gating is off by default. Turn it on with `somtum init --file-gating`.
 
 The trade-off: when the summary is enough, a full read is saved. When it isn't, the agent spends an extra tool call and still reads the file. Somtum meters both outcomes, and after 10 gated reads `somtum doctor` warns you if the net is negative.
 
+### Backfill (only when you run it)
+
+`somtum backfill` extracts recent past sessions so a new install doesn't start empty. It lists each session with the tokens extracting it would send (computed the same way the real extraction computes them, cap and prompt included) and asks before sending anything. Output adds roughly 1,000 tokens per session. Sessions already extracted are skipped, so running it twice costs nothing the second time. File summaries are not generated during backfill.
+
 ## Reading `somtum stats`
 
 ```

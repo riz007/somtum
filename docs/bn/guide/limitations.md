@@ -20,9 +20,10 @@ Somtum প্রোডাকশন-রেডি, কিন্তু এটিত
 
 **কী করবেন:**
 
-হাইব্রিড রিট্রিভাল সক্ষম করুন (BM25 + embeddings + Haiku rerank):
+হাইব্রিড রিট্রিভাল সক্ষম করুন (BM25 + embeddings, reciprocal rank fusion):
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex   # একবার ~৩০ MB ONNX মডেল ডাউনলোড করে
 somtum config set retrieval.strategy hybrid

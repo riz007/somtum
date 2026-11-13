@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import { fingerprintFiles } from '../core/fingerprint.js';
 import { ConfigSchema } from '../core/schema.js';
 import { MemoryStore } from '../core/store.js';
 import { RetrievalStatsStore } from '../core/retrieval_stats.js';
+import { TokenLedger } from '../core/ledger.js';
 import { runPrePrompt } from './pre_prompt.js';
 
 let tmp: string;
@@ -256,5 +258,108 @@ describe('runPrePrompt', () => {
     );
     expect(r.hit).toBe(false);
     expect(r.hookSpecificOutput).toBeUndefined();
+  });
+
+  it('reports the same token count in the header as the ledger records', async () => {
+    new MemoryStore(db).insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'decision',
+      title: 'Session cookies for auth',
+      body: 'Login sets an httpOnly session cookie; no tokens in localStorage.',
+    });
+    const r = await runPrePrompt(
+      { prompt: 'how does login store the auth cookie', cwd: tmp },
+      { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+    );
+    const header = /~(\d+) tokens/.exec(r.hookSpecificOutput?.additionalContext ?? '');
+    expect(header).not.toBeNull();
+    expect(new TokenLedger(db).summary('p1').injection.tokens).toBe(Number(header![1]));
+  });
+
+  describe('on a git branch', () => {
+    let repo: string;
+    const git = (...args: string[]) =>
+      execFileSync(
+        'git',
+        ['-C', repo, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args],
+        {
+          stdio: 'ignore',
+        },
+      );
+    const decide = (branch: string, title: string, body: string, ageMs: number) =>
+      new MemoryStore(db).insert({
+        project_id: 'p1',
+        session_id: `s-${branch}`,
+        kind: 'decision',
+        title,
+        body,
+        git_branch: branch,
+        created_at: Date.now() - ageMs,
+      });
+
+    beforeEach(() => {
+      repo = join(tmp, 'repo');
+      execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+      writeFileSync(join(repo, 'a.txt'), 'a');
+      git('add', 'a.txt');
+      git('commit', '-q', '-m', 'a');
+      git('checkout', '-q', '-b', 'feature/redux');
+      writeFileSync(join(repo, 'r.txt'), 'r');
+      git('add', 'r.txt');
+      git('commit', '-q', '-m', 'r');
+      git('checkout', '-q', 'main');
+      git('checkout', '-q', '-b', 'feature/zustand');
+    });
+
+    it('does not inject a decision from a parallel unmerged branch', async () => {
+      decide('feature/redux', 'Use Redux for global state', 'Store slices in Redux.', 60_000);
+      decide(
+        'feature/zustand',
+        'Use Zustand for global state',
+        'One Zustand store per feature.',
+        60_000,
+      );
+      const r = await runPrePrompt(
+        { prompt: 'which library manages global state here', cwd: repo },
+        { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+      );
+      const ctx = r.hookSpecificOutput?.additionalContext ?? '';
+      expect(ctx).toContain('Use Zustand for global state');
+      expect(ctx).not.toContain('Redux');
+    });
+
+    it('keeps only the newer of two near-duplicate decisions once both are visible', async () => {
+      decide('main', 'Use Redux for global state', 'Older decision on main.', 3 * 86_400_000);
+      decide(
+        'feature/zustand',
+        'Use Redux for the global state',
+        'Newer decision on this branch.',
+        60_000,
+      );
+      const r = await runPrePrompt(
+        { prompt: 'which library manages global state here', cwd: repo },
+        { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+      );
+      const ctx = r.hookSpecificOutput?.additionalContext ?? '';
+      expect(ctx).toContain('Newer decision on this branch.');
+      expect(ctx).not.toContain('Older decision on main.');
+    });
+
+    it('labels memories with their age and, from another branch, the branch', async () => {
+      decide(
+        'main',
+        'Use Zod for validation',
+        'All input validation goes through Zod schemas.',
+        2 * 86_400_000,
+      );
+      const r = await runPrePrompt(
+        { prompt: 'how should I add validation for this input', cwd: repo },
+        { db, config: ConfigSchema.parse({}), projectId: 'p1' },
+      );
+      expect(r.hookSpecificOutput?.additionalContext).toContain(
+        '[decision · 2 days ago · from main]',
+      );
+    });
   });
 });

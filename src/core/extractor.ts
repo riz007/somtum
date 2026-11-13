@@ -208,6 +208,11 @@ function transcriptPrompt(transcript: string, maxObservations: number): string {
   ].join('\n');
 }
 
+// Tokens every extraction call sends on top of the transcript itself.
+export function extractionOverheadTokens(maxObservations: number): number {
+  return countTokens(SYSTEM_PROMPT) + countTokens(transcriptPrompt('', maxObservations));
+}
+
 export interface ExtractOptions {
   model: string;
   maxObservations: number;

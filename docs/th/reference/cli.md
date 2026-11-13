@@ -8,6 +8,8 @@
 | `somtum init --no-cache` | บันทึกอย่างเดียว: เก็บความทรงจำแต่ไม่ฉีดเข้าพรอมต์ |
 | `somtum init --file-gating` | ติดตั้ง PreToolUse file-gating hook (ต้องเปิดเอง) และเปิดใช้สำหรับโปรเจกต์นี้ |
 | `somtum init --all` | ทุกอย่าง รวมถึง file gating |
+| `somtum backfill` | ดึงความทรงจำจากเซสชัน Claude Code และ Codex ที่ผ่านมา 5 เซสชันล่าสุดของโปรเจกต์นี้ แสดงจำนวนโทเคนของแต่ละเซสชันและถามก่อนเสมอ |
+| `somtum backfill --dry-run` | แสดงเซสชันและค่าใช้จ่ายโดยประมาณ ไม่ดึงข้อมูลจริง |
 | `somtum init --force` | ติดตั้งใหม่แม้ว่า hooks จะมีอยู่แล้ว |
 | `somtum init --agent codex` | ติดตั้งสำหรับ Codex: capture + auto-inject hooks ใน `.codex/hooks.json` และ MCP server ใน `.codex/config.toml` |
 | `somtum doctor` | ตรวจสอบการตั้งค่า: backend, hooks, ฐานข้อมูล, migration, ความทรงจำที่เก่า และ file gating คุ้มค่าหรือไม่ |
@@ -26,6 +28,7 @@
 | `somtum show <id>` | แสดงเนื้อหาเต็มของข้อสังเกต |
 | `somtum remember` | จัดเก็บข้อสังเกตด้วยตนเอง |
 | `somtum forget <id>` | ลบข้อสังเกตแบบ soft-delete ด้วย id |
+| `somtum forget --branch <name>` | ลบ (แบบ soft delete) ความทรงจำที่บันทึกบน git branch นั้น เช่น branch ทดลองที่เลิกใช้แล้ว |
 | `somtum forget --all` | ลบข้อสังเกต**ทั้งหมด**ในโปรเจกต์ปัจจุบันแบบ soft-delete |
 | `somtum edit <id>` | เปิดเนื้อหาข้อสังเกตใน `$EDITOR` |
 | `somtum rebuild` | สร้าง `index.md` ใหม่จากข้อสังเกตทั้งหมด |

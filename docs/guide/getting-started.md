@@ -115,11 +115,22 @@ Each failing check now shows an inline fix command. For example:
                API key:     export ANTHROPIC_API_KEY="sk-ant-..." >> ~/.zshrc && source ~/.zshrc
 ```
 
-### Step 3 — Work normally
+### Step 3 — Learn from past sessions (optional)
+
+If you've already used Claude Code or Codex in this project, start with what those sessions decided instead of an empty memory:
+
+```bash
+somtum backfill --dry-run   # list the 5 most recent sessions and what extracting them costs
+somtum backfill             # asks before sending anything
+```
+
+Sessions are processed oldest first and keep their original dates, so newer decisions win. Running it again skips what was already extracted.
+
+### Step 4 — Work normally
 
 Open Claude Code or Codex from the same directory where you ran `somtum init`. Work as usual. When the session ends, the hook extracts observations automatically in the background (capped at 90 seconds).
 
-### Step 4 — Check your memory
+### Step 5 — Check your memory
 
 ```bash
 # How many observations were captured?

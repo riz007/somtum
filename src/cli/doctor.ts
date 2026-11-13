@@ -4,6 +4,11 @@ import { GLOBAL_CONFIG_PATH, GLOBAL_DIR, loadConfig, projectPath } from '../conf
 import { PromptCache } from '../core/cache.js';
 import { appliedVersions, hasFts5, openDb } from '../core/db.js';
 import { TokenLedger } from '../core/ledger.js';
+import {
+  EMBEDDINGS_INSTALL_HINT,
+  EMBEDDINGS_PACKAGE,
+  embeddingsPackageInstalled,
+} from '../core/embeddings_xenova.js';
 import { pickBackend } from '../core/llm_backend.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { MemoryStore } from '../core/store.js';
@@ -153,12 +158,16 @@ export function runDoctor(opts: { cwd?: string } = {}): DoctorResult {
     checks.push({ name: 'cache_entries', ok: true, detail: `${cacheCount} entries` });
 
     // 11. Embeddings status
+    const embeddingsMissing = config.retrieval.embeddings.enabled && !embeddingsPackageInstalled();
     checks.push({
       name: 'embeddings',
-      ok: true,
-      detail: config.retrieval.embeddings.enabled
-        ? `enabled (model: ${config.retrieval.embeddings.model}) — run \`somtum reindex\` to embed missing`
-        : 'disabled (set retrieval.embeddings.enabled=true to enable)',
+      ok: !embeddingsMissing,
+      ...(embeddingsMissing ? { fix: [EMBEDDINGS_INSTALL_HINT] } : {}),
+      detail: embeddingsMissing
+        ? `enabled, but ${EMBEDDINGS_PACKAGE} is not installed`
+        : config.retrieval.embeddings.enabled
+          ? `enabled (model: ${config.retrieval.embeddings.model}) — run \`somtum reindex\` to embed missing`
+          : 'disabled (set retrieval.embeddings.enabled=true to enable)',
     });
 
     // 11. Extraction backend: Anthropic credentials, claude CLI or codex CLI

@@ -58,6 +58,22 @@ Extraction uses the first available of: the Anthropic API (`ANTHROPIC_API_KEY`, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Branches
+
+Each memory records the git branch and commit it was captured on. When recalling, Somtum leaves out memories from another branch that still exists and hasn't been merged into yours, so two branches that make different decisions don't contradict each other in your context.
+
+| Memory from | Recalled on your branch? |
+| --- | --- |
+| Your current branch | Yes |
+| The default branch (`main`, `master`) | Yes |
+| A branch merged into yours | Yes |
+| A deleted branch, or one whose upstream is gone (a merged pull request, including squash merges) | Yes |
+| Another branch that exists and isn't merged | No |
+| Another branch, captured before it had a commit of its own | No, until that branch is deleted |
+| Before 3.2, or outside a git repository | Yes |
+
+When two visible memories describe the same decision, only the newer is sent. Injected memories carry their age and, if they came from another branch, its name: `[decision · 3 days ago · from feature/zustand]`. A branch can only supersede its own memories, so an experiment can't overwrite a decision that still stands on `main`. For an abandoned branch, `somtum forget --branch <name>` drops its memories.
+
 ## What gets captured — an example
 
 You debug an auth bug and refactor a module. At session end, Somtum extracts something like:
@@ -128,7 +144,7 @@ Next session, in either agent, when you ask "why are we using pnpm?" or open `sr
 | **`bm25`** | Keyword search over title + body + tags (SQLite FTS5, no external dependencies) | Exact terms, offline setups | Near-zero |
 | **`embeddings`** | Semantic similarity using a 30 MB local ONNX model (bge-small-en-v1.5, fully in-process) | "What did we decide about auth?" style queries | ~5 ms at 10k memories |
 | **`index`** | Sends a compact memory catalog to Haiku; the model picks relevant IDs | Paraphrased or fuzzy queries | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings results merged and re-ranked by Haiku | General case (best recall) | BM25 + embeddings + 1 Haiku call |
+| **`hybrid`** | BM25 + embeddings, merged by reciprocal rank fusion | General case (best recall) | BM25 + embeddings, no model call |
 
 **Default is `bm25`** — works offline, no setup required. Enable `hybrid` once you have embeddings downloaded.
 
@@ -136,6 +152,7 @@ To switch strategy:
 
 ```bash
 # Enable semantic search (downloads 30 MB model once)
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 

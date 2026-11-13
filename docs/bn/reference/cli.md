@@ -8,6 +8,8 @@
 | `somtum init --no-cache` | শুধু ক্যাপচার: মেমরি সংরক্ষিত হয় কিন্তু প্রম্পটে ইনজেক্ট হয় না |
 | `somtum init --file-gating` | ঐচ্ছিক PreToolUse file-gating হুক ইনস্টল করে এবং এই প্রজেক্টে চালু করে |
 | `somtum init --all` | file gating সহ সবকিছু |
+| `somtum backfill` | এই প্রজেক্টের সাম্প্রতিক ৫টি পুরনো Claude Code ও Codex সেশন থেকে মেমরি এক্সট্র্যাক্ট করে। প্রতিটি সেশনের টোকেন খরচ দেখায় এবং আগে জিজ্ঞেস করে |
+| `somtum backfill --dry-run` | সেশন ও আনুমানিক খরচ দেখায়, কিছু এক্সট্র্যাক্ট করে না |
 | `somtum init --force` | হুক ইতিমধ্যে থাকলেও পুনরায় ইনস্টল করে |
 | `somtum init --agent codex` | Codex-এর জন্য ইনস্টল করে: `.codex/hooks.json`-এ capture + auto-inject হুক, `.codex/config.toml`-এ MCP server |
 | `somtum doctor` | সেটআপ পরীক্ষা: ব্যাকএন্ড, হুক, ডেটাবেস, মাইগ্রেশন, পুরনো মেমরি এবং file gating লাভজনক কিনা |
@@ -26,6 +28,7 @@
 | `somtum show <id>` | একটি পর্যবেক্ষণের পূর্ণ বডি প্রিন্ট করুন |
 | `somtum remember` | ম্যানুয়ালি একটি পর্যবেক্ষণ সংরক্ষণ করুন |
 | `somtum forget <id>` | id দ্বারা একটি পর্যবেক্ষণ soft-delete করুন |
+| `somtum forget --branch <name>` | একটি git branch-এ ধারণ করা মেমরি soft-delete করে, যেমন বাতিল করা পরীক্ষামূলক branch |
 | `somtum forget --all` | বর্তমান প্রজেক্টে **সমস্ত** পর্যবেক্ষণ soft-delete করুন |
 | `somtum edit <id>` | `$EDITOR`-এ একটি পর্যবেক্ষণের বডি খুলুন |
 | `somtum rebuild` | সমস্ত পর্যবেক্ষণ থেকে `index.md` পুনরায় তৈরি করুন |

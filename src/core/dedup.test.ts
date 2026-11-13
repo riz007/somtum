@@ -93,4 +93,86 @@ describe('deduplicateObservations', () => {
     expect(r.superseded).toBe(0);
     expect(r.pairs).toHaveLength(0);
   });
+
+  it('lets a branch supersede only its own memories', () => {
+    const onMain = store.insert({
+      project_id: 'p1',
+      session_id: 's1',
+      kind: 'decision',
+      title: 'Use Redux for global state',
+      body: 'b',
+      git_branch: 'main',
+    });
+    const onExperiment = store.insert({
+      project_id: 'p1',
+      session_id: 's2',
+      kind: 'decision',
+      title: 'Use Zustand for global state',
+      body: 'b',
+      git_branch: 'experiment',
+    });
+    const r = deduplicateObservations(db, 'p1', [onExperiment.id], { defaultBranch: 'main' });
+    expect(r.superseded).toBe(0);
+    expect(store.get(onMain.id)?.superseded_by).toBeNull();
+
+    const laterOnMain = store.insert({
+      project_id: 'p1',
+      session_id: 's3',
+      kind: 'decision',
+      title: 'Use Redux for global state',
+      body: 'b',
+      git_branch: 'main',
+    });
+    deduplicateObservations(db, 'p1', [laterOnMain.id], { defaultBranch: 'main' });
+    expect(store.get(onMain.id)?.superseded_by).toBe(laterOnMain.id);
+  });
+
+  it('supersedes memories without a branch only from the default branch', () => {
+    const legacy = obs('Use pnpm workspaces');
+    const fromFeature = store.insert({
+      project_id: 'p1',
+      session_id: 's2',
+      kind: 'decision',
+      title: 'Use pnpm workspaces',
+      body: 'b',
+      git_branch: 'feature/x',
+    });
+    deduplicateObservations(db, 'p1', [fromFeature.id], { defaultBranch: 'main' });
+    expect(store.get(legacy.id)?.superseded_by).toBeNull();
+
+    const fromMain = store.insert({
+      project_id: 'p1',
+      session_id: 's3',
+      kind: 'decision',
+      title: 'Use pnpm workspaces',
+      body: 'b',
+      git_branch: 'main',
+    });
+    deduplicateObservations(db, 'p1', [fromMain.id], { defaultBranch: 'main' });
+    expect(store.get(legacy.id)?.superseded_by).toBe(fromMain.id);
+  });
+
+  it('keeps the newer memory when a backfilled older session arrives later', () => {
+    const recent = store.insert({
+      project_id: 'p1',
+      session_id: 's-recent',
+      kind: 'decision',
+      title: 'Use Zustand for global state',
+      body: 'b',
+      git_branch: 'main',
+      created_at: Date.now(),
+    });
+    const backfilled = store.insert({
+      project_id: 'p1',
+      session_id: 's-old',
+      kind: 'decision',
+      title: 'Use Zustand for the global state',
+      body: 'b',
+      git_branch: 'main',
+      created_at: Date.now() - 30 * 86_400_000,
+    });
+    deduplicateObservations(db, 'p1', [backfilled.id], { defaultBranch: 'main' });
+    expect(store.get(backfilled.id)?.superseded_by).toBe(recent.id);
+    expect(store.get(recent.id)?.superseded_by).toBeNull();
+  });
 });

@@ -113,7 +113,7 @@
 | **`bm25`** | ค้นหาด้วยคีย์เวิร์ดในชื่อ + เนื้อหา + แท็ก (SQLite FTS5 ไม่ต้องการ dependency ภายนอก) | คำที่ตรงกันแน่นอน การตั้งค่าออฟไลน์ | เกือบเป็นศูนย์ |
 | **`embeddings`** | ความคล้ายคลึงเชิงความหมายโดยใช้โมเดล ONNX ในเครื่องขนาด 30 MB (bge-small-en-v1.5) | คิวรีแบบ "เราตัดสินใจเรื่อง auth อย่างไร?" | ~5 ms ที่ 10k ความทรงจำ |
 | **`index`** | ส่งแคตตาล็อกความทรงจำแบบย่อไปยัง Haiku โมเดลจะเลือก ID ที่เกี่ยวข้อง | คิวรีที่ถอดความหรือ fuzzy | 1 Haiku API call |
-| **`hybrid`** | ผล BM25 + embeddings รวมและจัดอันดับใหม่โดย Haiku | กรณีทั่วไป (การดึงข้อมูลที่ดีที่สุด) | BM25 + embeddings + 1 Haiku call |
+| **`hybrid`** | รวมผล BM25 + embeddings ด้วย reciprocal rank fusion | กรณีทั่วไป (ดึงข้อมูลได้ดีที่สุด) | BM25 + embeddings ไม่เรียกโมเดล |
 
 **ค่าเริ่มต้นคือ `bm25`** — ทำงานออฟไลน์ ไม่ต้องตั้งค่า เปิดใช้งาน `hybrid` เมื่อดาวน์โหลด embeddings แล้ว
 
@@ -121,6 +121,7 @@
 
 ```bash
 # เปิดใช้งาน semantic search (ดาวน์โหลดโมเดล 30 MB ครั้งเดียว)
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 

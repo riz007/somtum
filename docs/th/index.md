@@ -102,6 +102,7 @@ somtum config set retrieval.strategy bm25   # ตรงกับสิ่งท�
 หรือเปิดใช้งาน hybrid เต็มรูปแบบ (ต้องการ `ANTHROPIC_API_KEY`):
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 ```
 

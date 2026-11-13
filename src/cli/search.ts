@@ -38,6 +38,11 @@ export async function runSearch(opts: {
   const db = openDb({ path: dbPath });
   try {
     const retriever = makeRetriever(strategy, db, config);
+    if (retriever.name !== strategy) {
+      console.warn(
+        `[somtum] ${strategy} search is unavailable (run \`somtum doctor\` for why); used ${retriever.name}`,
+      );
+    }
     return await retriever.search(opts.query, { k, projectId });
   } finally {
     db.close();

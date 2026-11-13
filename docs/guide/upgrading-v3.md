@@ -7,6 +7,20 @@ npm install -g somtum@latest
 somtum doctor
 ```
 
+## From 3.1 to 3.2
+
+| Change | What you'll notice | Action |
+| --- | --- | --- |
+| Memories record the git branch and commit they came from | Decisions from unmerged parallel branches are no longer recalled; injected memories show their age and source branch | None. Memories captured before 3.2 have no branch and stay visible everywhere |
+| `somtum backfill` | Learn from recent past sessions instead of starting empty | Optional: `somtum backfill --dry-run` |
+| `somtum forget --branch <name>` | Drop an abandoned branch's memories in one step | None |
+| `@xenova/transformers` is an optional dependency | Installs are about 250 MB smaller and `npm audit` is clean | If you use embeddings, `npm install -g @xenova/transformers`. `somtum doctor` flags it |
+| Embeddings and hybrid search work from `somtum search`, the dashboard and MCP `recall` | Before 3.2 they failed with "No embedder configured" outside the hooks | None |
+| Upgraded to zod 4 | — | None |
+| The MCP server reports the real package version | — | None |
+| `somtum import` fills in `project_id` and `session_id`, and names the record and field when one is invalid | — | None |
+| The prompt header and `somtum stats` count injected tokens the same way | — | None |
+
 ## From 3.0 to 3.1
 
 3.1 is about cost: Somtum now meters every token it spends and stops spending where it can't pay off.

@@ -6,10 +6,11 @@ Config ระดับ global อยู่ที่ `~/.somtum/config.json` Conf
 
 ```bash
 # เปิดใช้งาน semantic search (embedding) — ดาวน์โหลดโมเดล 30 MB ครั้งเดียว
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 
-# เปลี่ยนเป็น hybrid retrieval (BM25 + embeddings + rerank) เพื่อการดึงข้อมูลที่ดีที่สุด
+# เปลี่ยนเป็น hybrid retrieval (BM25 + embeddings) เพื่อการดึงข้อมูลที่ดีที่สุด
 somtum config set retrieval.strategy hybrid
 
 # ใช้ LLM-based retrieval (ไม่ต้องการ embeddings ใช้ Haiku call หนึ่งครั้งต่อคิวรี)
@@ -99,7 +100,7 @@ somtum config set injection.max_chars 3000   # เพิ่มขีดจำก
 | **`bm25`** | ค้นหาด้วยคีย์เวิร์ด (SQLite FTS5 ไม่ต้องการ dependency) | คำที่ตรงกันแน่นอน การตั้งค่าออฟไลน์ | เกือบเป็นศูนย์ |
 | **`embeddings`** | ความคล้ายคลึงเชิงความหมาย โมเดล ONNX ในเครื่องขนาด 30 MB | "เราตัดสินใจเรื่อง auth อย่างไร?" | ~5 ms ที่ 10k ความทรงจำ |
 | **`index`** | Haiku เลือก ID ที่เกี่ยวข้องจากแคตตาล็อกแบบย่อ | คิวรีที่ถอดความหรือ fuzzy | 1 Haiku API call |
-| **`hybrid`** | BM25 + embeddings จัดอันดับใหม่โดย Haiku | กรณีทั่วไป (การดึงข้อมูลที่ดีที่สุด) | BM25 + embeddings + 1 Haiku call |
+| **`hybrid`** | รวมผล BM25 + embeddings ด้วย reciprocal rank fusion | กรณีทั่วไป (ดึงข้อมูลได้ดีที่สุด) | BM25 + embeddings ไม่เรียกโมเดล |
 
 ::: warning Hybrid ต้องการ embeddings
 การตั้ง `retrieval.strategy = "hybrid"` โดยไม่เปิดใช้งาน embeddings จะทำให้เปลี่ยนไปใช้ BM25 โดยอัตโนมัติ `somtum doctor` จะแสดงสิ่งนี้เป็น `strategy=hybrid` / `embeddings: disabled`
@@ -107,6 +108,7 @@ somtum config set injection.max_chars 3000   # เพิ่มขีดจำก
 เปิดใช้งาน embeddings ก่อนเสมอเมื่อใช้ hybrid:
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex   # ดาวน์โหลดโมเดล ONNX ~30 MB ครั้งเดียว
 somtum config set retrieval.strategy hybrid

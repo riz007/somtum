@@ -1,13 +1,32 @@
 // Xenova/transformers-backed embedder. Kept in its own module so the heavy
 // dynamic import only happens when embeddings are actually enabled.
 
+import { createRequire } from 'node:module';
 import { EMBEDDING_DIM, type Embedder, normalize } from './embeddings.js';
+
+// An optional peer dependency: most users never enable embeddings, and the
+// library pulls in onnxruntime and sharp (native image code) for everyone.
+export const EMBEDDINGS_PACKAGE = '@xenova/transformers';
+export const EMBEDDINGS_INSTALL_HINT = `npm install -g ${EMBEDDINGS_PACKAGE}`;
+
+export function embeddingsPackageInstalled(): boolean {
+  try {
+    createRequire(import.meta.url).resolve(EMBEDDINGS_PACKAGE);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function createXenovaEmbedder(
   modelName: string = 'Xenova/bge-small-en-v1.5',
 ): Promise<Embedder> {
-  // Dynamic import keeps startup lean; transformers pulls in ~30MB of deps.
-  const { pipeline } = (await import('@xenova/transformers')) as {
+  if (!embeddingsPackageInstalled()) {
+    throw new Error(
+      `Embeddings need ${EMBEDDINGS_PACKAGE}, which is not installed. Run: ${EMBEDDINGS_INSTALL_HINT}`,
+    );
+  }
+  const { pipeline } = (await import(EMBEDDINGS_PACKAGE)) as {
     pipeline: (
       task: string,
       model: string,

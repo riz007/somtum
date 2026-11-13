@@ -20,6 +20,8 @@ import {
 import { fingerprintFiles } from '../core/fingerprint.js';
 import { generateIndex } from '../core/index_gen.js';
 import { TokenLedger } from '../core/ledger.js';
+import { captureGit, type GitCapture } from '../core/git_context.js';
+import { scopeToBranch, newestOfDuplicates } from '../core/recall_filter.js';
 import { callerFor, NO_BACKEND_MESSAGE, pickBackend } from '../core/llm_backend.js';
 import { memoriesDir, writeMemoryMarkdown } from '../core/memory_files.js';
 import { projectNameFromCwd, resolveProjectId } from '../core/project_id.js';
@@ -72,10 +74,7 @@ function resolveTranscript(payload: HookPayload): ResolvedTranscript {
     raw = readFileSync(path, 'utf8');
   }
 
-  const turns = parseTranscript(raw);
-  // If the parser found structured turns, render them compactly for the extractor.
-  // Otherwise fall back to the raw string (plain-text transcript fixtures etc.).
-  return { text: turns.length > 0 ? renderTurns(turns) : raw, turns };
+  return readTranscript(raw);
 }
 
 function populateCache(
@@ -206,18 +205,19 @@ async function populateFileSummaries(
 
 // Write top-k memories to a warm-start file after PreCompact so the next
 // UserPromptSubmit can restore context into the fresh post-compaction session.
-function writeWarmStart(db: DB, projectId: string, k = 8): void {
+function writeWarmStart(db: DB, projectId: string, cwd: string, k = 8): void {
   try {
     const retriever = new Bm25Retriever(db);
     // Use a broad "recent" query — we want the most useful memories overall, not
     // query-specific ones, because we don't know what comes next.
     const results = retriever.search('recent decisions learnings bugs commands', {
-      k,
+      k: k * 2,
       projectId,
     });
     // retriever.search is async but Bm25Retriever is synchronous under the hood;
     // we await-via-then to stay non-blocking.
-    void Promise.resolve(results).then((hits) => {
+    void Promise.resolve(results).then((found) => {
+      const hits = newestOfDuplicates(scopeToBranch(found, cwd)).slice(0, k);
       if (hits.length === 0) return;
       const lines = hits
         .map((r) => `[${r.observation.kind}] ${r.observation.title}\n${r.observation.body}`)
@@ -239,7 +239,60 @@ function writeWarmStart(db: DB, projectId: string, k = 8): void {
   }
 }
 
+// Cap transcript size to stay within model context limits.
+// At ~4 chars/token, 60k tokens ≈ 240 KB of text. Anything beyond that
+// risks a context-limit error in Haiku; we take the tail (most recent turns).
+const MAX_TRANSCRIPT_TOKENS = 60_000;
+
+export interface ExtractionPlan {
+  transcript: string;
+  tokens: number;
+  resumeAt: number;
+  truncatedFrom: number | null;
+}
+
+// What an extraction of this session would send right now: only the turns not
+// yet extracted, capped to the most recent MAX_TRANSCRIPT_TOKENS. Shared with
+// `somtum backfill` so its cost preview matches what is actually sent.
+export function planExtraction(
+  db: DB,
+  sessionId: string,
+  resolved: ResolvedTranscript,
+): ExtractionPlan {
+  const resumeAt = new SessionProgressStore(db).resumeIndex(sessionId, resolved.turns);
+  const pendingText =
+    resolved.turns.length > 0 ? renderTurns(resolved.turns.slice(resumeAt)) : resolved.text;
+  const pendingTokens = countTokens(pendingText);
+  if (pendingTokens <= MAX_TRANSCRIPT_TOKENS) {
+    return { transcript: pendingText, tokens: pendingTokens, resumeAt, truncatedFrom: null };
+  }
+  // Characters per token varies with content (code is denser than prose), so
+  // shrink from the estimate until the measured count is under the cap.
+  let transcript = pendingText.slice(-MAX_TRANSCRIPT_TOKENS * 4);
+  let tokens = countTokens(transcript);
+  while (tokens > MAX_TRANSCRIPT_TOKENS) {
+    transcript = transcript.slice(
+      -Math.floor(transcript.length * (MAX_TRANSCRIPT_TOKENS / tokens) * 0.98),
+    );
+    tokens = countTokens(transcript);
+  }
+  return { transcript, tokens, resumeAt, truncatedFrom: pendingText.length };
+}
+
+// If the parser found structured turns, render them compactly for the extractor.
+// Otherwise fall back to the raw string (plain-text transcript fixtures etc.).
+export function readTranscript(raw: string): ResolvedTranscript {
+  const turns = parseTranscript(raw);
+  return { text: turns.length > 0 ? renderTurns(turns) : raw, turns };
+}
+
 export interface RunOptions {
+  // Branch and commit to record instead of reading them from git now; used
+  // when extracting a past session that ran on a different branch.
+  git?: GitCapture;
+  // When the session happened, if not now. Recency decides which of two
+  // conflicting memories wins, so a backfilled session must keep its date.
+  capturedAt?: number;
   cwd?: string;
   config?: Config;
   caller?: LlmCaller;
@@ -293,25 +346,13 @@ export async function runPostSession(
 
     // Only the turns not yet extracted for this session are sent: a session
     // that compacts and then ends is extracted once, not twice.
-    const resumeAt = progress.resumeIndex(sessionId, resolved.turns);
-    const pending = resolved.turns.slice(resumeAt);
-    const pendingText = resolved.turns.length > 0 ? renderTurns(pending) : resolved.text;
-
-    // Cap transcript size to stay within model context limits.
-    // At ~4 chars/token, 60k tokens ≈ 240 KB of text. Anything beyond that
-    // risks a context-limit error in Haiku; we take the tail (most recent turns).
-    const MAX_TRANSCRIPT_TOKENS = 60_000;
-    const transcript =
-      countTokens(pendingText) > MAX_TRANSCRIPT_TOKENS
-        ? (() => {
-            const charBudget = MAX_TRANSCRIPT_TOKENS * 4;
-            hookLog(
-              `[post_session] WARN: transcript truncated to last ~${charBudget} chars (was ${pendingText.length})`,
-            );
-            return pendingText.slice(-charBudget);
-          })()
-        : pendingText;
-    const transcriptTokens = countTokens(transcript);
+    const plan = planExtraction(db, sessionId, resolved);
+    const { transcript, resumeAt, tokens: transcriptTokens } = plan;
+    if (plan.truncatedFrom !== null) {
+      hookLog(
+        `[post_session] WARN: transcript truncated to last ~${MAX_TRANSCRIPT_TOKENS * 4} chars (was ${plan.truncatedFrom})`,
+      );
+    }
 
     let extraction: RunResult['extraction'] = resumeAt > 0 ? 'incremental' : 'full';
     let outcome: Awaited<ReturnType<typeof extract>> = {
@@ -347,6 +388,7 @@ export async function runPostSession(
     }
 
     const total = outcome.observations.length;
+    const gitInfo = opts.git ?? captureGit(cwd);
     // Divide extraction cost across observations so per-observation tokens_spent adds up.
     const perObsSpend = total > 0 ? Math.floor(outcome.tokensSpent / total) : 0;
 
@@ -369,6 +411,10 @@ export async function runPostSession(
           tags: obs.tags,
           tokens_saved: saved,
           tokens_spent: perObsSpend,
+          git_branch: gitInfo.branch,
+          git_commit: gitInfo.commit,
+          git_before_first_commit: gitInfo.beforeFirstCommit,
+          ...(opts.capturedAt !== undefined ? { created_at: Math.round(opts.capturedAt) } : {}),
         },
         { redactPatterns: config.privacy.redact_patterns },
       );
@@ -383,7 +429,9 @@ export async function runPostSession(
     }
 
     // M10: deduplicate — mark near-duplicate observations from prior sessions as superseded.
-    const dedupResult = deduplicateObservations(db, projectId, insertedIds);
+    const dedupResult = deduplicateObservations(db, projectId, insertedIds, {
+      defaultBranch: gitInfo.defaultBranch,
+    });
 
     const tokensSavedTotal = store.totalTokensSaved(projectId);
 
@@ -416,7 +464,7 @@ export async function runPostSession(
     });
 
     if (parsed.hook_event_name === 'PreCompact') {
-      writeWarmStart(db, projectId);
+      writeWarmStart(db, projectId, cwd);
     }
 
     // Summaries are optional work: run them last, and only while the hook's

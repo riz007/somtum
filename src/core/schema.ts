@@ -30,6 +30,9 @@ export const ObservationSchema = z.object({
   deleted_at: z.number().int().nullable(),
   scope: ObservationScope.default('project'),
   last_confirmed_at: z.number().int().nullable(),
+  git_branch: z.string().nullable().default(null),
+  git_commit: z.string().nullable().default(null),
+  git_before_first_commit: z.boolean().default(false),
 });
 export type Observation = z.infer<typeof ObservationSchema>;
 
@@ -46,6 +49,9 @@ export const ObservationInputSchema = z.object({
   tokens_saved: z.number().int().nonnegative().default(0),
   tokens_spent: z.number().int().nonnegative().default(0),
   scope: ObservationScope.default('project'),
+  git_branch: z.string().nullable().optional(),
+  git_commit: z.string().nullable().optional(),
+  git_before_first_commit: z.boolean().optional(),
 });
 export type ObservationInput = z.input<typeof ObservationInputSchema>;
 
@@ -128,7 +134,7 @@ export const ConfigSchema = z.object({
       // smaller than this. The turns are kept and sent with the next extraction.
       min_new_tokens: z.number().int().nonnegative().default(500),
     })
-    .default({}),
+    .prefault({}),
   cache: z
     .object({
       enabled: z.boolean().default(true),
@@ -137,27 +143,27 @@ export const ConfigSchema = z.object({
       max_entries: z.number().int().positive().default(10_000),
       ttl_days: z.number().int().positive().default(90),
     })
-    .default({}),
+    .prefault({}),
   retrieval: z
     .object({
       strategy: RetrievalStrategy.default('bm25'),
       k: z.number().int().positive().default(8),
       rerank_model: z.string().default('claude-haiku-4-5-20251001'),
-      bm25: z.object({ enabled: z.boolean().default(true) }).default({}),
+      bm25: z.object({ enabled: z.boolean().default(true) }).prefault({}),
       embeddings: z
         .object({
           enabled: z.boolean().default(false),
           model: z.string().default('Xenova/bge-small-en-v1.5'),
         })
-        .default({}),
+        .prefault({}),
       index: z
         .object({
           enabled: z.boolean().default(false),
           model: z.string().default('claude-haiku-4-5-20251001'),
         })
-        .default({}),
+        .prefault({}),
     })
-    .default({}),
+    .prefault({}),
   file_gating: z
     .object({
       // Opt-in: summaries cost extraction tokens and only pay off when the
@@ -166,7 +172,7 @@ export const ConfigSchema = z.object({
       min_file_size_tokens: z.number().int().positive().default(300),
       exclude_globs: z.array(z.string()).default(['**/*.env', '**/secrets/**']),
     })
-    .default({}),
+    .prefault({}),
   privacy: z
     .object({
       telemetry: z.boolean().default(false),
@@ -180,14 +186,14 @@ export const ConfigSchema = z.object({
           'AKIA[0-9A-Z]{16}',
         ]),
     })
-    .default({}),
+    .prefault({}),
   sync: z
     .object({
       enabled: z.boolean().default(false),
       backend: z.string().default('ssh'),
       remote: z.string().nullable().default(null),
     })
-    .default({}),
+    .prefault({}),
   injection: z
     .object({
       enabled: z.boolean().default(true),
@@ -201,13 +207,13 @@ export const ConfigSchema = z.object({
       // Prepend a one-line token budget summary to every injection.
       show_budget: z.boolean().default(true),
     })
-    .default({}),
+    .prefault({}),
   diagnostics: z
     .object({
       // Set false to suppress the auto-doctor check after a zero-memory first session.
       first_session_check: z.boolean().default(true),
     })
-    .default({}),
+    .prefault({}),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 export type ConfigInput = z.input<typeof ConfigSchema>;

@@ -30,6 +30,9 @@ interface ObservationRow {
   deleted_at: number | null;
   scope: ObservationScope;
   last_confirmed_at: number | null;
+  git_branch: string | null;
+  git_commit: string | null;
+  git_before_first_commit: number | null;
 }
 
 function rowToObservation(row: ObservationRow): Observation {
@@ -50,6 +53,9 @@ function rowToObservation(row: ObservationRow): Observation {
     deleted_at: row.deleted_at,
     scope: row.scope ?? 'project',
     last_confirmed_at: row.last_confirmed_at ?? null,
+    git_branch: row.git_branch ?? null,
+    git_commit: row.git_commit ?? null,
+    git_before_first_commit: row.git_before_first_commit === 1,
   });
 }
 
@@ -77,8 +83,8 @@ export class MemoryStore {
           `INSERT INTO observations
              (id, project_id, session_id, kind, title, body, files, tags,
               created_at, tokens_saved, tokens_spent, superseded_by, embedding, deleted_at,
-              scope, last_confirmed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL)`,
+              scope, last_confirmed_at, git_branch, git_commit, git_before_first_commit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, ?, ?, ?)`,
         )
         .run(
           id,
@@ -93,6 +99,9 @@ export class MemoryStore {
           parsed.tokens_saved,
           parsed.tokens_spent,
           scope,
+          parsed.git_branch ?? null,
+          parsed.git_commit ?? null,
+          parsed.git_before_first_commit ? 1 : 0,
         );
     });
     txn.immediate();

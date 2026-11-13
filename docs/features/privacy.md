@@ -4,7 +4,7 @@
 
 Somtum is designed to keep your data local and safe.
 
-**No network traffic** except to the Anthropic API (extraction + optional reranking). The embedding model runs fully local via ONNX Runtime in-process — no data is sent to Hugging Face or any other server at inference time.
+**No network traffic** except to the Anthropic API (extraction, and the optional `index` retrieval strategy). The embedding model runs fully local via ONNX Runtime in-process — no data is sent to Hugging Face or any other server at inference time.
 
 **Redaction at capture time.** `privacy.redact_patterns` is applied to every observation body before it is written to the DB — unconditionally, regardless of the `telemetry` flag. Default patterns cover:
 

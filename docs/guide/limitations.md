@@ -16,27 +16,25 @@ Somtum is production-ready, but it has real trade-offs worth knowing before you 
 
 ## BM25 can't find semantically similar memories
 
-**The problem:** The default retrieval strategy is BM25 — keyword matching over SQLite FTS5. It's fast and offline, but it's purely lexical. A memory titled _"migrated from Jest to Vitest"_ will **not** surface when you ask _"why did we switch test runners?"_ because no words overlap.
+**The problem:** The default retrieval is BM25, keyword matching over SQLite FTS5. It's fast and offline, but purely lexical: a memory titled _"migrated from Jest to Vitest"_ will **not** surface when you ask _"why did we switch test runners?"_, because no words overlap. Automatic recall on each prompt always uses BM25, to stay fast.
 
-**What to do:**
-
-Enable hybrid retrieval (BM25 + embeddings + Haiku rerank):
+**What to do:** for `somtum search` and the MCP `recall` tool, install the embedding library and switch on hybrid retrieval, which fuses keyword and embedding rankings (reciprocal rank fusion, no model call):
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, ~250 MB of native code
 somtum config set retrieval.embeddings.enabled true
-somtum reindex   # downloads ~30 MB ONNX model once
+somtum reindex                        # downloads a ~30 MB model once
 somtum config set retrieval.strategy hybrid
 ```
 
-If you don't want the model download, the `index` strategy uses Haiku to read the memory catalog and pick relevant IDs — slower but semantic:
+If the library isn't installed, these strategies fall back to BM25, `somtum search` says so, and `somtum doctor` shows the install command.
+
+The `index` strategy is the other option: Haiku reads the memory catalog and picks relevant IDs. It costs one model call per query and needs `ANTHROPIC_API_KEY`:
 
 ```bash
+somtum config set retrieval.index.enabled true
 somtum config set retrieval.strategy index
 ```
-
-::: warning Hybrid requires embeddings enabled
-Setting `strategy=hybrid` without enabling embeddings causes a silent fallback to BM25 while paying hybrid overhead. Run `somtum doctor` to catch this.
-:::
 
 ---
 
@@ -98,6 +96,18 @@ somtum purge --older-than 60d
 ```
 
 Consider a monthly pruning pass on long-lived projects.
+
+---
+
+## Branch awareness relies on how branches end
+
+**The problem:** Somtum can't tell an abandoned branch from a merged one once the branch is gone. A branch that was deleted (locally, or upstream after a pull request) is treated as merged and its memories become visible everywhere, because that is what usually happened. It also only knows the branch a session ended on, so a session that switched branches midway is attributed to the last one.
+
+**What to do:** before deleting a branch you abandoned, drop its memories:
+
+```bash
+somtum forget --branch experiment/redux
+```
 
 ---
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -185,7 +186,20 @@ describe('MCP server', () => {
         arguments: { query: '' },
       })) as { isError?: boolean; content: { type: string; text?: string }[] };
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toMatch(/at least 1 character/);
+      expect(result.content[0]?.text).toMatch(/query/);
+      expect(result.content[0]?.text).toMatch(/too_small/);
+    } finally {
+      await close();
+    }
+  });
+
+  it('reports the package version in serverInfo', async () => {
+    const { client, close } = await start();
+    try {
+      const { version } = JSON.parse(
+        readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+      ) as { version: string };
+      expect(client.getServerVersion()?.version).toBe(version);
     } finally {
       await close();
     }

@@ -4,6 +4,7 @@ import { openDb } from '../core/db.js';
 import { MemoryStore } from '../core/store.js';
 import { resolveProjectId } from '../core/project_id.js';
 import { projectDir } from '../config.js';
+import type { z } from 'zod';
 import { ObservationInputSchema } from '../core/schema.js';
 
 function parseJsonl(raw: string): unknown[] {
@@ -11,7 +12,19 @@ function parseJsonl(raw: string): unknown[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line));
+    .map((line, i) => {
+      try {
+        return JSON.parse(line) as unknown;
+      } catch {
+        throw new Error(`line ${i + 1} is not valid JSON`);
+      }
+    });
+}
+
+function describeIssues(issues: z.core.$ZodIssue[]): string {
+  return issues
+    .map((issue) => `${issue.path.length > 0 ? issue.path.join('.') : 'record'}: ${issue.message}`)
+    .join('; ');
 }
 
 export interface ImportResult {
@@ -45,10 +58,16 @@ export function runImport(opts: {
   try {
     const store = new MemoryStore(db);
 
-    for (const item of items) {
-      const parsed = ObservationInputSchema.safeParse(item);
+    for (const [index, item] of items.entries()) {
+      // Exports from another machine or tool often omit these; neither is
+      // needed to make a memory useful in this project.
+      const record =
+        item !== null && typeof item === 'object' && !Array.isArray(item)
+          ? { project_id: projectId, session_id: 'import', ...item }
+          : item;
+      const parsed = ObservationInputSchema.safeParse(record);
       if (!parsed.success) {
-        result.errors.push(parsed.error.message);
+        result.errors.push(`record ${index + 1}: ${describeIssues(parsed.error.issues)}`);
         result.skipped += 1;
         continue;
       }

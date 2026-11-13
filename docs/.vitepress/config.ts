@@ -5,7 +5,7 @@ const enNav = [
   { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
   { text: 'Troubleshooting', link: '/troubleshooting' },
   {
-    text: 'v3.1.0',
+    text: 'v3.2.0',
     items: [
       { text: 'Changelog', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -55,7 +55,7 @@ const thNav = [
   { text: 'เอกสารอ้างอิง', link: '/th/reference/cli', activeMatch: '/th/reference/' },
   { text: 'การแก้ปัญหา', link: '/th/troubleshooting' },
   {
-    text: 'v3.1.0',
+    text: 'v3.2.0',
     items: [
       { text: 'บันทึกการเปลี่ยนแปลง', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },
@@ -105,7 +105,7 @@ const bnNav = [
   { text: 'রেফারেন্স', link: '/bn/reference/cli', activeMatch: '/bn/reference/' },
   { text: 'সমস্যা সমাধান', link: '/bn/troubleshooting' },
   {
-    text: 'v3.1.0',
+    text: 'v3.2.0',
     items: [
       { text: 'পরিবর্তনলগ', link: 'https://github.com/riz007/somtum/blob/main/CHANGELOG.md' },
       { text: 'npm', link: 'https://www.npmjs.com/package/somtum' },

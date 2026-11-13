@@ -20,7 +20,7 @@ export const PreReadPayloadSchema = z.object({
       offset: z.number().optional(),
       limit: z.number().optional(),
     })
-    .passthrough()
+    .loose()
     .optional(),
   cwd: z.string().optional(),
   project_id: z.string().optional(),

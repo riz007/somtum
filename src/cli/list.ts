@@ -56,6 +56,7 @@ export function listCommand(opts: {
             files: o.files,
             tags: o.tags,
             created_at: o.created_at,
+            git_branch: o.git_branch,
           })),
           null,
           2,
@@ -65,14 +66,15 @@ export function listCommand(opts: {
     }
 
     if (observations.length === 0) {
-      console.log('No memories stored yet. Run a Claude session to capture observations.');
+      console.log('No memories stored yet. They are captured when an agent session ends or compacts.');
       return 0;
     }
 
     for (const o of observations) {
       const date = new Date(o.created_at).toISOString().slice(0, 10);
       const files = o.files.length > 0 ? `  [${o.files.slice(0, 2).join(', ')}]` : '';
-      console.log(`${o.id}  ${o.kind.padEnd(12)}  ${date}  ${o.title}${files}`);
+      const branch = o.git_branch ? `  (${o.git_branch})` : '';
+      console.log(`${o.id}  ${o.kind.padEnd(12)}  ${date}  ${o.title}${branch}${files}`);
     }
     return 0;
   } finally {

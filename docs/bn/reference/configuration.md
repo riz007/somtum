@@ -6,10 +6,11 @@
 
 ```bash
 # সিমান্টিক (এমবেডিং-ভিত্তিক) অনুসন্ধান সক্ষম করুন — একবার একটি ৩০ MB মডেল ডাউনলোড করে
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex
 
-# সর্বোত্তম রিকলের জন্য হাইব্রিড রিট্রিভালে (BM25 + embeddings + rerank) পরিবর্তন করুন
+# সর্বোত্তম রিকলের জন্য হাইব্রিড রিট্রিভালে (BM25 + embeddings) পরিবর্তন করুন
 somtum config set retrieval.strategy hybrid
 
 # LLM-ভিত্তিক রিট্রিভাল ব্যবহার করুন (এমবেডিং প্রয়োজন নেই, প্রতি কোয়েরিতে একটি Haiku কল খরচ করে)
@@ -99,7 +100,7 @@ somtum config set injection.max_chars 3000   # ইনজেকশন সাই�
 | **`bm25`** | কীওয়ার্ড অনুসন্ধান (SQLite FTS5, কোনো নির্ভরতা নেই) | সঠিক শব্দ, অফলাইন সেটআপ | প্রায় শূন্য |
 | **`embeddings`** | সিমান্টিক সিমিলারিটি, স্থানীয় ৩০ MB ONNX মডেল | "auth সম্পর্কে আমরা কী সিদ্ধান্ত নিয়েছিলাম?" | ~৫ ms ১০k মেমরিতে |
 | **`index`** | Haiku একটি কম্প্যাক্ট ক্যাটালগ থেকে প্রাসঙ্গিক ID বেছে নেয় | প্যারাফ্রেজড বা ফাজি কোয়েরি | ১টি Haiku API কল |
-| **`hybrid`** | BM25 + embeddings, Haiku দ্বারা পুনরায় র‍্যাংক করা | সাধারণ ক্ষেত্রে (সর্বোত্তম রিকল) | BM25 + embeddings + ১টি Haiku কল |
+| **`hybrid`** | BM25 + embeddings, reciprocal rank fusion দিয়ে একত্রিত | সাধারণ ক্ষেত্রে (সেরা রিকল) | BM25 + embeddings, কোনো মডেল কল নয় |
 
 ::: warning হাইব্রিডের জন্য এমবেডিং প্রয়োজন
 এমবেডিং সক্ষম না করে `retrieval.strategy = "hybrid"` সেট করলে BM25-এ চুপচাপ ফলব্যাক হয়। `somtum doctor` এটিকে `strategy=hybrid` / `embeddings: disabled` হিসেবে দেখাবে।
@@ -107,6 +108,7 @@ somtum config set injection.max_chars 3000   # ইনজেকশন সাই�
 হাইব্রিড ব্যবহার করার সময় সর্বদা প্রথমে এমবেডিং সক্ষম করুন:
 
 ```bash
+npm install -g @xenova/transformers   # optional dependency, needed once
 somtum config set retrieval.embeddings.enabled true
 somtum reindex   # একবার ~৩০ MB ONNX মডেল ডাউনলোড করে
 somtum config set retrieval.strategy hybrid
